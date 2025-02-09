@@ -4,3 +4,6 @@
 [submodule "source/backend/Harmonia"]
 	path = source/backend/Harmonia
 	url = https://github.com/DaphneWebFramework/Harmonia.git
+[submodule "source/backend/Peneus"]
+	path = source/backend/Peneus
+	url = https://github.com/DaphneWebFramework/Peneus.git
