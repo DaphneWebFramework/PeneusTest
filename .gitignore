@@ -1,0 +1,6 @@
+__MACOSX
+.DS_Store
+/.vscode/
+/.vagrant/
+/Vagrant*
+/Submodule*.bat
