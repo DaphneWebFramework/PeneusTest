@@ -1,8 +1,8 @@
-# TemplateLibraryTest
+# PeneusTest
 
-[![Backend Tests](https://github.com/DaphneWebFramework/TemplateLibraryTest/actions/workflows/test-backend.yml/badge.svg)](https://github.com/DaphneWebFramework/TemplateLibraryTest/actions/workflows/test-backend.yml)
+[![Backend Tests](https://github.com/DaphneWebFramework/PeneusTest/actions/workflows/test-backend.yml/badge.svg)](https://github.com/DaphneWebFramework/PeneusTest/actions/workflows/test-backend.yml)
 
-This repository contains tests for the [TemplateLibrary](https://github.com/DaphneWebFramework/TemplateLibrary) library.
+This repository contains tests for the [Peneus](https://github.com/DaphneWebFramework/Peneus) library.
 
 ## License
 
