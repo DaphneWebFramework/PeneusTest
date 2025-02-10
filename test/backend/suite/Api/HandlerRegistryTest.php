@@ -50,7 +50,7 @@ class HandlerRegistryTest extends TestCase
         $handlerRegistry = HandlerRegistry::Instance();
         $handlerRegistry->RegisterHandler('test', DummyHandler::class);
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Handler already registered.');
+        $this->expectExceptionMessage('Handler already registered: test');
         $handlerRegistry->RegisterHandler('test', DummyHandler::class);
     }
 
@@ -59,7 +59,7 @@ class HandlerRegistryTest extends TestCase
         $handlerRegistry = HandlerRegistry::Instance();
         $handlerRegistry->RegisterHandler('test', DummyHandler::class);
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Handler already registered.');
+        $this->expectExceptionMessage('Handler already registered: test');
         $handlerRegistry->RegisterHandler('test', NotAnIHandler::class);
     }
 
@@ -68,7 +68,7 @@ class HandlerRegistryTest extends TestCase
         $handlerRegistry = HandlerRegistry::Instance();
         $handlerRegistry->RegisterHandler('test', DummyHandler::class);
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Handler already registered.');
+        $this->expectExceptionMessage('Handler already registered: test');
         $handlerRegistry->RegisterHandler('TEST', DummyHandler::class);
     }
 
@@ -76,7 +76,7 @@ class HandlerRegistryTest extends TestCase
     {
         $handlerRegistry = HandlerRegistry::Instance();
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Handler class not found.');
+        $this->expectExceptionMessage('Handler class not found: NonExistingClass');
         $handlerRegistry->RegisterHandler('test', 'NonExistingClass');
     }
 
@@ -84,7 +84,8 @@ class HandlerRegistryTest extends TestCase
     {
         $handlerRegistry = HandlerRegistry::Instance();
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Handler class must implement IHandler interface.');
+        $this->expectExceptionMessage(
+            'Handler class must implement IHandler interface: NotAnIHandler');
         $handlerRegistry->RegisterHandler('test', NotAnIHandler::class);
     }
 
