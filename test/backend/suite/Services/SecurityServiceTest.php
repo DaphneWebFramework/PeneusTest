@@ -4,6 +4,7 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Services\SecurityService;
 
+use \Peneus\Services\CsrfToken;
 use \TestToolkit\AccessHelper;
 
 #[CoversClass(SecurityService::class)]
@@ -78,35 +79,52 @@ class SecurityServiceTest extends TestCase
         $securityService = new SecurityService();
         $csrfToken = $securityService->GenerateCsrfToken();
         $this->assertMatchesRegularExpression(
-            self::TOKEN_PATTERN, $csrfToken->token);
+            self::TOKEN_PATTERN, $csrfToken->Token());
         $this->assertMatchesRegularExpression(
-            self::CSRF_TOKEN_COOKIE_VALUE_PATTERN, $csrfToken->cookieValue);
+            self::CSRF_TOKEN_COOKIE_VALUE_PATTERN, $csrfToken->CookieValue());
         $deobfuscatedCookieValue = AccessHelper::CallNonPublicMethod(
-            $securityService, 'deobfuscate', [$csrfToken->cookieValue]);
-        $this->assertTrue(\password_verify($csrfToken->token, $deobfuscatedCookieValue));
+            $securityService, 'deobfuscate', [$csrfToken->CookieValue()]);
+        $this->assertTrue(\password_verify($csrfToken->Token(),
+                                           $deobfuscatedCookieValue));
     }
 
     #endregion GenerateCsrfToken
 
     #region VerifyCsrfToken ----------------------------------------------------
 
-    function testVerifyCsrfTokenWithInvalidToken()
+    function testVerifyCsrfTokenWithEmptyTokenAndEmptyCookieValue()
     {
         $securityService = new SecurityService();
-        $csrfToken = $securityService->GenerateCsrfToken();
-        $csrfToken->token = 'invalid';
+        $csrfToken = new CsrfToken('', '');
         $this->assertFalse($securityService->VerifyCsrfToken($csrfToken));
     }
 
-    function testVerifyCsrfTokenWithInvalidCookieValue()
+    function testVerifyCsrfTokenWithInvalidTokenAndInvalidCookieValue()
     {
         $securityService = new SecurityService();
-        $csrfToken = $securityService->GenerateCsrfToken();
-        $csrfToken->cookieValue = 'invalid';
+        $csrfToken = new CsrfToken('invalid', 'invalid');
         $this->assertFalse($securityService->VerifyCsrfToken($csrfToken));
     }
 
-    function testVerifyCsrfTokenWithValidTokenAndCookieValue()
+    function testVerifyCsrfTokenWithValidTokenAndEmptyCookieValue()
+    {
+        $securityService = new SecurityService();
+        $csrfToken = new CsrfToken($securityService->GenerateToken(), '');
+        $this->assertFalse($securityService->VerifyCsrfToken($csrfToken));
+    }
+
+    function testVerifyCsrfTokenWithValidTokenAndInvalidCookieValue()
+    {
+        $securityService = new SecurityService();
+        // Odd number of characters.
+        $csrfToken = new CsrfToken($securityService->GenerateToken(), 'invalid');
+        $this->assertFalse($securityService->VerifyCsrfToken($csrfToken));
+        // Even number of characters.
+        $csrfToken = new CsrfToken($securityService->GenerateToken(), 'invalid0');
+        $this->assertFalse($securityService->VerifyCsrfToken($csrfToken));
+    }
+
+    function testVerifyCsrfTokenWithValidTokenAndValidCookieValue()
     {
         $securityService = new SecurityService();
         $csrfToken = $securityService->GenerateCsrfToken();
