@@ -63,8 +63,8 @@ class TokenGuardTest extends TestCase
         $securityService->expects($this->once())
             ->method('VerifyCsrfToken')
             ->with($this->callback(function($csrfToken) {
-                return $csrfToken->Token() === '123456' &&
-                    $csrfToken->CookieValue() === 'invalid';
+                return $csrfToken->Token() === '123456'
+                    && $csrfToken->CookieValue() === 'invalid';
             }))
             ->willReturn(false);
         $tokenGuard = new TokenGuard('123456', 'my_cookie');
@@ -86,8 +86,8 @@ class TokenGuardTest extends TestCase
         $securityService->expects($this->once())
             ->method('VerifyCsrfToken')
             ->with($this->callback(function($csrfToken) {
-                return $csrfToken->Token() === '123456' &&
-                    $csrfToken->CookieValue() === 'valid';
+                return $csrfToken->Token() === '123456'
+                    && $csrfToken->CookieValue() === 'valid';
             }))
             ->willReturn(true);
         $tokenGuard = new TokenGuard('123456', 'my_cookie');

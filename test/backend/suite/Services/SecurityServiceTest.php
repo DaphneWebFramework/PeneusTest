@@ -4,7 +4,7 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Services\SecurityService;
 
-use \Peneus\Services\CsrfToken;
+use \Peneus\Services\Model\CsrfToken;
 use \TestToolkit\AccessHelper;
 
 #[CoversClass(SecurityService::class)]
