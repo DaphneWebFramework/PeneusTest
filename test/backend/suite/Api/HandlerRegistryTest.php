@@ -9,7 +9,7 @@ use \Peneus\Api\Handlers\IHandler;
 class NotAnIHandler {
 }
 class DummyHandler implements IHandler {
-    public function ProcessAction(string $actionName): mixed {}
+    public function HandleAction(string $actionName): mixed {}
 }
 
 #[CoversClass(HandlerRegistry::class)]

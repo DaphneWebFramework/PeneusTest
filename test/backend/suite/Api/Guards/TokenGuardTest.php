@@ -28,9 +28,9 @@ class TokenGuardTest extends TestCase
         SecurityService::ReplaceInstance($this->originalSecurityService);
     }
 
-    #region Authorize ----------------------------------------------------------
+    #region Verify -------------------------------------------------------------
 
-    function testAuthorizeWithMissingCookie()
+    function testVerifyWithMissingCookie()
     {
         $cookies = $this->createMock(CArray::class);
         $cookies->expects($this->once())
@@ -45,10 +45,10 @@ class TokenGuardTest extends TestCase
         $securityService->expects($this->never())
             ->method('VerifyCsrfToken');
         $tokenGuard = new TokenGuard('token', 'my_cookie');
-        $this->assertFalse($tokenGuard->Authorize());
+        $this->assertFalse($tokenGuard->Verify());
     }
 
-    function testAuthorizeWithInvalidCookie()
+    function testVerifyWithInvalidCookie()
     {
         $cookies = $this->createMock(CArray::class);
         $cookies->expects($this->once())
@@ -68,10 +68,10 @@ class TokenGuardTest extends TestCase
             }))
             ->willReturn(false);
         $tokenGuard = new TokenGuard('123456', 'my_cookie');
-        $this->assertFalse($tokenGuard->Authorize());
+        $this->assertFalse($tokenGuard->Verify());
     }
 
-    function testAuthorizeWithValidCookie()
+    function testVerifyWithValidCookie()
     {
         $cookies = $this->createMock(CArray::class);
         $cookies->expects($this->once())
@@ -91,8 +91,8 @@ class TokenGuardTest extends TestCase
             }))
             ->willReturn(true);
         $tokenGuard = new TokenGuard('123456', 'my_cookie');
-        $this->assertTrue($tokenGuard->Authorize());
+        $this->assertTrue($tokenGuard->Verify());
     }
 
-    #endregion Authorize
+    #endregion Verify
 }

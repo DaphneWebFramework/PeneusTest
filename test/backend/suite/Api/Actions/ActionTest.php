@@ -7,68 +7,68 @@ use \Peneus\Api\Actions\Action;
 use \Peneus\Api\Guards\IGuard;
 
 class DummyAction extends Action {
-    protected function perform(): mixed { return 42; }
+    protected function onExecute(): mixed { return 42; }
 }
 
 #[CoversClass(Action::class)]
 class ActionTest extends TestCase
 {
-    function testRunWithoutGuards()
+    function testExecuteWithoutGuards()
     {
         $action = new DummyAction();
-        $this->assertSame(42, $action->Run());
+        $this->assertSame(42, $action->Execute());
     }
 
-    function testRunWithGuardsWhenFirstGuardDoesNotAuthorize()
+    function testExecuteWithGuardsWhenFirstGuardDoesNotVerify()
     {
         $guard1 = $this->createMock(IGuard::class);
         $guard1->expects($this->once())
-            ->method('Authorize')
+            ->method('Verify')
             ->willReturn(false);
         $guard2 = $this->createMock(IGuard::class);
         $guard2->expects($this->never())
-            ->method('Authorize');
+            ->method('Verify');
         $action = new DummyAction();
         $action->AddGuard($guard1)
                ->AddGuard($guard2);
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('You do not have permission to perform this action.');
+        $this->expectExceptionMessage('You do not have permission to execute this action.');
         $this->expectExceptionCode(401);
-        $action->Run();
+        $action->Execute();
     }
 
-    function testRunWithGuardsWhenSecondGuardDoesNotAuthorize()
+    function testExecuteWithGuardsWhenSecondGuardDoesNotVerify()
     {
         $guard1 = $this->createMock(IGuard::class);
         $guard1->expects($this->once())
-            ->method('Authorize')
+            ->method('Verify')
             ->willReturn(true);
         $guard2 = $this->createMock(IGuard::class);
         $guard2->expects($this->once())
-            ->method('Authorize')
+            ->method('Verify')
             ->willReturn(false);
         $action = new DummyAction();
         $action->AddGuard($guard1)
                ->AddGuard($guard2);
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('You do not have permission to perform this action.');
+        $this->expectExceptionMessage('You do not have permission to execute this action.');
         $this->expectExceptionCode(401);
-        $action->Run();
+        $action->Execute();
     }
 
-    function testRunWithGuardsWhenAllGuardsAuthorize()
+    function testExecuteWithGuardsWhenAllGuardsVerify()
     {
         $guard1 = $this->createMock(IGuard::class);
         $guard1->expects($this->once())
-            ->method('Authorize')
+            ->method('Verify')
             ->willReturn(true);
         $guard2 = $this->createMock(IGuard::class);
         $guard2->expects($this->once())
-            ->method('Authorize')
+            ->method('Verify')
             ->willReturn(true);
         $action = new DummyAction();
         $action->AddGuard($guard1)
                ->AddGuard($guard2);
-        $this->assertSame(42, $action->Run());
+        $this->assertSame(42, $action->Execute());
     }
 }

@@ -42,9 +42,9 @@ class DispatcherTest extends TestCase
         Config::ReplaceInstance($this->originalConfig);
     }
 
-    #region HandleRequest ------------------------------------------------------
+    #region DispatchRequest ----------------------------------------------------
 
-    function testHandleRequestWithMissingHandlerParameter()
+    function testDispatchRequestWithMissingHandlerParameter()
     {
         $queryParams = $this->createMock(CArray::class);
         $queryParams->expects($this->once())
@@ -66,10 +66,10 @@ class DispatcherTest extends TestCase
             ->willReturn($response);
         $dispatcher = new Dispatcher();
         AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
-        $dispatcher->HandleRequest();
+        $dispatcher->DispatchRequest();
     }
 
-    function testHandleRequestWithMissingActionParameter()
+    function testDispatchRequestWithMissingActionParameter()
     {
         $queryParams = $this->createMock(CArray::class);
         $queryParams->expects($this->exactly(2))
@@ -96,10 +96,10 @@ class DispatcherTest extends TestCase
             ->willReturn($response);
         $dispatcher = new Dispatcher();
         AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
-        $dispatcher->HandleRequest();
+        $dispatcher->DispatchRequest();
     }
 
-    function testHandleRequestWithHandlerNotFound()
+    function testDispatchRequestWithHandlerNotFound()
     {
         $queryParams = $this->createMock(CArray::class);
         $queryParams->expects($this->exactly(2))
@@ -131,10 +131,10 @@ class DispatcherTest extends TestCase
             ->willReturn($response);
         $dispatcher = new Dispatcher();
         AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
-        $dispatcher->HandleRequest();
+        $dispatcher->DispatchRequest();
     }
 
-    function testHandleRequestWithProcessActionReturningNull()
+    function testDispatchRequestWithHandleActionReturningNull()
     {
         $queryParams = $this->createMock(CArray::class);
         $queryParams->expects($this->exactly(2))
@@ -152,7 +152,7 @@ class DispatcherTest extends TestCase
             ->willReturn($queryParams);
         $handler = $this->createMock(IHandler::class);
         $handler->expects($this->once())
-            ->method('ProcessAction')
+            ->method('HandleAction')
             ->with('action1')
             ->willReturn(null);
         $handlerRegistry = HandlerRegistry::Instance();
@@ -167,10 +167,10 @@ class DispatcherTest extends TestCase
             ->willReturn($response);
         $dispatcher = new Dispatcher();
         AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
-        $dispatcher->HandleRequest();
+        $dispatcher->DispatchRequest();
     }
 
-    function testHandleRequestWithProcessActionReturningResponseObject()
+    function testDispatchRequestWithHandleActionReturningResponseObject()
     {
         $queryParams = $this->createMock(CArray::class);
         $queryParams->expects($this->exactly(2))
@@ -189,7 +189,7 @@ class DispatcherTest extends TestCase
         $handler = $this->createMock(IHandler::class);
         $resultResponse = $this->createMock(Response::class);
         $handler->expects($this->once())
-            ->method('ProcessAction')
+            ->method('HandleAction')
             ->with('action1')
             ->willReturn($resultResponse);
         $handlerRegistry = HandlerRegistry::Instance();
@@ -198,12 +198,12 @@ class DispatcherTest extends TestCase
             ->with('handler1')
             ->willReturn($handler);
         $dispatcher = new Dispatcher();
-        $dispatcher->HandleRequest();
+        $dispatcher->DispatchRequest();
         $this->assertSame($resultResponse,
             AccessHelper::GetNonPublicProperty($dispatcher, 'response'));
     }
 
-    function testHandleRequestWithProcessActionReturningOtherResult()
+    function testDispatchRequestWithHandleActionReturningOtherResult()
     {
         $queryParams = $this->createMock(CArray::class);
         $queryParams->expects($this->exactly(2))
@@ -221,7 +221,7 @@ class DispatcherTest extends TestCase
             ->willReturn($queryParams);
         $handler = $this->createMock(IHandler::class);
         $handler->expects($this->once())
-            ->method('ProcessAction')
+            ->method('HandleAction')
             ->with('action1')
             ->willReturn(['question' => 'What is the meaning of life?',
                           'answer' => 42]);
@@ -241,10 +241,10 @@ class DispatcherTest extends TestCase
             ->willReturn($response);
         $dispatcher = new Dispatcher();
         AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
-        $dispatcher->HandleRequest();
+        $dispatcher->DispatchRequest();
     }
 
-    function testHandleRequestWithProcessActionThrowingExceptionWithCodeNotSet()
+    function testDispatchRequestWithHandleActionThrowingExceptionWithCodeNotSet()
     {
         $queryParams = $this->createMock(CArray::class);
         $queryParams->expects($this->exactly(2))
@@ -262,7 +262,7 @@ class DispatcherTest extends TestCase
             ->willReturn($queryParams);
         $handler = $this->createMock(IHandler::class);
         $handler->expects($this->once())
-            ->method('ProcessAction')
+            ->method('HandleAction')
             ->with('action1')
             ->willThrowException(new \Exception('Sample error message.'));
         $handlerRegistry = HandlerRegistry::Instance();
@@ -285,10 +285,10 @@ class DispatcherTest extends TestCase
             ->willReturn($response);
         $dispatcher = new Dispatcher();
         AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
-        $dispatcher->HandleRequest();
+        $dispatcher->DispatchRequest();
     }
 
-    function testHandleRequestWithProcessActionThrowingExceptionWithCodeSet()
+    function testDispatchRequestWithHandleActionThrowingExceptionWithCodeSet()
     {
         $queryParams = $this->createMock(CArray::class);
         $queryParams->expects($this->exactly(2))
@@ -306,7 +306,7 @@ class DispatcherTest extends TestCase
             ->willReturn($queryParams);
         $handler = $this->createMock(IHandler::class);
         $handler->expects($this->once())
-            ->method('ProcessAction')
+            ->method('HandleAction')
             ->with('action1')
             ->willThrowException(new \Exception('File is too large.', 413));
         $handlerRegistry = HandlerRegistry::Instance();
@@ -329,10 +329,10 @@ class DispatcherTest extends TestCase
             ->willReturn($response);
         $dispatcher = new Dispatcher();
         AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
-        $dispatcher->HandleRequest();
+        $dispatcher->DispatchRequest();
     }
 
-    #endregion HandleRequest
+    #endregion DispatchRequest
 
     #region OnShutdown ---------------------------------------------------------
 
