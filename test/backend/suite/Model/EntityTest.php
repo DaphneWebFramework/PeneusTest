@@ -7,6 +7,7 @@ use \Peneus\Model\Entity;
 use \Harmonia\Database\Database;
 use \Harmonia\Database\Queries\DeleteQuery;
 use \Harmonia\Database\Queries\InsertQuery;
+use \Harmonia\Database\Queries\SelectQuery;
 use \Harmonia\Database\Queries\UpdateQuery;
 use \Harmonia\Database\ResultSet;
 use \TestToolkit\AccessHelper;
@@ -22,6 +23,16 @@ class TestEntity extends Entity {
     // Properties to be mapped:
     public string $name = '';
     public int $age = 0;
+}
+
+class TestEntityWithCustomTableName extends Entity {
+    public string $name = '';
+    public int $age = 0;
+
+    protected static function tableName(): string
+    {
+        return 'custom_table_name';
+    }
 }
 
 #[CoversClass(Entity::class)]
@@ -146,6 +157,43 @@ class EntityTest extends TestCase
 
     #region Save ---------------------------------------------------------------
 
+    function testSaveFailsToInsertIfExecuteFails()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn(null);
+
+        $entity = new TestEntity(['name' => 'John', 'age' => 30]);
+        $this->assertFalse($entity->Save());
+    }
+
+    function testSaveFailsToUpdateIfExecuteFails()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn(null);
+
+        $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
+        $this->assertFalse($entity->Save());
+    }
+
+    function testSaveFailsToUpdateIfNoRowsAffected()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->isInstanceOf(UpdateQuery::class))
+            ->willReturn($this->createStub(ResultSet::class));
+        $database->expects($this->once())
+            ->method('LastAffectedRowCount')
+            ->willReturn(-1); // Simulates MySQL failure
+
+        $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
+        $this->assertFalse($entity->Save());
+    }
+
     function testSaveInsertsIfIdIsZero()
     {
         $database = Database::Instance();
@@ -197,32 +245,6 @@ class EntityTest extends TestCase
         $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
         $this->assertTrue($entity->Save());
         $this->assertSame(1, $entity->id); // ID should remain unchanged
-    }
-
-    function testSaveFailsIfExecuteFails()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn(null);
-
-        $entity = new TestEntity(['name' => 'John', 'age' => 30]);
-        $this->assertFalse($entity->Save());
-    }
-
-    function testSaveFailsIfNoRowUpdated()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->isInstanceOf(UpdateQuery::class))
-            ->willReturn($this->createStub(ResultSet::class));
-        $database->expects($this->once())
-            ->method('LastAffectedRowCount')
-            ->willReturn(-1); // Simulates MySQL failure
-
-        $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
-        $this->assertFalse($entity->Save());
     }
 
     #endregion Save
@@ -292,4 +314,356 @@ class EntityTest extends TestCase
     }
 
     #endregion Delete
+
+    #region FindById -----------------------------------------------------------
+
+    function testFindByIdReturnsNullIfExecuteFails()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn(null);
+
+        $entity = TestEntity::FindById(1);
+
+        $this->assertNull($entity);
+    }
+
+    function testFindByIdReturnsNullIfNotFound()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->method('Row')->willReturn(null);
+
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn($resultSet);
+
+        $entity = TestEntity::FindById(99);
+
+        $this->assertNull($entity);
+    }
+
+    function testFindByIdReturnsEntityIfExists()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->method('Row')->willReturn([
+            'id' => 1,
+            'name' => 'John Doe',
+            'age' => 30
+        ]);
+
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame('testentity',
+                    AccessHelper::GetNonPublicProperty($query, 'table'));
+                $this->assertSame('*',
+                    AccessHelper::GetNonPublicProperty($query, 'columns'));
+                $this->assertSame('id = :id',
+                    AccessHelper::GetNonPublicProperty($query, 'condition'));
+                $this->assertSame(['id' => 1], $query->Bindings());
+                return true;
+            }))
+            ->willReturn($resultSet);
+
+        $entity = TestEntity::FindById(1);
+
+        $this->assertInstanceOf(TestEntity::class, $entity);
+        $this->assertSame(1, $entity->id);
+        $this->assertSame('John Doe', $entity->name);
+        $this->assertSame(30, $entity->age);
+    }
+
+    #endregion FindById
+
+    #region FindFirst ----------------------------------------------------------
+
+    function testFindFirstReturnsNullIfExecuteFails()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn(null);
+
+        $entity = TestEntity::FindFirst(
+            'status = :status',
+            ['status' => 'active']
+        );
+
+        $this->assertNull($entity);
+    }
+
+    function testFindFirstReturnsNullIfNotFound()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->method('Row')->willReturn(null);
+
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn($resultSet);
+
+        $entity = TestEntity::FindFirst(
+            'status = :status',
+            ['status' => 'inactive']
+        );
+
+        $this->assertNull($entity);
+    }
+
+    function testFindFirstReturnsEntityWhenNoParametersProvided()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->method('Row')->willReturn([
+            'id' => 1,
+            'name' => 'First User',
+            'age' => 25
+        ]);
+
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame('testentity', AccessHelper::GetNonPublicProperty($query, 'table'));
+                $this->assertSame('*', AccessHelper::GetNonPublicProperty($query, 'columns'));
+                $this->assertNull(AccessHelper::GetNonPublicProperty($query, 'condition'));
+                $this->assertNull(AccessHelper::GetNonPublicProperty($query, 'orderBy'));
+                $this->assertSame('1', AccessHelper::GetNonPublicProperty($query, 'limit'));
+                $this->assertSame([], $query->Bindings());
+                return true;
+            }))
+            ->willReturn($resultSet);
+
+        $entity = TestEntity::FindFirst();
+
+        $this->assertInstanceOf(TestEntity::class, $entity);
+        $this->assertSame(1, $entity->id);
+        $this->assertSame('First User', $entity->name);
+        $this->assertSame(25, $entity->age);
+    }
+
+    function testFindFirstReturnsEntityIfExists()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->method('Row')->willReturn([
+            'id' => 1,
+            'name' => 'John Doe',
+            'age' => 30
+        ]);
+
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame('testentity', AccessHelper::GetNonPublicProperty($query, 'table'));
+                $this->assertSame('*', AccessHelper::GetNonPublicProperty($query, 'columns'));
+                $this->assertSame('status = :status', AccessHelper::GetNonPublicProperty($query, 'condition'));
+                $this->assertNull(AccessHelper::GetNonPublicProperty($query, 'orderBy'));
+                $this->assertSame('1', AccessHelper::GetNonPublicProperty($query, 'limit'));
+                $this->assertSame(['status' => 'active'], $query->Bindings());
+                return true;
+            }))
+            ->willReturn($resultSet);
+
+        $entity = TestEntity::FindFirst(
+            'status = :status',
+            ['status' => 'active']
+        );
+
+        $this->assertInstanceOf(TestEntity::class, $entity);
+        $this->assertSame(1, $entity->id);
+        $this->assertSame('John Doe', $entity->name);
+        $this->assertSame(30, $entity->age);
+    }
+
+    function testFindFirstReturnsEntityIfExistsWithOrderBy()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->method('Row')->willReturn([
+            'id' => 2,
+            'name' => 'Jane Doe',
+            'age' => 25
+        ]);
+
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame('testentity', AccessHelper::GetNonPublicProperty($query, 'table'));
+                $this->assertSame('*', AccessHelper::GetNonPublicProperty($query, 'columns'));
+                $this->assertSame('status = :status', AccessHelper::GetNonPublicProperty($query, 'condition'));
+                $this->assertSame('created_at DESC', AccessHelper::GetNonPublicProperty($query, 'orderBy'));
+                $this->assertSame('1', AccessHelper::GetNonPublicProperty($query, 'limit'));
+                $this->assertSame(['status' => 'active'], $query->Bindings());
+                return true;
+            }))
+            ->willReturn($resultSet);
+
+        $entity = TestEntity::FindFirst(
+            'status = :status',
+            ['status' => 'active'],
+            'created_at DESC'
+        );
+
+        $this->assertInstanceOf(TestEntity::class, $entity);
+        $this->assertSame(2, $entity->id);
+        $this->assertSame('Jane Doe', $entity->name);
+        $this->assertSame(25, $entity->age);
+    }
+
+    #endregion FindFirst
+
+    #region Find ---------------------------------------------------------------
+
+    function testFindReturnsEmptyArrayIfExecuteFails()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn(null);
+
+        $entities = TestEntity::Find();
+
+        $this->assertIsArray($entities);
+        $this->assertEmpty($entities);
+    }
+
+    function testFindReturnsEmptyArrayIfNotFound()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->method('Row')->willReturn(null);
+
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn($resultSet);
+
+        $entities = TestEntity::Find();
+
+        $this->assertIsArray($entities);
+        $this->assertEmpty($entities);
+    }
+
+    function testFindReturnsArrayOfEntitiesWhenNoParametersProvided()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->expects($invokedCount = $this->exactly(3))
+            ->method('Row')
+            ->willReturnCallback(function() use($invokedCount) {
+                switch ($invokedCount->numberOfInvocations()) {
+                    case 1:
+                        return ['id' => 3, 'name' => 'Alice Doe', 'age' => 27];
+                    case 2:
+                        return ['id' => 4, 'name' => 'Bob Smith', 'age' => 35];
+                    case 3:
+                        return null; // Stop iteration
+                }
+            });
+
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame('testentity', AccessHelper::GetNonPublicProperty($query, 'table'));
+                $this->assertSame('*', AccessHelper::GetNonPublicProperty($query, 'columns'));
+                $this->assertNull(AccessHelper::GetNonPublicProperty($query, 'condition'));
+                $this->assertNull(AccessHelper::GetNonPublicProperty($query, 'orderBy'));
+                $this->assertNull(AccessHelper::GetNonPublicProperty($query, 'limit'));
+                $this->assertSame([], $query->Bindings());
+                return true;
+            }))
+            ->willReturn($resultSet);
+
+        $entities = TestEntity::Find();
+
+        $this->assertIsArray($entities);
+        $this->assertCount(2, $entities);
+        $this->assertInstanceOf(TestEntity::class, $entities[0]);
+            $this->assertSame(         3 , $entities[0]->id);
+            $this->assertSame('Alice Doe', $entities[0]->name);
+            $this->assertSame(        27 , $entities[0]->age);
+        $this->assertInstanceOf(TestEntity::class, $entities[1]);
+            $this->assertSame(         4 , $entities[1]->id);
+            $this->assertSame('Bob Smith', $entities[1]->name);
+            $this->assertSame(        35 , $entities[1]->age);
+    }
+
+    function testFindReturnsArrayOfEntitiesWhenAllParametersProvided()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->expects($invokedCount = $this->exactly(3))
+            ->method('Row')
+            ->willReturnCallback(function() use($invokedCount) {
+                switch ($invokedCount->numberOfInvocations()) {
+                    case 1:
+                        return ['id' => 3, 'name' => 'Alice Doe', 'age' => 27];
+                    case 2:
+                        return ['id' => 4, 'name' => 'Bob Smith', 'age' => 35];
+                    case 3:
+                        return null; // Stop iteration
+                }
+            });
+
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame('testentity', AccessHelper::GetNonPublicProperty($query, 'table'));
+                $this->assertSame('*', AccessHelper::GetNonPublicProperty($query, 'columns'));
+                $this->assertSame('status = :status AND age >= :minAge', AccessHelper::GetNonPublicProperty($query, 'condition'));
+                $this->assertSame('createdAt DESC', AccessHelper::GetNonPublicProperty($query, 'orderBy'));
+                $this->assertSame('10 OFFSET 5', AccessHelper::GetNonPublicProperty($query, 'limit'));
+                $this->assertSame(['status' => 'active', 'minAge' => 25], $query->Bindings());
+                return true;
+            }))
+            ->willReturn($resultSet);
+
+        $entities = TestEntity::Find(
+            'status = :status AND age >= :minAge',
+            ['status' => 'active', 'minAge' => 25],
+            'createdAt DESC',
+            10,
+            5
+        );
+
+        $this->assertIsArray($entities);
+        $this->assertCount(2, $entities);
+        $this->assertInstanceOf(TestEntity::class, $entities[0]);
+            $this->assertSame(         3 , $entities[0]->id);
+            $this->assertSame('Alice Doe', $entities[0]->name);
+            $this->assertSame(        27 , $entities[0]->age);
+        $this->assertInstanceOf(TestEntity::class, $entities[1]);
+            $this->assertSame(         4 , $entities[1]->id);
+            $this->assertSame('Bob Smith', $entities[1]->name);
+            $this->assertSame(        35 , $entities[1]->age);
+    }
+
+    #endregion Find
+
+    #region tableName ----------------------------------------------------------
+
+    function testTableNameCanBeOverridden()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(InsertQuery::class, $query);
+                $this->assertSame('custom_table_name', AccessHelper::GetNonPublicProperty($query, 'table'));
+                return true;
+            }));
+
+        $entity = new TestEntityWithCustomTableName(['name' => 'John', 'age' => 30]);
+        $entity->Save();
+    }
+
+    #endregion tableName
 }
