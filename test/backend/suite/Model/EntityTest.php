@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Model\Entity;
 
@@ -11,26 +12,66 @@ use \Harmonia\Database\Queries\SelectQuery;
 use \Harmonia\Database\Queries\UpdateQuery;
 use \Harmonia\Database\ResultSet;
 use \TestToolkit\AccessHelper;
+use \TestToolkit\DataHelper;
 
 class TestEntity extends Entity {
-    // Properties to be ignored:
+// Properties to be ignored:
     static private int $aStaticPrivateProperty = 0;
     static protected int $aStaticProtectedProperty = 0;
     static public int $aStaticPublicProperty = 0;
     private int $aPrivateProperty = 0;
     protected int $aProtectedProperty = 0;
-
-    // Properties to be mapped:
+// Properties to be mapped:
     public string $name = '';
     public int $age = 0;
+}
+
+class TestEntityWithDateTime extends Entity {
+    public \DateTime $createdAt; // e.g. DATETIME in MySQL
+    public \DateTime $registeredOn; // e.g. DATE in MySQL
+}
+
+class TestEntityWithUninitializedProperties extends Entity {
+    public bool $aBool;
+    public int $anInt;
+    public float $aFloat;
+    public string $aString;
+    public array $anArray;
+    public \stdClass $aStdClass;
+}
+
+class TestEntityWithUntypedProperty extends Entity {
+    public $property;
+}
+
+class TestEntityWithPropertyOfNonExistentClass extends Entity {
+    public NonExistentClass $property;
+}
+
+class TestEntityWithNullablePropertyOfNonExistentClass extends Entity {
+    public ?NonExistentClass $property;
+}
+
+         class NonInstantiableClass1 { public function __construct(int $x) {} }
+         class NonInstantiableClass2 { private function __construct() {} }
+abstract class NonInstantiableClass3 {}
+     interface NonInstantiableClass4 {}
+         trait NonInstantiableClass5 {}
+          enum NonInstantiableClass6 {}
+
+class TestEntityWithPropertiesOfNonInstantiableClasses extends Entity {
+    public NonInstantiableClass1 $property1;
+    public NonInstantiableClass2 $property2;
+    public NonInstantiableClass3 $property3;
+    public NonInstantiableClass4 $property4;
+    public NonInstantiableClass5 $property5;
+    public NonInstantiableClass6 $property6;
 }
 
 class TestEntityWithCustomTableName extends Entity {
     public string $name = '';
     public int $age = 0;
-
-    protected static function tableName(): string
-    {
+    protected static function tableName(): string {
         return 'custom_table_name';
     }
 }
@@ -56,34 +97,47 @@ class EntityTest extends TestCase
     function testEntityIsAbstract()
     {
         $this->expectException(\Error::class);
-
         $entity = new Entity();
     }
 
     function testConstructWithoutData()
     {
         $entity = new TestEntity();
-
         $this->assertSame(0, $entity->id);
         $this->assertSame('', $entity->name);
         $this->assertSame(0, $entity->age);
     }
 
-    function testConstructWithDataIncludingUnknownProperty()
+    function testConstructWithDataExcludingId()
+    {
+        $entity = new TestEntity(['name' => 'John', 'age' => 30]);
+        $this->assertSame(0, $entity->id);
+        $this->assertSame('John', $entity->name);
+        $this->assertSame(30, $entity->age);
+    }
+
+    function testConstructWithDataIncludingId()
+    {
+        $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
+        $this->assertSame(1, $entity->id);
+        $this->assertSame('John', $entity->name);
+        $this->assertSame(30, $entity->age);
+    }
+
+    function testConstructWithUnknownProperty()
     {
         $entity = new TestEntity([
             'name' => 'John',
             'age' => 30,
             'unknown' => 'value'
         ]);
-
         $this->assertSame(0, $entity->id);
         $this->assertSame('John', $entity->name);
         $this->assertSame(30, $entity->age);
         $this->assertFalse(\property_exists($entity, 'unknown'));
     }
 
-    function testConstructWithDataIncludingStaticProperties()
+    function testConstructWithStaticProperties()
     {
         $entity = new TestEntity([
             'name' => 'John',
@@ -92,11 +146,9 @@ class EntityTest extends TestCase
             'aStaticProtectedProperty' => 99,
             'aStaticPublicProperty' => 99
         ]);
-
         $this->assertSame(0, $entity->id);
         $this->assertSame('John', $entity->name);
         $this->assertSame(30, $entity->age);
-
         // Static properties should remain unchanged.
         $this->assertSame(0, AccessHelper::GetNonPublicStaticProperty(
             TestEntity::class, 'aStaticPrivateProperty'));
@@ -106,7 +158,7 @@ class EntityTest extends TestCase
             TestEntity::class, 'aStaticPublicProperty'));
     }
 
-    function testConstructWithDataIncludingNonPublicProperties()
+    function testConstructWithNonPublicProperties()
     {
         $entity = new TestEntity([
             'name' => 'John',
@@ -114,11 +166,9 @@ class EntityTest extends TestCase
             'aPrivateProperty' => 99,
             'aProtectedProperty' => 99
         ]);
-
         $this->assertSame(0, $entity->id);
         $this->assertSame('John', $entity->name);
         $this->assertSame(30, $entity->age);
-
         // Non-public properties should remain unchanged.
         $this->assertSame(0, AccessHelper::GetNonPublicProperty(
             $entity, 'aPrivateProperty'));
@@ -126,31 +176,109 @@ class EntityTest extends TestCase
             $entity, 'aProtectedProperty'));
     }
 
-    function testConstructWithDataHavingIntegerKeys()
+    function testConstructWithIntegerKeys()
     {
         $entity = new TestEntity([0 => 'John', 1 => 30]);
-
         $this->assertSame(0, $entity->id);
         $this->assertSame('', $entity->name); // Name should remain default
         $this->assertSame(0, $entity->age); // Age should remain default
     }
 
-    function testConstructWithDataExcludingId()
+    function testConstructWithIncorrectTypes()
     {
-        $entity = new TestEntity(['name' => 'John', 'age' => 30]);
-
+        $entity = new TestEntity(['name' => 30, 'age' => 'John']);
         $this->assertSame(0, $entity->id);
-        $this->assertSame('John', $entity->name);
-        $this->assertSame(30, $entity->age);
+        $this->assertSame('', $entity->name); // Name should remain default
+        $this->assertSame(0, $entity->age); // Age should remain default
     }
 
-    function testConstructWithDataIncludingId()
+    function testConstructWithDateTimeFields()
     {
-        $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
+        $entity = new TestEntityWithDateTime([
+            'createdAt' => '2025-03-15 12:45:00',
+            'registeredOn' => '2025-03-15'
+        ]);
+        $this->assertInstanceOf(\DateTime::class, $entity->createdAt);
+        $this->assertInstanceOf(\DateTime::class, $entity->registeredOn);
+        $this->assertSame('2025-03-15 12:45:00', $entity->createdAt->format('Y-m-d H:i:s'));
+        $this->assertSame('2025-03-15', $entity->registeredOn->format('Y-m-d'));
+    }
 
-        $this->assertSame(1, $entity->id);
-        $this->assertSame('John', $entity->name);
-        $this->assertSame(30, $entity->age);
+    function testConstructWithMalformedDateTimeField()
+    {
+        $entity = new TestEntityWithDateTime([
+            'createdAt' => '02.12.20239'
+        ]);
+        $this->assertInstanceOf(\DateTime::class, $entity->createdAt);
+    }
+
+    #[DataProviderExternal(DataHelper::class, 'NonStringProvider')]
+    function testConstructWithhNonStringDateTimeField($value)
+    {
+        $entity = new TestEntityWithDateTime([
+            'createdAt' => $value
+        ]);
+        $this->assertInstanceOf(\DateTime::class, $entity->createdAt);
+    }
+
+    function testConstructWithUninitializedProperties()
+    {
+        $entity = new TestEntityWithUninitializedProperties([
+            'aBool' => true,
+            'anInt' => 42,
+            'aFloat' => 3.14,
+            'aString' => 'Hello, World!',
+            'anArray' => ['key' => 'value'],
+            'aStdClass' => new \stdClass()
+        ]);
+        $this->assertIsBool($entity->aBool);
+        $this->assertSame(true, $entity->aBool);
+        $this->assertIsInt($entity->anInt);
+        $this->assertSame(42, $entity->anInt);
+        $this->assertIsFloat($entity->aFloat);
+        $this->assertSame(3.14, $entity->aFloat);
+        $this->assertIsString($entity->aString);
+        $this->assertSame('Hello, World!', $entity->aString);
+        $this->assertIsArray($entity->anArray);
+        $this->assertSame(['key' => 'value'], $entity->anArray);
+        $this->assertInstanceOf(\stdClass::class, $entity->aStdClass);
+    }
+
+    function testConstructWithUntypedProperty()
+    {
+        $entity = new TestEntityWithUntypedProperty([
+            'property' => 'value'
+        ]);
+        $this->assertSame('value', $entity->property);
+    }
+
+    function testConstructWithPropertyOfNonExistentClass()
+    {
+        $entity = new TestEntityWithPropertyOfNonExistentClass([
+            'property' => null
+        ]);
+        $this->assertTrue(true); // No error should be thrown
+    }
+
+    function testConstructWithNullablePropertyOfNonExistentClass()
+    {
+        $entity = new TestEntityWithNullablePropertyOfNonExistentClass([
+            'property' => null
+        ]);
+        $this->assertTrue(true); // No error should be thrown
+    }
+
+    function testConstructWithPropertiesOfNonInstantiableClasses()
+    {
+        $entity = new TestEntityWithPropertiesOfNonInstantiableClasses([
+            'property1' => null,
+            'property2' => null,
+            'property3' => null,
+            'property4' => null,
+            'property5' => null,
+            'property6' => null
+        ]);
+        $this->assertTrue(true); // No error should be thrown
     }
 
     #endregion __construct
@@ -245,6 +373,75 @@ class EntityTest extends TestCase
         $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
         $this->assertTrue($entity->Save());
         $this->assertSame(1, $entity->id); // ID should remain unchanged
+    }
+
+    function testSaveInsertsWithDateTimeFields()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(InsertQuery::class, $query);
+                $this->assertSame('createdAt, registeredOn',
+                    AccessHelper::GetNonPublicProperty($query, 'columns'));
+                $this->assertSame(':createdAt, :registeredOn',
+                    AccessHelper::GetNonPublicProperty($query, 'values'));
+                $bindings = $query->Bindings();
+                $this->assertArrayHasKey('createdAt', $bindings);
+                $this->assertSame('2025-03-15 12:45:00', $bindings['createdAt']);
+                // Since 'registeredOn' is a DATE field, the time part should be
+                // automatically set to the current time. Compare the time part
+                // with the current time with a 10-second delta.
+                $this->assertArrayHasKey('registeredOn', $bindings);
+                $registeredOnDate = \substr($bindings['registeredOn'], 0, 10);
+                $registeredOnTime = \substr($bindings['registeredOn'], 11);
+                $this->assertSame('2025-03-15', $registeredOnDate);
+                $this->assertEqualsWithDelta(\time(), \strtotime($registeredOnTime), 10);
+                return true;
+            }))
+            ->willReturn($this->createStub(ResultSet::class));
+
+        $entity = new TestEntityWithDateTime([
+            'createdAt' => '2025-03-15 12:45:00',
+            'registeredOn' => '2025-03-15'
+        ]);
+        $entity->Save();
+    }
+
+    function testSaveUpdatesWithDateTimeFields()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(UpdateQuery::class, $query);
+                $this->assertSame(['createdAt', 'registeredOn'],
+                    AccessHelper::GetNonPublicProperty($query, 'columns'));
+                $this->assertSame([':createdAt', ':registeredOn'],
+                    AccessHelper::GetNonPublicProperty($query, 'values'));
+                $bindings = $query->Bindings();
+                $this->assertArrayHasKey('id', $bindings);
+                $this->assertSame(1, $bindings['id']);
+                $this->assertArrayHasKey('createdAt', $bindings);
+                $this->assertSame('2025-03-15 12:45:00', $bindings['createdAt']);
+                // Since 'registeredOn' is a DATE field, the time part should be
+                // automatically set to the current time. Compare the time part
+                // with the current time with a 10-second delta.
+                $this->assertArrayHasKey('registeredOn', $bindings);
+                $registeredOnDate = \substr($bindings['registeredOn'], 0, 10);
+                $registeredOnTime = \substr($bindings['registeredOn'], 11);
+                $this->assertSame('2025-03-15', $registeredOnDate);
+                $this->assertEqualsWithDelta(\time(), \strtotime($registeredOnTime), 10);
+                return true;
+            }))
+            ->willReturn($this->createStub(ResultSet::class));
+
+        $entity = new TestEntityWithDateTime([
+            'id' => 1,
+            'createdAt' => '2025-03-15 12:45:00',
+            'registeredOn' => '2025-03-15'
+        ]);
+        $entity->Save();
     }
 
     #endregion Save
