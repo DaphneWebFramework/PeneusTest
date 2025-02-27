@@ -40,6 +40,14 @@ class TestEntityWithUninitializedProperties extends Entity {
     public \stdClass $aStdClass;
 }
 
+class TestEntityWithReadOnlyProperty extends Entity {
+    public readonly string $property;
+    public function __construct(array $data) {
+        parent::__construct($data);
+        $this->property = "I'm readonly";
+    }
+}
+
 class TestEntityWithUntypedProperty extends Entity {
     public $property;
 }
@@ -66,6 +74,16 @@ class TestEntityWithPropertiesOfNonInstantiableClasses extends Entity {
     public NonInstantiableClass4 $property4;
     public NonInstantiableClass5 $property5;
     public NonInstantiableClass6 $property6;
+}
+
+class TestEntityWithNoProperties extends Entity {
+}
+
+class TestEntityWithNonBindableProperties extends Entity {
+    public array $anArray;
+    public mixed $aResource; // Will be assigned a resource during tests
+    public \stdClass $anObjectWithoutToString;
+    public string $aString; // Only this property will be bound
 }
 
 class TestEntityWithCustomTableName extends Entity {
@@ -244,6 +262,14 @@ class EntityTest extends TestCase
         $this->assertInstanceOf(\stdClass::class, $entity->aStdClass);
     }
 
+    function testConstructWithReadOnlyProperty()
+    {
+        $entity = new TestEntityWithReadOnlyProperty([
+            'property' => "I'm overwriting"
+        ]);
+        $this->assertSame("I'm readonly", $entity->property);
+    }
+
     function testConstructWithUntypedProperty()
     {
         $entity = new TestEntityWithUntypedProperty([
@@ -284,6 +310,28 @@ class EntityTest extends TestCase
     #endregion __construct
 
     #region Save ---------------------------------------------------------------
+
+    function testSaveFailsToInsertOnEntityWithNoProperties()
+    {
+        $database = Database::Instance();
+        $database->expects($this->never())
+            ->method('Execute');
+
+        $entity = new TestEntityWithNoProperties();
+
+        $this->assertFalse($entity->Save());
+    }
+
+    function testSaveFailsToUpdateOnEntityWithNoProperties()
+    {
+        $database = Database::Instance();
+        $database->expects($this->never())
+            ->method('Execute');
+
+        $entity = new TestEntityWithNoProperties(['id' => 1]);
+
+        $this->assertFalse($entity->Save());
+    }
 
     function testSaveFailsToInsertIfExecuteFails()
     {
@@ -442,6 +490,74 @@ class EntityTest extends TestCase
             'registeredOn' => '2025-03-15'
         ]);
         $entity->Save();
+    }
+
+    function testSaveInsertSkipsNonBindableProperties()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(InsertQuery::class, $query);
+                $this->assertSame('testentitywithnonbindableproperties',
+                    AccessHelper::GetNonPublicProperty($query, 'table'));
+                $this->assertSame('aString',
+                    AccessHelper::GetNonPublicProperty($query, 'columns'));
+                $this->assertSame(':aString',
+                    AccessHelper::GetNonPublicProperty($query, 'values'));
+                $this->assertSame(['aString' => 'Hello, World!'],
+                    $query->Bindings());
+                return true;
+            }))
+            ->willReturn($this->createStub(ResultSet::class));
+        $database->expects($this->once())
+            ->method('LastInsertId')
+            ->willReturn(1);
+
+        $entity = new TestEntityWithNonBindableProperties([
+            'anArray' => ['key' => 'value'],
+            'aResource' => \fopen('php://memory', 'r'),
+            'anObjectWithoutToString' => new \stdClass(),
+            'aString' => 'Hello, World!'
+        ]);
+
+        $this->assertTrue($entity->Save());
+
+        \fclose($entity->aResource);
+    }
+
+    function testSaveUpdateSkipsNonBindableProperties()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(UpdateQuery::class, $query);
+                $this->assertSame('testentitywithnonbindableproperties',
+                    AccessHelper::GetNonPublicProperty($query, 'table'));
+                $this->assertSame(['aString'],
+                    AccessHelper::GetNonPublicProperty($query, 'columns'));
+                $this->assertSame([':aString'],
+                    AccessHelper::GetNonPublicProperty($query, 'values'));
+                $this->assertSame('id = :id',
+                    AccessHelper::GetNonPublicProperty($query, 'condition'));
+                $this->assertSame(['id' => 1, 'aString' => 'Hello, World!'],
+                    $query->Bindings());
+                return true;
+            }))
+            ->willReturn($this->createStub(ResultSet::class));
+
+        $entity = new TestEntityWithNonBindableProperties([
+            'id' => 1,
+            'anArray' => ['key' => 'value'],
+            'aResource' => \fopen('php://memory', 'r'),
+            'anObjectWithoutToString' => new \stdClass(),
+            'aString' => 'Hello, World!'
+        ]);
+
+        $this->assertTrue($entity->Save());
+
+        \fclose($entity->aResource);
     }
 
     #endregion Save
