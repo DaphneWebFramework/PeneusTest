@@ -159,8 +159,8 @@ class EntityTest extends TestCase
             'aPrivate' => 99,
             'aProtected' => 99
         ]);
-        $this->assertSame(1, AccessHelper::GetNonPublicProperty($entity, 'aPrivate'));
-        $this->assertSame(2, AccessHelper::GetNonPublicProperty($entity, 'aProtected'));
+        $this->assertSame(1, AccessHelper::GetProperty($entity, 'aPrivate'));
+        $this->assertSame(2, AccessHelper::GetProperty($entity, 'aProtected'));
     }
 
     function testConstructWithStaticProperty()
@@ -170,11 +170,11 @@ class EntityTest extends TestCase
             'aStaticProtected' => 99,
             'aStaticPublic' => 99
         ]);
-        $this->assertSame(1, AccessHelper::GetNonPublicStaticProperty(
+        $this->assertSame(1, AccessHelper::GetStaticProperty(
                              EntityWithStaticProperty::class, 'aStaticPrivate'));
-        $this->assertSame(2, AccessHelper::GetNonPublicStaticProperty(
+        $this->assertSame(2, AccessHelper::GetStaticProperty(
                              EntityWithStaticProperty::class, 'aStaticProtected'));
-        $this->assertSame(3, AccessHelper::GetNonPublicStaticProperty(
+        $this->assertSame(3, AccessHelper::GetStaticProperty(
                              EntityWithStaticProperty::class, 'aStaticPublic'));
     }
 
@@ -481,11 +481,11 @@ class EntityTest extends TestCase
                 $this->assertInstanceOf(DeleteQuery::class, $query);
                 $this->assertSame(
                     'testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table')
+                    AccessHelper::GetProperty($query, 'table')
                 );
                 $this->assertSame(
                     'id = :id',
-                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                    AccessHelper::GetProperty($query, 'condition')
                 );
                 $this->assertSame(
                     ['id' => 1],
@@ -528,21 +528,21 @@ class EntityTest extends TestCase
                 $this->assertInstanceOf(SelectQuery::class, $query);
                 $this->assertSame(
                     'testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table')
+                    AccessHelper::GetProperty($query, 'table')
                 );
                 $this->assertSame(
                     '*',
-                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                    AccessHelper::GetProperty($query, 'columns')
                 );
                 $this->assertSame(
                     'id = :id',
-                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                    AccessHelper::GetProperty($query, 'condition')
                 );
                 $this->assertNull(
-                    AccessHelper::GetNonPublicProperty($query, 'orderBy')
+                    AccessHelper::GetProperty($query, 'orderBy')
                 );
                 $this->assertNull(
-                    AccessHelper::GetNonPublicProperty($query, 'limit')
+                    AccessHelper::GetProperty($query, 'limit')
                 );
                 $this->assertSame(
                     ['id' => 1],
@@ -572,21 +572,21 @@ class EntityTest extends TestCase
                 $this->assertInstanceOf(SelectQuery::class, $query);
                 $this->assertSame(
                     'testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table')
+                    AccessHelper::GetProperty($query, 'table')
                 );
                 $this->assertSame(
                     '*',
-                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                    AccessHelper::GetProperty($query, 'columns')
                 );
                 $this->assertSame(
                     'id = :id',
-                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                    AccessHelper::GetProperty($query, 'condition')
                 );
                 $this->assertNull(
-                    AccessHelper::GetNonPublicProperty($query, 'orderBy')
+                    AccessHelper::GetProperty($query, 'orderBy')
                 );
                 $this->assertNull(
-                    AccessHelper::GetNonPublicProperty($query, 'limit')
+                    AccessHelper::GetProperty($query, 'limit')
                 );
                 $this->assertSame(
                     ['id' => 1],
@@ -629,21 +629,21 @@ class EntityTest extends TestCase
                 $this->assertInstanceOf(SelectQuery::class, $query);
                 $this->assertSame(
                     'testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table')
+                    AccessHelper::GetProperty($query, 'table')
                 );
                 $this->assertSame(
                     '*',
-                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                    AccessHelper::GetProperty($query, 'columns')
                 );
                 $this->assertNull(
-                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                    AccessHelper::GetProperty($query, 'condition')
                 );
                 $this->assertNull(
-                    AccessHelper::GetNonPublicProperty($query, 'orderBy')
+                    AccessHelper::GetProperty($query, 'orderBy')
                 );
                 $this->assertSame(
                     '1',
-                    AccessHelper::GetNonPublicProperty($query, 'limit')
+                    AccessHelper::GetProperty($query, 'limit')
                 );
                 $this->assertSame(
                     [],
@@ -673,23 +673,23 @@ class EntityTest extends TestCase
                 $this->assertInstanceOf(SelectQuery::class, $query);
                 $this->assertSame(
                     'testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table')
+                    AccessHelper::GetProperty($query, 'table')
                 );
                 $this->assertSame(
                     '*',
-                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                    AccessHelper::GetProperty($query, 'columns')
                 );
                 $this->assertSame(
                     'age > :age',
-                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                    AccessHelper::GetProperty($query, 'condition')
                 );
                 $this->assertSame(
                     'name DESC',
-                    AccessHelper::GetNonPublicProperty($query, 'orderBy')
+                    AccessHelper::GetProperty($query, 'orderBy')
                 );
                 $this->assertSame(
                     '1',
-                    AccessHelper::GetNonPublicProperty($query, 'limit')
+                    AccessHelper::GetProperty($query, 'limit')
                 );
                 $this->assertSame(
                     ['age' => 29],
@@ -737,20 +737,20 @@ class EntityTest extends TestCase
                 $this->assertInstanceOf(SelectQuery::class, $query);
                 $this->assertSame(
                     'testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table')
+                    AccessHelper::GetProperty($query, 'table')
                 );
                 $this->assertSame(
                     '*',
-                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                    AccessHelper::GetProperty($query, 'columns')
                 );
                 $this->assertNull(
-                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                    AccessHelper::GetProperty($query, 'condition')
                 );
                 $this->assertNull(
-                    AccessHelper::GetNonPublicProperty($query, 'orderBy')
+                    AccessHelper::GetProperty($query, 'orderBy')
                 );
                 $this->assertNull(
-                    AccessHelper::GetNonPublicProperty($query, 'limit')
+                    AccessHelper::GetProperty($query, 'limit')
                 );
                 $this->assertSame(
                     [],
@@ -796,23 +796,23 @@ class EntityTest extends TestCase
                 $this->assertInstanceOf(SelectQuery::class, $query);
                 $this->assertSame(
                     'testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table')
+                    AccessHelper::GetProperty($query, 'table')
                 );
                 $this->assertSame(
                     '*',
-                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                    AccessHelper::GetProperty($query, 'columns')
                 );
                 $this->assertSame(
                     'name LIKE :name AND age >= :age',
-                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                    AccessHelper::GetProperty($query, 'condition')
                 );
                 $this->assertSame(
                     'createdAt DESC',
-                    AccessHelper::GetNonPublicProperty($query, 'orderBy')
+                    AccessHelper::GetProperty($query, 'orderBy')
                 );
                 $this->assertSame(
                     '10 OFFSET 5',
-                    AccessHelper::GetNonPublicProperty($query, 'limit')
+                    AccessHelper::GetProperty($query, 'limit')
                 );
                 $this->assertSame(
                     ['name' => 'A%', 'age' => 25],
@@ -855,7 +855,7 @@ class EntityTest extends TestCase
                 $this->assertInstanceOf(DeleteQuery::class, $query);
                 $this->assertSame(
                     'custom_table_name',
-                    AccessHelper::GetNonPublicProperty($query, 'table')
+                    AccessHelper::GetProperty($query, 'table')
                 );
                 return true;
             }));
@@ -876,15 +876,15 @@ class EntityTest extends TestCase
                 $this->assertInstanceOf(InsertQuery::class, $query);
                 $this->assertSame(
                     'entitywithnonbindableproperties',
-                    AccessHelper::GetNonPublicProperty($query, 'table')
+                    AccessHelper::GetProperty($query, 'table')
                 );
                 $this->assertSame(
                     'aString',
-                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                    AccessHelper::GetProperty($query, 'columns')
                 );
                 $this->assertSame(
                     ':aString',
-                    AccessHelper::GetNonPublicProperty($query, 'values')
+                    AccessHelper::GetProperty($query, 'values')
                 );
                 $this->assertSame(
                     ['aString' => 'Hello, World!'],
@@ -902,7 +902,7 @@ class EntityTest extends TestCase
             'anObjectWithoutToString' => new \stdClass(),
             'aString' => 'Hello, World!'
         ]);
-        $this->assertTrue(AccessHelper::CallNonPublicMethod($entity, 'insert'));
+        $this->assertTrue(AccessHelper::CallMethod($entity, 'insert'));
         \fclose($entity->aResource);
     }
 
@@ -912,7 +912,7 @@ class EntityTest extends TestCase
         $database->expects($this->never())
             ->method('Execute');
         $entity = new EntityWithNoProperties();
-        $this->assertFalse(AccessHelper::CallNonPublicMethod($entity, 'insert'));
+        $this->assertFalse(AccessHelper::CallMethod($entity, 'insert'));
     }
 
     function testInsertFailsIfExecuteFails()
@@ -922,7 +922,7 @@ class EntityTest extends TestCase
             ->method('Execute')
             ->willReturn(null);
         $entity = new TestEntity();
-        $this->assertFalse(AccessHelper::CallNonPublicMethod($entity, 'insert'));
+        $this->assertFalse(AccessHelper::CallMethod($entity, 'insert'));
     }
 
     function testInsertSucceedsIfExecuteSucceeds()
@@ -934,15 +934,15 @@ class EntityTest extends TestCase
                 $this->assertInstanceOf(InsertQuery::class, $query);
                 $this->assertSame(
                     'testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table')
+                    AccessHelper::GetProperty($query, 'table')
                 );
                 $this->assertSame(
                     'name, age, createdAt',
-                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                    AccessHelper::GetProperty($query, 'columns')
                 );
                 $this->assertSame(
                     ':name, :age, :createdAt',
-                    AccessHelper::GetNonPublicProperty($query, 'values')
+                    AccessHelper::GetProperty($query, 'values')
                 );
                 $this->assertSame(
                     ['name' => 'John', 'age' => 30, 'createdAt' => '2021-01-01 12:34:56'],
@@ -959,7 +959,7 @@ class EntityTest extends TestCase
             'age' => 30,
             'createdAt' => '2021-01-01 12:34:56'
         ]);
-        $this->assertTrue(AccessHelper::CallNonPublicMethod($entity, 'insert'));
+        $this->assertTrue(AccessHelper::CallMethod($entity, 'insert'));
         $this->assertSame(23, $entity->id);
     }
 
@@ -976,19 +976,19 @@ class EntityTest extends TestCase
                 $this->assertInstanceOf(UpdateQuery::class, $query);
                 $this->assertSame(
                     'entitywithnonbindableproperties',
-                    AccessHelper::GetNonPublicProperty($query, 'table')
+                    AccessHelper::GetProperty($query, 'table')
                 );
                 $this->assertSame(
                     ['aString'],
-                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                    AccessHelper::GetProperty($query, 'columns')
                 );
                 $this->assertSame(
                     [':aString'],
-                    AccessHelper::GetNonPublicProperty($query, 'values')
+                    AccessHelper::GetProperty($query, 'values')
                 );
                 $this->assertSame(
                     'id = :id',
-                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                    AccessHelper::GetProperty($query, 'condition')
                 );
                 $this->assertSame(
                     ['id' => 23, 'aString' => 'Hello, World!'],
@@ -1004,7 +1004,7 @@ class EntityTest extends TestCase
             'anObjectWithoutToString' => new \stdClass(),
             'aString' => 'Hello, World!'
         ]);
-        $this->assertTrue(AccessHelper::CallNonPublicMethod($entity, 'update'));
+        $this->assertTrue(AccessHelper::CallMethod($entity, 'update'));
         \fclose($entity->aResource);
     }
 
@@ -1014,7 +1014,7 @@ class EntityTest extends TestCase
         $database->expects($this->never())
             ->method('Execute');
         $entity = new EntityWithNoProperties();
-        $this->assertFalse(AccessHelper::CallNonPublicMethod($entity, 'update'));
+        $this->assertFalse(AccessHelper::CallMethod($entity, 'update'));
     }
 
     function testUpdateFailsIfExecuteFails()
@@ -1024,7 +1024,7 @@ class EntityTest extends TestCase
             ->method('Execute')
             ->willReturn(null);
         $entity = new TestEntity();
-        $this->assertFalse(AccessHelper::CallNonPublicMethod($entity, 'update'));
+        $this->assertFalse(AccessHelper::CallMethod($entity, 'update'));
     }
 
     function testUpdateFailsIfLastAffectedRowCountIsMinusOne()
@@ -1038,7 +1038,7 @@ class EntityTest extends TestCase
             ->method('LastAffectedRowCount')
             ->willReturn(-1);
         $entity = new TestEntity();
-        $this->assertFalse(AccessHelper::CallNonPublicMethod($entity, 'update'));
+        $this->assertFalse(AccessHelper::CallMethod($entity, 'update'));
     }
 
     function testUpdateSucceedsIfLastAffectedRowCountIsNotMinusOne()
@@ -1050,19 +1050,19 @@ class EntityTest extends TestCase
                 $this->assertInstanceOf(UpdateQuery::class, $query);
                 $this->assertSame(
                     'testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table')
+                    AccessHelper::GetProperty($query, 'table')
                 );
                 $this->assertSame(
                     ['name', 'age', 'createdAt'],
-                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                    AccessHelper::GetProperty($query, 'columns')
                 );
                 $this->assertSame(
                     [':name', ':age', ':createdAt'],
-                    AccessHelper::GetNonPublicProperty($query, 'values')
+                    AccessHelper::GetProperty($query, 'values')
                 );
                 $this->assertSame(
                     'id = :id',
-                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                    AccessHelper::GetProperty($query, 'condition')
                 );
                 $this->assertSame(
                     ['id' => 23, 'name' => 'John', 'age' => 30, 'createdAt' => '2021-01-01 12:34:56'],
@@ -1080,7 +1080,7 @@ class EntityTest extends TestCase
             'age' => 30,
             'createdAt' => '2021-01-01 12:34:56'
         ]);
-        $this->assertTrue(AccessHelper::CallNonPublicMethod($entity, 'update'));
+        $this->assertTrue(AccessHelper::CallMethod($entity, 'update'));
         $this->assertSame(23, $entity->id); // ID should remain unchanged
     }
 

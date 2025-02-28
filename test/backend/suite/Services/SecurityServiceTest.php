@@ -94,7 +94,7 @@ class SecurityServiceTest extends TestCase
             self::TOKEN_PATTERN, $csrfToken->Token());
         $this->assertMatchesRegularExpression(
             self::CSRF_TOKEN_COOKIE_VALUE_PATTERN, $csrfToken->CookieValue());
-        $deobfuscatedCookieValue = AccessHelper::CallNonPublicMethod(
+        $deobfuscatedCookieValue = AccessHelper::CallMethod(
             $securityService, 'deobfuscate', [$csrfToken->CookieValue()]);
         $this->assertTrue(\password_verify($csrfToken->Token(),
                                            $deobfuscatedCookieValue));

@@ -65,7 +65,7 @@ class DispatcherTest extends TestCase
             ->with('{"error":"Handler not specified."}')
             ->willReturn($response);
         $dispatcher = new Dispatcher();
-        AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
 
@@ -95,7 +95,7 @@ class DispatcherTest extends TestCase
             ->with('{"error":"Action not specified."}')
             ->willReturn($response);
         $dispatcher = new Dispatcher();
-        AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
 
@@ -130,7 +130,7 @@ class DispatcherTest extends TestCase
             ->with('{"error":"Handler not found: handler1"}')
             ->willReturn($response);
         $dispatcher = new Dispatcher();
-        AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
 
@@ -166,7 +166,7 @@ class DispatcherTest extends TestCase
             ->with(StatusCode::NoContent)
             ->willReturn($response);
         $dispatcher = new Dispatcher();
-        AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
 
@@ -200,7 +200,7 @@ class DispatcherTest extends TestCase
         $dispatcher = new Dispatcher();
         $dispatcher->DispatchRequest();
         $this->assertSame($resultResponse,
-            AccessHelper::GetNonPublicProperty($dispatcher, 'response'));
+            AccessHelper::GetProperty($dispatcher, 'response'));
     }
 
     function testDispatchRequestWithHandleActionReturningOtherResult()
@@ -240,7 +240,7 @@ class DispatcherTest extends TestCase
             ->with('{"question":"What is the meaning of life?","answer":42}')
             ->willReturn($response);
         $dispatcher = new Dispatcher();
-        AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
 
@@ -284,7 +284,7 @@ class DispatcherTest extends TestCase
             ->with('{"error":"Sample error message."}')
             ->willReturn($response);
         $dispatcher = new Dispatcher();
-        AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
 
@@ -328,7 +328,7 @@ class DispatcherTest extends TestCase
             ->with('{"error":"File is too large."}')
             ->willReturn($response);
         $dispatcher = new Dispatcher();
-        AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
 
@@ -342,7 +342,7 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('Send');
         $dispatcher = new Dispatcher();
-        AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->OnShutdown(null);
     }
 
@@ -369,7 +369,7 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('Send');
         $dispatcher = new Dispatcher();
-        AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->OnShutdown("E_NOTICE: Something went wrong in 'file.php' on line 123.");
     }
 
@@ -396,7 +396,7 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('Send');
         $dispatcher = new Dispatcher();
-        AccessHelper::SetNonPublicProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->OnShutdown("E_NOTICE: Something went wrong in 'file.php' on line 123.");
     }
 
