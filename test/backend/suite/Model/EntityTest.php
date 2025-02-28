@@ -14,60 +14,89 @@ use \Harmonia\Database\ResultSet;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
-class TestEntity extends Entity {
-// Properties to be ignored:
-    static private int $aStaticPrivateProperty = 0;
-    static protected int $aStaticProtectedProperty = 0;
-    static public int $aStaticPublicProperty = 0;
-    private int $aPrivateProperty = 0;
-    protected int $aProtectedProperty = 0;
-// Properties to be mapped:
-    public string $name = '';
-    public int $age = 0;
+#region Classes Under Test -----------------------------------------------------
+
+class EntityWithNonPublicProperty extends Entity {
+    private int $aPrivate = 1;
+    protected int $aProtected = 2;
 }
 
-class TestEntityWithDateTime extends Entity {
-    public \DateTime $createdAt; // e.g. DATETIME in MySQL
-    public \DateTime $registeredOn; // e.g. DATE in MySQL
+class EntityWithStaticProperty extends Entity {
+    static private int $aStaticPrivate = 1;
+    static protected int $aStaticProtected = 2;
+    static public int $aStaticPublic = 3;
 }
 
-class TestEntityWithUninitializedProperties extends Entity {
+class EntityWithReadOnlyProperty extends Entity {
+    public readonly int $property;
+    public function __construct(?array $data = null) {
+        parent::__construct($data);
+        $this->property = 1;
+    }
+}
+
+class EntityWithUninitializedProperty extends Entity {
     public bool $aBool;
     public int $anInt;
     public float $aFloat;
     public string $aString;
     public array $anArray;
-    public \stdClass $aStdClass;
+    public mixed $aMixed;
+    public object $anObject;
+    public iterable $anIterable;
 }
 
-class TestEntityWithReadOnlyProperty extends Entity {
-    public readonly string $property;
-    public function __construct(array $data) {
-        parent::__construct($data);
-        $this->property = "I'm readonly";
-    }
+class EntityWithNullableUninitializedProperty extends Entity {
+    public ?bool $aBool;
+    public ?int $anInt;
+    public ?float $aFloat;
+    public ?string $aString;
+    public ?array $anArray;
+    public ?object $anObject;
+    public ?iterable $anIterable;
 }
 
-class TestEntityWithUntypedProperty extends Entity {
+class EntityWithInitializedProperty extends Entity {
+    public bool $aBool = true;
+    public int $anInt = 42;
+    public float $aFloat = 3.14;
+    public string $aString = "I'm a string";
+    public array $anArray = [1, 2, 3];
+    public mixed $aMixed = "I'm a string too";
+}
+
+class EntityWithUntypedProperty extends Entity {
     public $property;
 }
 
-class TestEntityWithPropertyOfNonExistentClass extends Entity {
+class EntityWithUnionProperty extends Entity {
+    public int|string $initProperty = 1;
+    public int|string $uninitProperty;
+}
+
+class EntityWithIntersectionProperty extends Entity {
+    public \Iterator&\Countable $property;
+}
+
+class EntityWithPromotedProperty extends Entity {
+    public function __construct(public int $property, ?array $data = null) {
+        parent::__construct($data);
+    }
+}
+
+class EntityWithNonExistentClassProperty extends Entity {
+    public ?NonExistentClass $nullableProperty;
     public NonExistentClass $property;
 }
 
-class TestEntityWithNullablePropertyOfNonExistentClass extends Entity {
-    public ?NonExistentClass $property;
-}
-
-         class NonInstantiableClass1 { public function __construct(int $x) {} }
-         class NonInstantiableClass2 { private function __construct() {} }
+class NonInstantiableClass1 { public function __construct(int $x) {} }
+class NonInstantiableClass2 { private function __construct() {} }
 abstract class NonInstantiableClass3 {}
-     interface NonInstantiableClass4 {}
-         trait NonInstantiableClass5 {}
-          enum NonInstantiableClass6 {}
+interface NonInstantiableClass4 {}
+trait NonInstantiableClass5 {}
+enum NonInstantiableClass6 {}
 
-class TestEntityWithPropertiesOfNonInstantiableClasses extends Entity {
+class EntityWithNonInstantiableClassProperty extends Entity {
     public NonInstantiableClass1 $property1;
     public NonInstantiableClass2 $property2;
     public NonInstantiableClass3 $property3;
@@ -76,23 +105,29 @@ class TestEntityWithPropertiesOfNonInstantiableClasses extends Entity {
     public NonInstantiableClass6 $property6;
 }
 
-class TestEntityWithNoProperties extends Entity {
-}
-
-class TestEntityWithNonBindableProperties extends Entity {
-    public array $anArray;
-    public mixed $aResource; // Will be assigned a resource during tests
-    public \stdClass $anObjectWithoutToString;
-    public string $aString; // Only this property will be bound
-}
-
-class TestEntityWithCustomTableName extends Entity {
-    public string $name = '';
-    public int $age = 0;
+class EntityWithCustomTableName extends Entity {
     protected static function tableName(): string {
         return 'custom_table_name';
     }
 }
+
+class EntityWithNoProperties extends Entity {
+}
+
+class EntityWithNonBindableProperties extends Entity {
+    public array $anArray;
+    public mixed $aResource;
+    public \stdClass $anObjectWithoutToString;
+    public string $aString; // Only this property will be bound
+}
+
+class TestEntity extends Entity {
+    public string $name;
+    public int $age;
+    public \DateTime $createdAt;
+}
+
+#endregion Classes Under Test
 
 #[CoversClass(Entity::class)]
 class EntityTest extends TestCase
@@ -112,452 +147,290 @@ class EntityTest extends TestCase
 
     #region __construct --------------------------------------------------------
 
-    function testEntityIsAbstract()
+    function testBaseClassCannotBeInstantiated()
     {
         $this->expectException(\Error::class);
         $entity = new Entity();
+    }
+
+    function testConstructWithNonPublicProperty()
+    {
+        $entity = new EntityWithNonPublicProperty([
+            'aPrivate' => 99,
+            'aProtected' => 99
+        ]);
+        $this->assertSame(1, AccessHelper::GetNonPublicProperty($entity, 'aPrivate'));
+        $this->assertSame(2, AccessHelper::GetNonPublicProperty($entity, 'aProtected'));
+    }
+
+    function testConstructWithStaticProperty()
+    {
+        $entity = new EntityWithStaticProperty([
+            'aStaticPrivate' => 99,
+            'aStaticProtected' => 99,
+            'aStaticPublic' => 99
+        ]);
+        $this->assertSame(1, AccessHelper::GetNonPublicStaticProperty(
+                             EntityWithStaticProperty::class, 'aStaticPrivate'));
+        $this->assertSame(2, AccessHelper::GetNonPublicStaticProperty(
+                             EntityWithStaticProperty::class, 'aStaticProtected'));
+        $this->assertSame(3, AccessHelper::GetNonPublicStaticProperty(
+                             EntityWithStaticProperty::class, 'aStaticPublic'));
+    }
+
+    function testConstructWithReadOnlyProperty()
+    {
+        $entity = new EntityWithReadOnlyProperty([
+            'property' => 99
+        ]);
+        $this->assertSame(1, $entity->property);
+    }
+
+    function testConstructWithUninitializedProperty()
+    {
+        $entity = new EntityWithUninitializedProperty([
+            'aBool' => true,
+            'anInt' => 42,
+            'aFloat' => 3.14,
+            'aString' => "I'm a string",
+            'anArray' => [1, 2, 3],
+            'aMixed' => "I'm a string too",
+            'anObject' => new \stdClass(),
+            'anIterable' => new \ArrayIterator([1, 2, 3])
+        ]);
+        $this->assertTrue($entity->aBool);
+        $this->assertSame(42, $entity->anInt);
+        $this->assertSame(3.14, $entity->aFloat);
+        $this->assertSame("I'm a string", $entity->aString);
+        $this->assertSame([1, 2, 3], $entity->anArray);
+        $this->assertSame("I'm a string too", $entity->aMixed);
+        // Error: Typed property must not be accessed before initialization.
+        $this->expectException(\Error::class);
+        $entity->anObject;
+        $entity->anIterable;
+    }
+
+    function testConstructWithNullableUninitializedProperty()
+    {
+        $entity = new EntityWithNullableUninitializedProperty([
+            'aBool' => true,
+            'anInt' => 42,
+            'aFloat' => 3.14,
+            'aString' => "I'm a string",
+            'anArray' => [1, 2, 3],
+            'anObject' => new \stdClass(),
+            'anIterable' => new \ArrayIterator([1, 2, 3])
+        ]);
+        $this->assertTrue($entity->aBool);
+        $this->assertSame(42, $entity->anInt);
+        $this->assertSame(3.14, $entity->aFloat);
+        $this->assertSame("I'm a string", $entity->aString);
+        $this->assertSame([1, 2, 3], $entity->anArray);
+        $this->assertInstanceOf(\stdClass::class, $entity->anObject);
+        $this->assertInstanceOf(\ArrayIterator::class, $entity->anIterable);
+    }
+
+    function testConstructWithInitializedProperty()
+    {
+        $entity = new EntityWithInitializedProperty([
+            'aBool' => false,
+            'anInt' => 99,
+            'aFloat' => 6.28,
+            'aString' => "I'm another string",
+            'anArray' => [4, 5, 6],
+            'aMixed' => "I'm another string too"
+        ]);
+        $this->assertFalse($entity->aBool);
+        $this->assertSame(99, $entity->anInt);
+        $this->assertSame(6.28, $entity->aFloat);
+        $this->assertSame("I'm another string", $entity->aString);
+        $this->assertSame([4, 5, 6], $entity->anArray);
+        $this->assertSame("I'm another string too", $entity->aMixed);
+    }
+
+    function testConstructWithUntypedProperty()
+    {
+        $entity = new EntityWithUntypedProperty([
+            'property' => 'any value'
+        ]);
+        $this->assertSame('any value', $entity->property);
+    }
+
+    function testConstructWithUnionProperty()
+    {
+        $entity = new EntityWithUnionProperty([
+            'initProperty' => 99,
+            'uninitProperty' => 99
+        ]);
+        $this->assertSame(99, $entity->initProperty);
+        // Error: Typed property must not be accessed before initialization.
+        $this->expectException(\Error::class);
+        $entity->uninitProperty;
+    }
+
+    function testConstructWithIntersectionProperty()
+    {
+        $entity = new EntityWithIntersectionProperty([
+            'property' => new \ArrayIterator([1, 2, 3])
+        ]);
+        // Error: Typed property must not be accessed before initialization.
+        $this->expectException(\Error::class);
+        $entity->property;
+    }
+
+    function testConstructWithPromotedProperty()
+    {
+        $entity = new EntityWithPromotedProperty(99, [
+            'property' => 99
+        ]);
+        $this->assertSame(99, $entity->property);
+    }
+
+    function testConstructWithNonExistentClassProperty()
+    {
+        $entity = new EntityWithNonExistentClassProperty([
+            'nullableProperty' => null,
+          //'property' => new NonExistentClass()
+        ]);
+        $this->assertNull($entity->nullableProperty);
+        // Error: Typed property must not be accessed before initialization.
+        $this->expectException(\Error::class);
+        $entity->property;
+    }
+
+
+    function testConstructWithNonInstantiableClassProperty()
+    {
+        $entity = new EntityWithNonInstantiableClassProperty([
+          //'property1' => new NonInstantiableClass1(1),
+          //'property2' => new NonInstantiableClass2(),
+          //'property3' => new NonInstantiableClass3(),
+          //'property4' => new NonInstantiableClass4(),
+          //'property5' => new NonInstantiableClass5(),
+          //'property6' => new NonInstantiableClass6()
+        ]);
+        // Error: Typed property must not be accessed before initialization.
+        $this->expectException(\Error::class);
+        $entity->property1;
+        $entity->property2;
+        $entity->property3;
+        $entity->property4;
+        $entity->property5;
+        $entity->property6;
     }
 
     function testConstructWithoutData()
     {
         $entity = new TestEntity();
         $this->assertSame(0, $entity->id);
+        // Error: Typed property must not be accessed before initialization.
+        $this->expectException(\Error::class);
+        $entity->name;
+        $entity->age;
+        $entity->createdAt;
+    }
+
+    function testConstructWithEmptyData()
+    {
+        $entity = new TestEntity([]);
+        $this->assertSame(0, $entity->id);
         $this->assertSame('', $entity->name);
         $this->assertSame(0, $entity->age);
+        $this->assertInstanceOf(\DateTime::class, $entity->createdAt);
     }
 
     function testConstructWithDataExcludingId()
     {
-        $entity = new TestEntity(['name' => 'John', 'age' => 30]);
+        $entity = new TestEntity([
+            'name' => 'John',
+            'age' => 30,
+            'createdAt' => '2021-01-01'
+        ]);
         $this->assertSame(0, $entity->id);
         $this->assertSame('John', $entity->name);
         $this->assertSame(30, $entity->age);
+        $this->assertInstanceOf(\DateTime::class, $entity->createdAt);
+        $this->assertSame('2021-01-01', $entity->createdAt->format('Y-m-d'));
     }
 
     function testConstructWithDataIncludingId()
     {
-        $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
-        $this->assertSame(1, $entity->id);
+        $entity = new TestEntity([
+            'id' => 42,
+            'name' => 'John',
+            'age' => 30,
+            'createdAt' => '2021-01-01'
+        ]);
+        $this->assertSame(42, $entity->id);
         $this->assertSame('John', $entity->name);
         $this->assertSame(30, $entity->age);
+        $this->assertInstanceOf(\DateTime::class, $entity->createdAt);
+        $this->assertSame('2021-01-01', $entity->createdAt->format('Y-m-d'));
     }
 
     function testConstructWithUnknownProperty()
     {
         $entity = new TestEntity([
-            'name' => 'John',
-            'age' => 30,
             'unknown' => 'value'
         ]);
-        $this->assertSame(0, $entity->id);
-        $this->assertSame('John', $entity->name);
-        $this->assertSame(30, $entity->age);
         $this->assertFalse(\property_exists($entity, 'unknown'));
-    }
-
-    function testConstructWithStaticProperties()
-    {
-        $entity = new TestEntity([
-            'name' => 'John',
-            'age' => 30,
-            'aStaticPrivateProperty' => 99,
-            'aStaticProtectedProperty' => 99,
-            'aStaticPublicProperty' => 99
-        ]);
-        $this->assertSame(0, $entity->id);
-        $this->assertSame('John', $entity->name);
-        $this->assertSame(30, $entity->age);
-        // Static properties should remain unchanged.
-        $this->assertSame(0, AccessHelper::GetNonPublicStaticProperty(
-            TestEntity::class, 'aStaticPrivateProperty'));
-        $this->assertSame(0, AccessHelper::GetNonPublicStaticProperty(
-            TestEntity::class, 'aStaticProtectedProperty'));
-        $this->assertSame(0, AccessHelper::GetNonPublicStaticProperty(
-            TestEntity::class, 'aStaticPublicProperty'));
-    }
-
-    function testConstructWithNonPublicProperties()
-    {
-        $entity = new TestEntity([
-            'name' => 'John',
-            'age' => 30,
-            'aPrivateProperty' => 99,
-            'aProtectedProperty' => 99
-        ]);
-        $this->assertSame(0, $entity->id);
-        $this->assertSame('John', $entity->name);
-        $this->assertSame(30, $entity->age);
-        // Non-public properties should remain unchanged.
-        $this->assertSame(0, AccessHelper::GetNonPublicProperty(
-            $entity, 'aPrivateProperty'));
-        $this->assertSame(0, AccessHelper::GetNonPublicProperty(
-            $entity, 'aProtectedProperty'));
     }
 
     function testConstructWithIntegerKeys()
     {
-        $entity = new TestEntity([0 => 'John', 1 => 30]);
+        $entity = new TestEntity([
+            'John',
+            30,
+            '2021-01-01'
+        ]);
         $this->assertSame(0, $entity->id);
-        $this->assertSame('', $entity->name); // Name should remain default
-        $this->assertSame(0, $entity->age); // Age should remain default
+        $this->assertSame('', $entity->name);
+        $this->assertSame(0, $entity->age);
+        $this->assertInstanceOf(\DateTime::class, $entity->createdAt);
     }
 
     function testConstructWithIncorrectTypes()
     {
-        $entity = new TestEntity(['name' => 30, 'age' => 'John']);
+        $entity = new TestEntity([
+            'id' => '42',
+            'name' => 30,
+            'age' => '30',
+            'createdAt' => 20210101
+        ]);
         $this->assertSame(0, $entity->id);
-        $this->assertSame('', $entity->name); // Name should remain default
-        $this->assertSame(0, $entity->age); // Age should remain default
-    }
-
-    function testConstructWithDateTimeFields()
-    {
-        $entity = new TestEntityWithDateTime([
-            'createdAt' => '2025-03-15 12:45:00',
-            'registeredOn' => '2025-03-15'
-        ]);
+        $this->assertSame('', $entity->name);
+        $this->assertSame(0, $entity->age);
         $this->assertInstanceOf(\DateTime::class, $entity->createdAt);
-        $this->assertInstanceOf(\DateTime::class, $entity->registeredOn);
-        $this->assertSame('2025-03-15 12:45:00', $entity->createdAt->format('Y-m-d H:i:s'));
-        $this->assertSame('2025-03-15', $entity->registeredOn->format('Y-m-d'));
-    }
-
-    function testConstructWithMalformedDateTimeField()
-    {
-        $entity = new TestEntityWithDateTime([
-            'createdAt' => '02.12.20239'
-        ]);
-        $this->assertInstanceOf(\DateTime::class, $entity->createdAt);
-    }
-
-    #[DataProviderExternal(DataHelper::class, 'NonStringProvider')]
-    function testConstructWithhNonStringDateTimeField($value)
-    {
-        $entity = new TestEntityWithDateTime([
-            'createdAt' => $value
-        ]);
-        $this->assertInstanceOf(\DateTime::class, $entity->createdAt);
-    }
-
-    function testConstructWithUninitializedProperties()
-    {
-        $entity = new TestEntityWithUninitializedProperties([
-            'aBool' => true,
-            'anInt' => 42,
-            'aFloat' => 3.14,
-            'aString' => 'Hello, World!',
-            'anArray' => ['key' => 'value'],
-            'aStdClass' => new \stdClass()
-        ]);
-        $this->assertIsBool($entity->aBool);
-        $this->assertSame(true, $entity->aBool);
-        $this->assertIsInt($entity->anInt);
-        $this->assertSame(42, $entity->anInt);
-        $this->assertIsFloat($entity->aFloat);
-        $this->assertSame(3.14, $entity->aFloat);
-        $this->assertIsString($entity->aString);
-        $this->assertSame('Hello, World!', $entity->aString);
-        $this->assertIsArray($entity->anArray);
-        $this->assertSame(['key' => 'value'], $entity->anArray);
-        $this->assertInstanceOf(\stdClass::class, $entity->aStdClass);
-    }
-
-    function testConstructWithReadOnlyProperty()
-    {
-        $entity = new TestEntityWithReadOnlyProperty([
-            'property' => "I'm overwriting"
-        ]);
-        $this->assertSame("I'm readonly", $entity->property);
-    }
-
-    function testConstructWithUntypedProperty()
-    {
-        $entity = new TestEntityWithUntypedProperty([
-            'property' => 'value'
-        ]);
-        $this->assertSame('value', $entity->property);
-    }
-
-    function testConstructWithPropertyOfNonExistentClass()
-    {
-        $entity = new TestEntityWithPropertyOfNonExistentClass([
-            'property' => null
-        ]);
-        $this->assertTrue(true); // No error should be thrown
-    }
-
-    function testConstructWithNullablePropertyOfNonExistentClass()
-    {
-        $entity = new TestEntityWithNullablePropertyOfNonExistentClass([
-            'property' => null
-        ]);
-        $this->assertTrue(true); // No error should be thrown
-    }
-
-    function testConstructWithPropertiesOfNonInstantiableClasses()
-    {
-        $entity = new TestEntityWithPropertiesOfNonInstantiableClasses([
-            'property1' => null,
-            'property2' => null,
-            'property3' => null,
-            'property4' => null,
-            'property5' => null,
-            'property6' => null
-        ]);
-        $this->assertTrue(true); // No error should be thrown
     }
 
     #endregion __construct
 
     #region Save ---------------------------------------------------------------
 
-    function testSaveFailsToInsertOnEntityWithNoProperties()
+    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
+    function testSaveCallsInsertWhenIdIsZero($returnValue)
     {
-        $database = Database::Instance();
-        $database->expects($this->never())
-            ->method('Execute');
-
-        $entity = new TestEntityWithNoProperties();
-
-        $this->assertFalse($entity->Save());
+        $entity = $this->getMockBuilder(TestEntity::class)
+            ->setConstructorArgs([[]]) // i.e., id = 0
+            ->onlyMethods(['insert'])
+            ->getMock();
+        $entity->expects($this->once())
+            ->method('insert')
+            ->willReturn($returnValue);
+        $this->assertSame($returnValue, $entity->Save());
     }
 
-    function testSaveFailsToUpdateOnEntityWithNoProperties()
+    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
+    function testSaveCallsUpdateWhenIdIsNotZero($returnValue)
     {
-        $database = Database::Instance();
-        $database->expects($this->never())
-            ->method('Execute');
-
-        $entity = new TestEntityWithNoProperties(['id' => 1]);
-
-        $this->assertFalse($entity->Save());
-    }
-
-    function testSaveFailsToInsertIfExecuteFails()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn(null);
-
-        $entity = new TestEntity(['name' => 'John', 'age' => 30]);
-        $this->assertFalse($entity->Save());
-    }
-
-    function testSaveFailsToUpdateIfExecuteFails()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn(null);
-
-        $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
-        $this->assertFalse($entity->Save());
-    }
-
-    function testSaveFailsToUpdateIfNoRowsAffected()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->isInstanceOf(UpdateQuery::class))
-            ->willReturn($this->createStub(ResultSet::class));
-        $database->expects($this->once())
-            ->method('LastAffectedRowCount')
-            ->willReturn(-1); // Simulates MySQL failure
-
-        $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
-        $this->assertFalse($entity->Save());
-    }
-
-    function testSaveInsertsIfIdIsZero()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(InsertQuery::class, $query);
-                $this->assertSame('testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table'));
-                $this->assertSame('name, age',
-                    AccessHelper::GetNonPublicProperty($query, 'columns'));
-                $this->assertSame(':name, :age',
-                    AccessHelper::GetNonPublicProperty($query, 'values'));
-                $this->assertSame(['name' => 'John', 'age' => 30],
-                    $query->Bindings());
-                return true;
-            }))
-            ->willReturn($this->createStub(ResultSet::class));
-        $database->expects($this->once())
-            ->method('LastInsertId')
-            ->willReturn(1);
-
-        $entity = new TestEntity(['name' => 'John', 'age' => 30]);
-        $this->assertTrue($entity->Save());
-        $this->assertSame(1, $entity->id);
-    }
-
-    function testSaveUpdatesIfIdIsNotZero()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(UpdateQuery::class, $query);
-                $this->assertSame('testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table'));
-                $this->assertSame(['name', 'age'],
-                    AccessHelper::GetNonPublicProperty($query, 'columns'));
-                $this->assertSame([':name', ':age'],
-                    AccessHelper::GetNonPublicProperty($query, 'values'));
-                $this->assertSame('id = :id',
-                    AccessHelper::GetNonPublicProperty($query, 'condition'));
-                $this->assertSame(['id' => 1, 'name' => 'John', 'age' => 30],
-                    $query->Bindings());
-                return true;
-            }))
-            ->willReturn($this->createStub(ResultSet::class));
-
-        $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
-        $this->assertTrue($entity->Save());
-        $this->assertSame(1, $entity->id); // ID should remain unchanged
-    }
-
-    function testSaveInsertsWithDateTimeFields()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(InsertQuery::class, $query);
-                $this->assertSame('createdAt, registeredOn',
-                    AccessHelper::GetNonPublicProperty($query, 'columns'));
-                $this->assertSame(':createdAt, :registeredOn',
-                    AccessHelper::GetNonPublicProperty($query, 'values'));
-                $bindings = $query->Bindings();
-                $this->assertArrayHasKey('createdAt', $bindings);
-                $this->assertSame('2025-03-15 12:45:00', $bindings['createdAt']);
-                // Since 'registeredOn' is a DATE field, the time part should be
-                // automatically set to the current time. Compare the time part
-                // with the current time with a 10-second delta.
-                $this->assertArrayHasKey('registeredOn', $bindings);
-                $registeredOnDate = \substr($bindings['registeredOn'], 0, 10);
-                $registeredOnTime = \substr($bindings['registeredOn'], 11);
-                $this->assertSame('2025-03-15', $registeredOnDate);
-                $this->assertEqualsWithDelta(\time(), \strtotime($registeredOnTime), 10);
-                return true;
-            }))
-            ->willReturn($this->createStub(ResultSet::class));
-
-        $entity = new TestEntityWithDateTime([
-            'createdAt' => '2025-03-15 12:45:00',
-            'registeredOn' => '2025-03-15'
-        ]);
-        $entity->Save();
-    }
-
-    function testSaveUpdatesWithDateTimeFields()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(UpdateQuery::class, $query);
-                $this->assertSame(['createdAt', 'registeredOn'],
-                    AccessHelper::GetNonPublicProperty($query, 'columns'));
-                $this->assertSame([':createdAt', ':registeredOn'],
-                    AccessHelper::GetNonPublicProperty($query, 'values'));
-                $bindings = $query->Bindings();
-                $this->assertArrayHasKey('id', $bindings);
-                $this->assertSame(1, $bindings['id']);
-                $this->assertArrayHasKey('createdAt', $bindings);
-                $this->assertSame('2025-03-15 12:45:00', $bindings['createdAt']);
-                // Since 'registeredOn' is a DATE field, the time part should be
-                // automatically set to the current time. Compare the time part
-                // with the current time with a 10-second delta.
-                $this->assertArrayHasKey('registeredOn', $bindings);
-                $registeredOnDate = \substr($bindings['registeredOn'], 0, 10);
-                $registeredOnTime = \substr($bindings['registeredOn'], 11);
-                $this->assertSame('2025-03-15', $registeredOnDate);
-                $this->assertEqualsWithDelta(\time(), \strtotime($registeredOnTime), 10);
-                return true;
-            }))
-            ->willReturn($this->createStub(ResultSet::class));
-
-        $entity = new TestEntityWithDateTime([
-            'id' => 1,
-            'createdAt' => '2025-03-15 12:45:00',
-            'registeredOn' => '2025-03-15'
-        ]);
-        $entity->Save();
-    }
-
-    function testSaveInsertSkipsNonBindableProperties()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(InsertQuery::class, $query);
-                $this->assertSame('testentitywithnonbindableproperties',
-                    AccessHelper::GetNonPublicProperty($query, 'table'));
-                $this->assertSame('aString',
-                    AccessHelper::GetNonPublicProperty($query, 'columns'));
-                $this->assertSame(':aString',
-                    AccessHelper::GetNonPublicProperty($query, 'values'));
-                $this->assertSame(['aString' => 'Hello, World!'],
-                    $query->Bindings());
-                return true;
-            }))
-            ->willReturn($this->createStub(ResultSet::class));
-        $database->expects($this->once())
-            ->method('LastInsertId')
-            ->willReturn(1);
-
-        $entity = new TestEntityWithNonBindableProperties([
-            'anArray' => ['key' => 'value'],
-            'aResource' => \fopen('php://memory', 'r'),
-            'anObjectWithoutToString' => new \stdClass(),
-            'aString' => 'Hello, World!'
-        ]);
-
-        $this->assertTrue($entity->Save());
-
-        \fclose($entity->aResource);
-    }
-
-    function testSaveUpdateSkipsNonBindableProperties()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(UpdateQuery::class, $query);
-                $this->assertSame('testentitywithnonbindableproperties',
-                    AccessHelper::GetNonPublicProperty($query, 'table'));
-                $this->assertSame(['aString'],
-                    AccessHelper::GetNonPublicProperty($query, 'columns'));
-                $this->assertSame([':aString'],
-                    AccessHelper::GetNonPublicProperty($query, 'values'));
-                $this->assertSame('id = :id',
-                    AccessHelper::GetNonPublicProperty($query, 'condition'));
-                $this->assertSame(['id' => 1, 'aString' => 'Hello, World!'],
-                    $query->Bindings());
-                return true;
-            }))
-            ->willReturn($this->createStub(ResultSet::class));
-
-        $entity = new TestEntityWithNonBindableProperties([
-            'id' => 1,
-            'anArray' => ['key' => 'value'],
-            'aResource' => \fopen('php://memory', 'r'),
-            'anObjectWithoutToString' => new \stdClass(),
-            'aString' => 'Hello, World!'
-        ]);
-
-        $this->assertTrue($entity->Save());
-
-        \fclose($entity->aResource);
+        $entity = $this->getMockBuilder(TestEntity::class)
+            ->setConstructorArgs([['id' => 1]])
+            ->onlyMethods(['update'])
+            ->getMock();
+        $entity->expects($this->once())
+            ->method('update')
+            ->willReturn($returnValue);
+        $this->assertSame($returnValue, $entity->Save());
     }
 
     #endregion Save
@@ -569,8 +442,7 @@ class EntityTest extends TestCase
         $database = Database::Instance();
         $database->expects($this->never())
             ->method('Execute');
-
-        $entity = new TestEntity(['name' => 'John', 'age' => 30]);
+        $entity = new TestEntity();
         $this->assertFalse($entity->Delete());
     }
 
@@ -580,12 +452,12 @@ class EntityTest extends TestCase
         $database->expects($this->once())
             ->method('Execute')
             ->willReturn(null);
-
-        $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
+        $entity = new TestEntity(['id' => 1]);
         $this->assertFalse($entity->Delete());
+        $this->assertSame(1, $entity->id); // ID should remain unchanged
     }
 
-    function testDeleteFailsIfNoRowDeleted()
+    function testDeleteFailsIfLastAffectedRowCountIsNotOne()
     {
         $database = Database::Instance();
         $database->expects($this->once())
@@ -594,34 +466,38 @@ class EntityTest extends TestCase
             ->willReturn($this->createStub(ResultSet::class));
         $database->expects($this->once())
             ->method('LastAffectedRowCount')
-            ->willReturn(0); // Simulates no row was deleted
-
-        $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
+            ->willReturn(0);
+        $entity = new TestEntity(['id' => 1]);
         $this->assertFalse($entity->Delete());
         $this->assertSame(1, $entity->id); // ID should remain unchanged
     }
 
-    function testDeleteSucceedsIfRowExists()
+    function testDeleteSucceedsIfLastAffectedRowCountIsOne()
     {
         $database = Database::Instance();
         $database->expects($this->once())
             ->method('Execute')
             ->with($this->callback(function($query) {
                 $this->assertInstanceOf(DeleteQuery::class, $query);
-                $this->assertSame('testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table'));
-                $this->assertSame('id = :id',
-                    AccessHelper::GetNonPublicProperty($query, 'condition'));
-                $this->assertSame(['id' => 1],
-                    $query->Bindings());
+                $this->assertSame(
+                    'testentity',
+                    AccessHelper::GetNonPublicProperty($query, 'table')
+                );
+                $this->assertSame(
+                    'id = :id',
+                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                );
+                $this->assertSame(
+                    ['id' => 1],
+                    $query->Bindings()
+                );
                 return true;
             }))
             ->willReturn($this->createStub(ResultSet::class));
         $database->expects($this->once())
             ->method('LastAffectedRowCount')
-            ->willReturn(1); // Simulates row deletion
-
-        $entity = new TestEntity(['id' => 1, 'name' => 'John', 'age' => 30]);
+            ->willReturn(1);
+        $entity = new TestEntity(['id' => 1]);
         $this->assertTrue($entity->Delete());
         $this->assertSame(0, $entity->id); // ID should be reset to zero
     }
@@ -630,333 +506,340 @@ class EntityTest extends TestCase
 
     #region FindById -----------------------------------------------------------
 
-    function testFindByIdReturnsNullIfExecuteFails()
+    function testFindByIdFailsIfExecuteFails()
     {
         $database = Database::Instance();
         $database->expects($this->once())
             ->method('Execute')
             ->willReturn(null);
-
         $entity = TestEntity::FindById(1);
-
         $this->assertNull($entity);
     }
 
-    function testFindByIdReturnsNullIfNotFound()
+    function testFindByIdFailsIfResultSetIsEmpty()
     {
         $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->method('Row')->willReturn(null);
-
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn($resultSet);
-
-        $entity = TestEntity::FindById(99);
-
-        $this->assertNull($entity);
-    }
-
-    function testFindByIdReturnsEntityIfExists()
-    {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->method('Row')->willReturn([
-            'id' => 1,
-            'name' => 'John Doe',
-            'age' => 30
-        ]);
-
+        $resultSet->method('Row')
+            ->willReturn(null);
         $database = Database::Instance();
         $database->expects($this->once())
             ->method('Execute')
             ->with($this->callback(function($query) {
                 $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame('testentity',
-                    AccessHelper::GetNonPublicProperty($query, 'table'));
-                $this->assertSame('*',
-                    AccessHelper::GetNonPublicProperty($query, 'columns'));
-                $this->assertSame('id = :id',
-                    AccessHelper::GetNonPublicProperty($query, 'condition'));
-                $this->assertSame(['id' => 1], $query->Bindings());
+                $this->assertSame(
+                    'testentity',
+                    AccessHelper::GetNonPublicProperty($query, 'table')
+                );
+                $this->assertSame(
+                    '*',
+                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                );
+                $this->assertSame(
+                    'id = :id',
+                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                );
+                $this->assertNull(
+                    AccessHelper::GetNonPublicProperty($query, 'orderBy')
+                );
+                $this->assertNull(
+                    AccessHelper::GetNonPublicProperty($query, 'limit')
+                );
+                $this->assertSame(
+                    ['id' => 1],
+                    $query->Bindings()
+                );
                 return true;
             }))
             ->willReturn($resultSet);
-
         $entity = TestEntity::FindById(1);
+        $this->assertNull($entity);
+    }
 
+    function testFindByIdSucceedsIfResultSetIsNotEmpty()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->method('Row')
+            ->willReturn([
+                'id' => 1,
+                'name' => 'John',
+                'age' => 30,
+                'createdAt' => '2021-01-01'
+            ]);
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame(
+                    'testentity',
+                    AccessHelper::GetNonPublicProperty($query, 'table')
+                );
+                $this->assertSame(
+                    '*',
+                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                );
+                $this->assertSame(
+                    'id = :id',
+                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                );
+                $this->assertNull(
+                    AccessHelper::GetNonPublicProperty($query, 'orderBy')
+                );
+                $this->assertNull(
+                    AccessHelper::GetNonPublicProperty($query, 'limit')
+                );
+                $this->assertSame(
+                    ['id' => 1],
+                    $query->Bindings()
+                );
+                return true;
+            }))
+            ->willReturn($resultSet);
+        $entity = TestEntity::FindById(1);
         $this->assertInstanceOf(TestEntity::class, $entity);
         $this->assertSame(1, $entity->id);
-        $this->assertSame('John Doe', $entity->name);
+        $this->assertSame('John', $entity->name);
         $this->assertSame(30, $entity->age);
+        $this->assertSame('2021-01-01', $entity->createdAt->format('Y-m-d'));
     }
 
     #endregion FindById
 
     #region FindFirst ----------------------------------------------------------
 
-    function testFindFirstReturnsNullIfExecuteFails()
+    function testFindFirstFailsIfExecuteFails()
     {
         $database = Database::Instance();
         $database->expects($this->once())
             ->method('Execute')
             ->willReturn(null);
-
-        $entity = TestEntity::FindFirst(
-            'status = :status',
-            ['status' => 'active']
-        );
-
-        $this->assertNull($entity);
-    }
-
-    function testFindFirstReturnsNullIfNotFound()
-    {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->method('Row')->willReturn(null);
-
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn($resultSet);
-
-        $entity = TestEntity::FindFirst(
-            'status = :status',
-            ['status' => 'inactive']
-        );
-
-        $this->assertNull($entity);
-    }
-
-    function testFindFirstReturnsEntityWhenNoParametersProvided()
-    {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->method('Row')->willReturn([
-            'id' => 1,
-            'name' => 'First User',
-            'age' => 25
-        ]);
-
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame('testentity', AccessHelper::GetNonPublicProperty($query, 'table'));
-                $this->assertSame('*', AccessHelper::GetNonPublicProperty($query, 'columns'));
-                $this->assertNull(AccessHelper::GetNonPublicProperty($query, 'condition'));
-                $this->assertNull(AccessHelper::GetNonPublicProperty($query, 'orderBy'));
-                $this->assertSame('1', AccessHelper::GetNonPublicProperty($query, 'limit'));
-                $this->assertSame([], $query->Bindings());
-                return true;
-            }))
-            ->willReturn($resultSet);
-
         $entity = TestEntity::FindFirst();
-
-        $this->assertInstanceOf(TestEntity::class, $entity);
-        $this->assertSame(1, $entity->id);
-        $this->assertSame('First User', $entity->name);
-        $this->assertSame(25, $entity->age);
+        $this->assertNull($entity);
     }
 
-    function testFindFirstReturnsEntityIfExists()
+    function testFindFirstFailsIfResultSetIsEmpty()
     {
         $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->method('Row')->willReturn([
-            'id' => 1,
-            'name' => 'John Doe',
-            'age' => 30
-        ]);
-
+        $resultSet->method('Row')
+            ->willReturn(null);
         $database = Database::Instance();
         $database->expects($this->once())
             ->method('Execute')
             ->with($this->callback(function($query) {
                 $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame('testentity', AccessHelper::GetNonPublicProperty($query, 'table'));
-                $this->assertSame('*', AccessHelper::GetNonPublicProperty($query, 'columns'));
-                $this->assertSame('status = :status', AccessHelper::GetNonPublicProperty($query, 'condition'));
-                $this->assertNull(AccessHelper::GetNonPublicProperty($query, 'orderBy'));
-                $this->assertSame('1', AccessHelper::GetNonPublicProperty($query, 'limit'));
-                $this->assertSame(['status' => 'active'], $query->Bindings());
+                $this->assertSame(
+                    'testentity',
+                    AccessHelper::GetNonPublicProperty($query, 'table')
+                );
+                $this->assertSame(
+                    '*',
+                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                );
+                $this->assertNull(
+                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                );
+                $this->assertNull(
+                    AccessHelper::GetNonPublicProperty($query, 'orderBy')
+                );
+                $this->assertSame(
+                    '1',
+                    AccessHelper::GetNonPublicProperty($query, 'limit')
+                );
+                $this->assertSame(
+                    [],
+                    $query->Bindings()
+                );
                 return true;
             }))
             ->willReturn($resultSet);
+        $entity = TestEntity::FindFirst(); // No arguments
+        $this->assertNull($entity);
+    }
 
+    function testFindFirstSucceedsIfResultSetIsNotEmpty()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->method('Row')
+            ->willReturn([
+                'id' => 1,
+                'name' => 'John',
+                'age' => 30,
+                'createdAt' => '2021-01-01'
+            ]);
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame(
+                    'testentity',
+                    AccessHelper::GetNonPublicProperty($query, 'table')
+                );
+                $this->assertSame(
+                    '*',
+                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                );
+                $this->assertSame(
+                    'age > :age',
+                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                );
+                $this->assertSame(
+                    'name DESC',
+                    AccessHelper::GetNonPublicProperty($query, 'orderBy')
+                );
+                $this->assertSame(
+                    '1',
+                    AccessHelper::GetNonPublicProperty($query, 'limit')
+                );
+                $this->assertSame(
+                    ['age' => 29],
+                    $query->Bindings()
+                );
+                return true;
+            }))
+            ->willReturn($resultSet);
         $entity = TestEntity::FindFirst(
-            'status = :status',
-            ['status' => 'active']
+            condition: 'age > :age',
+            bindings: ['age' => 29],
+            orderBy: 'name DESC'
         );
-
         $this->assertInstanceOf(TestEntity::class, $entity);
         $this->assertSame(1, $entity->id);
-        $this->assertSame('John Doe', $entity->name);
+        $this->assertSame('John', $entity->name);
         $this->assertSame(30, $entity->age);
-    }
-
-    function testFindFirstReturnsEntityIfExistsWithOrderBy()
-    {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->method('Row')->willReturn([
-            'id' => 2,
-            'name' => 'Jane Doe',
-            'age' => 25
-        ]);
-
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame('testentity', AccessHelper::GetNonPublicProperty($query, 'table'));
-                $this->assertSame('*', AccessHelper::GetNonPublicProperty($query, 'columns'));
-                $this->assertSame('status = :status', AccessHelper::GetNonPublicProperty($query, 'condition'));
-                $this->assertSame('created_at DESC', AccessHelper::GetNonPublicProperty($query, 'orderBy'));
-                $this->assertSame('1', AccessHelper::GetNonPublicProperty($query, 'limit'));
-                $this->assertSame(['status' => 'active'], $query->Bindings());
-                return true;
-            }))
-            ->willReturn($resultSet);
-
-        $entity = TestEntity::FindFirst(
-            'status = :status',
-            ['status' => 'active'],
-            'created_at DESC'
-        );
-
-        $this->assertInstanceOf(TestEntity::class, $entity);
-        $this->assertSame(2, $entity->id);
-        $this->assertSame('Jane Doe', $entity->name);
-        $this->assertSame(25, $entity->age);
+        $this->assertSame('2021-01-01', $entity->createdAt->format('Y-m-d'));
     }
 
     #endregion FindFirst
 
     #region Find ---------------------------------------------------------------
 
-    function testFindReturnsEmptyArrayIfExecuteFails()
+    function testFindFailsIfExecuteFails()
     {
         $database = Database::Instance();
         $database->expects($this->once())
             ->method('Execute')
             ->willReturn(null);
-
         $entities = TestEntity::Find();
-
         $this->assertIsArray($entities);
         $this->assertEmpty($entities);
     }
 
-    function testFindReturnsEmptyArrayIfNotFound()
+    function testFindFailsIfResultSetIsEmpty()
     {
         $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->method('Row')->willReturn(null);
-
+        $resultSet->method('Row')
+            ->willReturn(null);
         $database = Database::Instance();
         $database->expects($this->once())
             ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame(
+                    'testentity',
+                    AccessHelper::GetNonPublicProperty($query, 'table')
+                );
+                $this->assertSame(
+                    '*',
+                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                );
+                $this->assertNull(
+                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                );
+                $this->assertNull(
+                    AccessHelper::GetNonPublicProperty($query, 'orderBy')
+                );
+                $this->assertNull(
+                    AccessHelper::GetNonPublicProperty($query, 'limit')
+                );
+                $this->assertSame(
+                    [],
+                    $query->Bindings()
+                );
+                return true;
+            }))
             ->willReturn($resultSet);
-
-        $entities = TestEntity::Find();
-
+        $entities = TestEntity::Find(); // No arguments
         $this->assertIsArray($entities);
         $this->assertEmpty($entities);
     }
 
-    function testFindReturnsArrayOfEntitiesWhenNoParametersProvided()
+    function testFindSucceedsIfResultSetIsNotEmpty()
     {
         $resultSet = $this->createMock(ResultSet::class);
         $resultSet->expects($invokedCount = $this->exactly(3))
             ->method('Row')
             ->willReturnCallback(function() use($invokedCount) {
                 switch ($invokedCount->numberOfInvocations()) {
-                    case 1:
-                        return ['id' => 3, 'name' => 'Alice Doe', 'age' => 27];
-                    case 2:
-                        return ['id' => 4, 'name' => 'Bob Smith', 'age' => 35];
-                    case 3:
-                        return null; // Stop iteration
+                case 1:
+                    return [
+                        'id' => 3,
+                        'name' => 'Alice Doe',
+                        'age' => 27,
+                        'createdAt' => '2021-01-01'
+                    ];
+                case 2:
+                    return [
+                        'id' => 4,
+                        'name' => 'Aziz Smith',
+                        'age' => 35,
+                        'createdAt' => '2021-01-02'
+                    ];
+                case 3:
+                    return null; // Stop iteration
                 }
             });
-
         $database = Database::Instance();
         $database->expects($this->once())
             ->method('Execute')
             ->with($this->callback(function($query) {
                 $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame('testentity', AccessHelper::GetNonPublicProperty($query, 'table'));
-                $this->assertSame('*', AccessHelper::GetNonPublicProperty($query, 'columns'));
-                $this->assertNull(AccessHelper::GetNonPublicProperty($query, 'condition'));
-                $this->assertNull(AccessHelper::GetNonPublicProperty($query, 'orderBy'));
-                $this->assertNull(AccessHelper::GetNonPublicProperty($query, 'limit'));
-                $this->assertSame([], $query->Bindings());
+                $this->assertSame(
+                    'testentity',
+                    AccessHelper::GetNonPublicProperty($query, 'table')
+                );
+                $this->assertSame(
+                    '*',
+                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                );
+                $this->assertSame(
+                    'name LIKE :name AND age >= :age',
+                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                );
+                $this->assertSame(
+                    'createdAt DESC',
+                    AccessHelper::GetNonPublicProperty($query, 'orderBy')
+                );
+                $this->assertSame(
+                    '10 OFFSET 5',
+                    AccessHelper::GetNonPublicProperty($query, 'limit')
+                );
+                $this->assertSame(
+                    ['name' => 'A%', 'age' => 25],
+                    $query->Bindings()
+                );
                 return true;
             }))
             ->willReturn($resultSet);
-
-        $entities = TestEntity::Find();
-
-        $this->assertIsArray($entities);
-        $this->assertCount(2, $entities);
-        $this->assertInstanceOf(TestEntity::class, $entities[0]);
-            $this->assertSame(         3 , $entities[0]->id);
-            $this->assertSame('Alice Doe', $entities[0]->name);
-            $this->assertSame(        27 , $entities[0]->age);
-        $this->assertInstanceOf(TestEntity::class, $entities[1]);
-            $this->assertSame(         4 , $entities[1]->id);
-            $this->assertSame('Bob Smith', $entities[1]->name);
-            $this->assertSame(        35 , $entities[1]->age);
-    }
-
-    function testFindReturnsArrayOfEntitiesWhenAllParametersProvided()
-    {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->expects($invokedCount = $this->exactly(3))
-            ->method('Row')
-            ->willReturnCallback(function() use($invokedCount) {
-                switch ($invokedCount->numberOfInvocations()) {
-                    case 1:
-                        return ['id' => 3, 'name' => 'Alice Doe', 'age' => 27];
-                    case 2:
-                        return ['id' => 4, 'name' => 'Bob Smith', 'age' => 35];
-                    case 3:
-                        return null; // Stop iteration
-                }
-            });
-
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame('testentity', AccessHelper::GetNonPublicProperty($query, 'table'));
-                $this->assertSame('*', AccessHelper::GetNonPublicProperty($query, 'columns'));
-                $this->assertSame('status = :status AND age >= :minAge', AccessHelper::GetNonPublicProperty($query, 'condition'));
-                $this->assertSame('createdAt DESC', AccessHelper::GetNonPublicProperty($query, 'orderBy'));
-                $this->assertSame('10 OFFSET 5', AccessHelper::GetNonPublicProperty($query, 'limit'));
-                $this->assertSame(['status' => 'active', 'minAge' => 25], $query->Bindings());
-                return true;
-            }))
-            ->willReturn($resultSet);
-
         $entities = TestEntity::Find(
-            'status = :status AND age >= :minAge',
-            ['status' => 'active', 'minAge' => 25],
-            'createdAt DESC',
-            10,
-            5
+            condition: 'name LIKE :name AND age >= :age',
+            bindings: ['name' => 'A%', 'age' => 25],
+            orderBy: 'createdAt DESC',
+            limit: 10,
+            offset: 5
         );
-
         $this->assertIsArray($entities);
         $this->assertCount(2, $entities);
         $this->assertInstanceOf(TestEntity::class, $entities[0]);
-            $this->assertSame(         3 , $entities[0]->id);
-            $this->assertSame('Alice Doe', $entities[0]->name);
-            $this->assertSame(        27 , $entities[0]->age);
+        $this->assertSame(3           , $entities[0]->id);
+        $this->assertSame('Alice Doe' , $entities[0]->name);
+        $this->assertSame(27          , $entities[0]->age);
+        $this->assertSame('2021-01-01', $entities[0]->createdAt->format('Y-m-d'));
         $this->assertInstanceOf(TestEntity::class, $entities[1]);
-            $this->assertSame(         4 , $entities[1]->id);
-            $this->assertSame('Bob Smith', $entities[1]->name);
-            $this->assertSame(        35 , $entities[1]->age);
+        $this->assertSame(4           , $entities[1]->id);
+        $this->assertSame('Aziz Smith', $entities[1]->name);
+        $this->assertSame(35          , $entities[1]->age);
+        $this->assertSame('2021-01-02', $entities[1]->createdAt->format('Y-m-d'));
     }
 
     #endregion Find
@@ -969,14 +852,237 @@ class EntityTest extends TestCase
         $database->expects($this->once())
             ->method('Execute')
             ->with($this->callback(function($query) {
-                $this->assertInstanceOf(InsertQuery::class, $query);
-                $this->assertSame('custom_table_name', AccessHelper::GetNonPublicProperty($query, 'table'));
+                $this->assertInstanceOf(DeleteQuery::class, $query);
+                $this->assertSame(
+                    'custom_table_name',
+                    AccessHelper::GetNonPublicProperty($query, 'table')
+                );
                 return true;
             }));
-
-        $entity = new TestEntityWithCustomTableName(['name' => 'John', 'age' => 30]);
-        $entity->Save();
+        $entity = new EntityWithCustomTableName(['id' => 1]);
+        $entity->Delete();
     }
 
     #endregion tableName
+
+    #region insert -------------------------------------------------------------
+
+    function testInsertSkipsNonBindableProperties()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(InsertQuery::class, $query);
+                $this->assertSame(
+                    'entitywithnonbindableproperties',
+                    AccessHelper::GetNonPublicProperty($query, 'table')
+                );
+                $this->assertSame(
+                    'aString',
+                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                );
+                $this->assertSame(
+                    ':aString',
+                    AccessHelper::GetNonPublicProperty($query, 'values')
+                );
+                $this->assertSame(
+                    ['aString' => 'Hello, World!'],
+                    $query->Bindings()
+                );
+                return true;
+            }))
+            ->willReturn($this->createStub(ResultSet::class));
+        $database->expects($this->once())
+            ->method('LastInsertId')
+            ->willReturn(1);
+        $entity = new EntityWithNonBindableProperties([
+            'anArray' => ['key' => 'value'],
+            'aResource' => \fopen('php://memory', 'r'),
+            'anObjectWithoutToString' => new \stdClass(),
+            'aString' => 'Hello, World!'
+        ]);
+        $this->assertTrue(AccessHelper::CallNonPublicMethod($entity, 'insert'));
+        \fclose($entity->aResource);
+    }
+
+    function testInsertFailsOnEntityWithNoProperties()
+    {
+        $database = Database::Instance();
+        $database->expects($this->never())
+            ->method('Execute');
+        $entity = new EntityWithNoProperties();
+        $this->assertFalse(AccessHelper::CallNonPublicMethod($entity, 'insert'));
+    }
+
+    function testInsertFailsIfExecuteFails()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn(null);
+        $entity = new TestEntity();
+        $this->assertFalse(AccessHelper::CallNonPublicMethod($entity, 'insert'));
+    }
+
+    function testInsertSucceedsIfExecuteSucceeds()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(InsertQuery::class, $query);
+                $this->assertSame(
+                    'testentity',
+                    AccessHelper::GetNonPublicProperty($query, 'table')
+                );
+                $this->assertSame(
+                    'name, age, createdAt',
+                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                );
+                $this->assertSame(
+                    ':name, :age, :createdAt',
+                    AccessHelper::GetNonPublicProperty($query, 'values')
+                );
+                $this->assertSame(
+                    ['name' => 'John', 'age' => 30, 'createdAt' => '2021-01-01 12:34:56'],
+                    $query->Bindings()
+                );
+                return true;
+            }))
+            ->willReturn($this->createStub(ResultSet::class));
+        $database->expects($this->once())
+            ->method('LastInsertId')
+            ->willReturn(23);
+        $entity = new TestEntity([
+            'name' => 'John',
+            'age' => 30,
+            'createdAt' => '2021-01-01 12:34:56'
+        ]);
+        $this->assertTrue(AccessHelper::CallNonPublicMethod($entity, 'insert'));
+        $this->assertSame(23, $entity->id);
+    }
+
+    #endregion insert
+
+    #region update -------------------------------------------------------------
+
+    function testSaveUpdateSkipsNonBindableProperties()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(UpdateQuery::class, $query);
+                $this->assertSame(
+                    'entitywithnonbindableproperties',
+                    AccessHelper::GetNonPublicProperty($query, 'table')
+                );
+                $this->assertSame(
+                    ['aString'],
+                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                );
+                $this->assertSame(
+                    [':aString'],
+                    AccessHelper::GetNonPublicProperty($query, 'values')
+                );
+                $this->assertSame(
+                    'id = :id',
+                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                );
+                $this->assertSame(
+                    ['id' => 23, 'aString' => 'Hello, World!'],
+                    $query->Bindings()
+                );
+                return true;
+            }))
+            ->willReturn($this->createStub(ResultSet::class));
+        $entity = new EntityWithNonBindableProperties([
+            'id' => 23,
+            'anArray' => ['key' => 'value'],
+            'aResource' => \fopen('php://memory', 'r'),
+            'anObjectWithoutToString' => new \stdClass(),
+            'aString' => 'Hello, World!'
+        ]);
+        $this->assertTrue(AccessHelper::CallNonPublicMethod($entity, 'update'));
+        \fclose($entity->aResource);
+    }
+
+    function testUpdateFailsOnEntityWithNoProperties()
+    {
+        $database = Database::Instance();
+        $database->expects($this->never())
+            ->method('Execute');
+        $entity = new EntityWithNoProperties();
+        $this->assertFalse(AccessHelper::CallNonPublicMethod($entity, 'update'));
+    }
+
+    function testUpdateFailsIfExecuteFails()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn(null);
+        $entity = new TestEntity();
+        $this->assertFalse(AccessHelper::CallNonPublicMethod($entity, 'update'));
+    }
+
+    function testUpdateFailsIfLastAffectedRowCountIsMinusOne()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->isInstanceOf(UpdateQuery::class))
+            ->willReturn($this->createStub(ResultSet::class));
+        $database->expects($this->once())
+            ->method('LastAffectedRowCount')
+            ->willReturn(-1);
+        $entity = new TestEntity();
+        $this->assertFalse(AccessHelper::CallNonPublicMethod($entity, 'update'));
+    }
+
+    function testUpdateSucceedsIfLastAffectedRowCountIsNotMinusOne()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(UpdateQuery::class, $query);
+                $this->assertSame(
+                    'testentity',
+                    AccessHelper::GetNonPublicProperty($query, 'table')
+                );
+                $this->assertSame(
+                    ['name', 'age', 'createdAt'],
+                    AccessHelper::GetNonPublicProperty($query, 'columns')
+                );
+                $this->assertSame(
+                    [':name', ':age', ':createdAt'],
+                    AccessHelper::GetNonPublicProperty($query, 'values')
+                );
+                $this->assertSame(
+                    'id = :id',
+                    AccessHelper::GetNonPublicProperty($query, 'condition')
+                );
+                $this->assertSame(
+                    ['id' => 23, 'name' => 'John', 'age' => 30, 'createdAt' => '2021-01-01 12:34:56'],
+                    $query->Bindings()
+                );
+                return true;
+            }))
+            ->willReturn($this->createStub(ResultSet::class));
+        $database->expects($this->once())
+            ->method('LastAffectedRowCount')
+            ->willReturn(1);
+        $entity = new TestEntity([
+            'id' => 23,
+            'name' => 'John',
+            'age' => 30,
+            'createdAt' => '2021-01-01 12:34:56'
+        ]);
+        $this->assertTrue(AccessHelper::CallNonPublicMethod($entity, 'update'));
+        $this->assertSame(23, $entity->id); // ID should remain unchanged
+    }
+
+    #endregion update
 }
