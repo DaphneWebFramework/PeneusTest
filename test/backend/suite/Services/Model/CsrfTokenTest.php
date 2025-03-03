@@ -11,7 +11,7 @@ class CsrfTokenTest extends TestCase
 
     function testToken()
     {
-        $csrfToken = new CsrfToken('token', 'cookieValue');
+        $csrfToken = new CsrfToken('token', 'cookie-value');
         $this->assertEquals('token', $csrfToken->Token());
     }
 
@@ -21,8 +21,8 @@ class CsrfTokenTest extends TestCase
 
     function testCookieValue()
     {
-        $csrfToken = new CsrfToken('token', 'cookieValue');
-        $this->assertEquals('cookieValue', $csrfToken->CookieValue());
+        $csrfToken = new CsrfToken('token', 'cookie-value');
+        $this->assertEquals('cookie-value', $csrfToken->CookieValue());
     }
 
     #endregion CookieValue
