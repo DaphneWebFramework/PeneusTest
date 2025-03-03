@@ -22,15 +22,17 @@ class ActionTest extends TestCase
     function testExecuteWithGuardsWhenFirstGuardDoesNotVerify()
     {
         $guard1 = $this->createMock(IGuard::class);
+        $guard2 = $this->createMock(IGuard::class);
+        $action = new DummyAction();
+
         $guard1->expects($this->once())
             ->method('Verify')
             ->willReturn(false);
-        $guard2 = $this->createMock(IGuard::class);
         $guard2->expects($this->never())
             ->method('Verify');
-        $action = new DummyAction();
         $action->AddGuard($guard1)
                ->AddGuard($guard2);
+
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('You do not have permission to execute this action.');
         $this->expectExceptionCode(401);
@@ -40,16 +42,18 @@ class ActionTest extends TestCase
     function testExecuteWithGuardsWhenSecondGuardDoesNotVerify()
     {
         $guard1 = $this->createMock(IGuard::class);
+        $guard2 = $this->createMock(IGuard::class);
+        $action = new DummyAction();
+
         $guard1->expects($this->once())
             ->method('Verify')
             ->willReturn(true);
-        $guard2 = $this->createMock(IGuard::class);
         $guard2->expects($this->once())
             ->method('Verify')
             ->willReturn(false);
-        $action = new DummyAction();
         $action->AddGuard($guard1)
                ->AddGuard($guard2);
+
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('You do not have permission to execute this action.');
         $this->expectExceptionCode(401);
@@ -59,16 +63,18 @@ class ActionTest extends TestCase
     function testExecuteWithGuardsWhenAllGuardsVerify()
     {
         $guard1 = $this->createMock(IGuard::class);
+        $guard2 = $this->createMock(IGuard::class);
+        $action = new DummyAction();
+
         $guard1->expects($this->once())
             ->method('Verify')
             ->willReturn(true);
-        $guard2 = $this->createMock(IGuard::class);
         $guard2->expects($this->once())
             ->method('Verify')
             ->willReturn(true);
-        $action = new DummyAction();
         $action->AddGuard($guard1)
                ->AddGuard($guard2);
+
         $this->assertSame(42, $action->Execute());
     }
 }

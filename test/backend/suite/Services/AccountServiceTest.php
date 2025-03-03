@@ -18,6 +18,7 @@ use \TestToolkit\DataHelper;
 #[CoversClass(AccountService::class)]
 class AccountServiceTest extends TestCase
 {
+    private ?AccountService $originalAccountService = null;
     private ?CookieService $originalCookieService = null;
     private ?Session $originalSession = null;
     private ?Request $originalRequest = null;
@@ -25,6 +26,7 @@ class AccountServiceTest extends TestCase
 
     protected function setUp(): void
     {
+        $this->originalAccountService = AccountService::ReplaceInstance(null);
         $this->originalCookieService = CookieService::ReplaceInstance(
             $this->createMock(CookieService::class));
         $this->originalSession = Session::ReplaceInstance(
@@ -37,6 +39,7 @@ class AccountServiceTest extends TestCase
 
     protected function tearDown(): void
     {
+        AccountService::ReplaceInstance($this->originalAccountService);
         CookieService::ReplaceInstance($this->originalCookieService);
         Session::ReplaceInstance($this->originalSession);
         Request::ReplaceInstance($this->originalRequest);
