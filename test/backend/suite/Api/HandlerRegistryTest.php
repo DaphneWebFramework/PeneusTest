@@ -4,12 +4,14 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\HandlerRegistry;
 
-use \Peneus\Api\Handlers\IHandler;
+use \Peneus\Api\Actions\Action;
+use \Peneus\Api\Handlers\Handler;
 
-class NotAnIHandler {
-}
-class DummyHandler implements IHandler {
-    public function HandleAction(string $actionName): mixed {}
+class NotAnHandler {}
+class DummyHandler extends Handler {
+    protected function createAction(string $actionName): ?Action {
+        return null; // Not used.
+    }
 }
 
 #[CoversClass(HandlerRegistry::class)]
@@ -60,7 +62,7 @@ class HandlerRegistryTest extends TestCase
         $handlerRegistry->RegisterHandler('test', DummyHandler::class);
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Handler already registered: test');
-        $handlerRegistry->RegisterHandler('test', NotAnIHandler::class);
+        $handlerRegistry->RegisterHandler('test', NotAnHandler::class);
     }
 
     function testRegisterHandlerWithCaseInsensitiveHandlerName()
@@ -80,13 +82,13 @@ class HandlerRegistryTest extends TestCase
         $handlerRegistry->RegisterHandler('test', 'NonExistingClass');
     }
 
-    function testRegisterHandlerWithExistingClassButDoesNotImplementIHandler()
+    function testRegisterHandlerWithExistingClassButDoesNotExtendHandler()
     {
         $handlerRegistry = HandlerRegistry::Instance();
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Handler class must implement IHandler interface: NotAnIHandler');
-        $handlerRegistry->RegisterHandler('test', NotAnIHandler::class);
+            'Class must extend Handler class: NotAnHandler');
+        $handlerRegistry->RegisterHandler('test', NotAnHandler::class);
     }
 
     #endregion RegisterHandler

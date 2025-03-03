@@ -11,7 +11,7 @@ use \Harmonia\Http\Response;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Shutdown\ShutdownHandler;
 use \Peneus\Api\HandlerRegistry;
-use \Peneus\Api\Handlers\IHandler;
+use \Peneus\Api\Handlers\Handler;
 use \TestToolkit\AccessHelper;
 
 #[CoversClass(Dispatcher::class)]
@@ -144,7 +144,7 @@ class DispatcherTest extends TestCase
     {
         $queryParams = $this->createMock(CArray::class);
         $request = Request::Instance();
-        $handler = $this->createMock(IHandler::class);
+        $handler = $this->createMock(Handler::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $response = $this->createMock(Response::class);
         $dispatcher = new Dispatcher();
@@ -182,7 +182,7 @@ class DispatcherTest extends TestCase
     {
         $queryParams = $this->createMock(CArray::class);
         $request = Request::Instance();
-        $handler = $this->createMock(IHandler::class);
+        $handler = $this->createMock(Handler::class);
         $resultResponse = $this->createMock(Response::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $dispatcher = new Dispatcher();
@@ -218,7 +218,7 @@ class DispatcherTest extends TestCase
     {
         $queryParams = $this->createMock(CArray::class);
         $request = Request::Instance();
-        $handler = $this->createMock(IHandler::class);
+        $handler = $this->createMock(Handler::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $response = $this->createMock(Response::class);
         $dispatcher = new Dispatcher();
@@ -261,7 +261,7 @@ class DispatcherTest extends TestCase
     {
         $queryParams = $this->createMock(CArray::class);
         $request = Request::Instance();
-        $handler = $this->createMock(IHandler::class);
+        $handler = $this->createMock(Handler::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $response = $this->createMock(Response::class);
         $dispatcher = new Dispatcher();
@@ -307,7 +307,7 @@ class DispatcherTest extends TestCase
     {
         $queryParams = $this->createMock(CArray::class);
         $request = Request::Instance();
-        $handler = $this->createMock(IHandler::class);
+        $handler = $this->createMock(Handler::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $response = $this->createMock(Response::class);
         $dispatcher = new Dispatcher();

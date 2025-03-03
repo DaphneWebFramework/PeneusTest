@@ -33,7 +33,7 @@ class LogoutActionTest extends TestCase
         Session::ReplaceInstance($this->originalSession);
     }
 
-    #region Untitled -----------------------------------------------------------
+    #region onExecute ----------------------------------------------------------
 
     function testOnExecuteThrowsIfDeleteCookieReturnsFalse()
     {
@@ -131,5 +131,5 @@ class LogoutActionTest extends TestCase
         $this->assertNull(AccessHelper::CallMethod($logoutAction, 'onExecute'));
     }
 
-    #endregion Untitled
+    #endregion onExecute
 }
