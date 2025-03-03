@@ -47,15 +47,17 @@ class DispatcherTest extends TestCase
     function testDispatchRequestWithMissingHandlerParameter()
     {
         $queryParams = $this->createMock(CArray::class);
+        $request = Request::Instance();
+        $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
         $queryParams->expects($this->once())
             ->method('Get')
             ->with('handler')
             ->willReturn(null);
-        $request = Request::Instance();
         $request->expects($this->once())
             ->method('QueryParams')
             ->willReturn($queryParams);
-        $response = $this->createMock(Response::class);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::BadRequest)
@@ -64,7 +66,7 @@ class DispatcherTest extends TestCase
             ->method('SetBody')
             ->with('{"error":"Handler not specified."}')
             ->willReturn($response);
-        $dispatcher = new Dispatcher();
+
         AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
@@ -72,6 +74,10 @@ class DispatcherTest extends TestCase
     function testDispatchRequestWithMissingActionParameter()
     {
         $queryParams = $this->createMock(CArray::class);
+        $request = Request::Instance();
+        $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
         $queryParams->expects($this->exactly(2))
             ->method('Get')
             ->willReturnCallback(function($key) {
@@ -81,11 +87,9 @@ class DispatcherTest extends TestCase
                     default => null,
                 };
             });
-        $request = Request::Instance();
         $request->expects($this->exactly(2))
             ->method('QueryParams')
             ->willReturn($queryParams);
-        $response = $this->createMock(Response::class);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::BadRequest)
@@ -94,7 +98,7 @@ class DispatcherTest extends TestCase
             ->method('SetBody')
             ->with('{"error":"Action not specified."}')
             ->willReturn($response);
-        $dispatcher = new Dispatcher();
+
         AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
@@ -102,6 +106,11 @@ class DispatcherTest extends TestCase
     function testDispatchRequestWithHandlerNotFound()
     {
         $queryParams = $this->createMock(CArray::class);
+        $request = Request::Instance();
+        $handlerRegistry = HandlerRegistry::Instance();
+        $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
         $queryParams->expects($this->exactly(2))
             ->method('Get')
             ->willReturnCallback(function($key) {
@@ -111,16 +120,13 @@ class DispatcherTest extends TestCase
                     default => null,
                 };
             });
-        $request = Request::Instance();
         $request->expects($this->exactly(2))
             ->method('QueryParams')
             ->willReturn($queryParams);
-        $handlerRegistry = HandlerRegistry::Instance();
         $handlerRegistry->expects($this->once())
             ->method('FindHandler')
             ->with('handler1')
             ->willReturn(null);
-        $response = $this->createMock(Response::class);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::NotFound)
@@ -129,7 +135,7 @@ class DispatcherTest extends TestCase
             ->method('SetBody')
             ->with('{"error":"Handler not found: handler1"}')
             ->willReturn($response);
-        $dispatcher = new Dispatcher();
+
         AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
@@ -137,6 +143,12 @@ class DispatcherTest extends TestCase
     function testDispatchRequestWithHandleActionReturningNull()
     {
         $queryParams = $this->createMock(CArray::class);
+        $request = Request::Instance();
+        $handler = $this->createMock(IHandler::class);
+        $handlerRegistry = HandlerRegistry::Instance();
+        $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
         $queryParams->expects($this->exactly(2))
             ->method('Get')
             ->willReturnCallback(function($key) {
@@ -146,26 +158,22 @@ class DispatcherTest extends TestCase
                     default => null,
                 };
             });
-        $request = Request::Instance();
         $request->expects($this->exactly(2))
             ->method('QueryParams')
             ->willReturn($queryParams);
-        $handler = $this->createMock(IHandler::class);
         $handler->expects($this->once())
             ->method('HandleAction')
             ->with('action1')
             ->willReturn(null);
-        $handlerRegistry = HandlerRegistry::Instance();
         $handlerRegistry->expects($this->once())
             ->method('FindHandler')
             ->with('handler1')
             ->willReturn($handler);
-        $response = $this->createMock(Response::class);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::NoContent)
             ->willReturn($response);
-        $dispatcher = new Dispatcher();
+
         AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
@@ -173,6 +181,12 @@ class DispatcherTest extends TestCase
     function testDispatchRequestWithHandleActionReturningResponseObject()
     {
         $queryParams = $this->createMock(CArray::class);
+        $request = Request::Instance();
+        $handler = $this->createMock(IHandler::class);
+        $resultResponse = $this->createMock(Response::class);
+        $handlerRegistry = HandlerRegistry::Instance();
+        $dispatcher = new Dispatcher();
+
         $queryParams->expects($this->exactly(2))
             ->method('Get')
             ->willReturnCallback(function($key) {
@@ -182,23 +196,20 @@ class DispatcherTest extends TestCase
                     default => null,
                 };
             });
-        $request = Request::Instance();
         $request->expects($this->exactly(2))
             ->method('QueryParams')
             ->willReturn($queryParams);
-        $handler = $this->createMock(IHandler::class);
-        $resultResponse = $this->createMock(Response::class);
         $handler->expects($this->once())
             ->method('HandleAction')
             ->with('action1')
             ->willReturn($resultResponse);
-        $handlerRegistry = HandlerRegistry::Instance();
         $handlerRegistry->expects($this->once())
             ->method('FindHandler')
             ->with('handler1')
             ->willReturn($handler);
-        $dispatcher = new Dispatcher();
+
         $dispatcher->DispatchRequest();
+
         $this->assertSame($resultResponse,
             AccessHelper::GetProperty($dispatcher, 'response'));
     }
@@ -206,6 +217,12 @@ class DispatcherTest extends TestCase
     function testDispatchRequestWithHandleActionReturningOtherResult()
     {
         $queryParams = $this->createMock(CArray::class);
+        $request = Request::Instance();
+        $handler = $this->createMock(IHandler::class);
+        $handlerRegistry = HandlerRegistry::Instance();
+        $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
         $queryParams->expects($this->exactly(2))
             ->method('Get')
             ->willReturnCallback(function($key) {
@@ -215,22 +232,18 @@ class DispatcherTest extends TestCase
                     default => null,
                 };
             });
-        $request = Request::Instance();
         $request->expects($this->exactly(2))
             ->method('QueryParams')
             ->willReturn($queryParams);
-        $handler = $this->createMock(IHandler::class);
         $handler->expects($this->once())
             ->method('HandleAction')
             ->with('action1')
             ->willReturn(['question' => 'What is the meaning of life?',
                           'answer' => 42]);
-        $handlerRegistry = HandlerRegistry::Instance();
         $handlerRegistry->expects($this->once())
             ->method('FindHandler')
             ->with('handler1')
             ->willReturn($handler);
-        $response = $this->createMock(Response::class);
         $response->expects($this->once())
             ->method('SetHeader')
             ->with('Content-Type', 'application/json')
@@ -239,7 +252,7 @@ class DispatcherTest extends TestCase
             ->method('SetBody')
             ->with('{"question":"What is the meaning of life?","answer":42}')
             ->willReturn($response);
-        $dispatcher = new Dispatcher();
+
         AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
@@ -247,6 +260,12 @@ class DispatcherTest extends TestCase
     function testDispatchRequestWithHandleActionThrowingExceptionWithCodeNotSet()
     {
         $queryParams = $this->createMock(CArray::class);
+        $request = Request::Instance();
+        $handler = $this->createMock(IHandler::class);
+        $handlerRegistry = HandlerRegistry::Instance();
+        $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
         $queryParams->expects($this->exactly(2))
             ->method('Get')
             ->willReturnCallback(function($key) {
@@ -256,21 +275,17 @@ class DispatcherTest extends TestCase
                     default => null,
                 };
             });
-        $request = Request::Instance();
         $request->expects($this->exactly(2))
             ->method('QueryParams')
             ->willReturn($queryParams);
-        $handler = $this->createMock(IHandler::class);
         $handler->expects($this->once())
             ->method('HandleAction')
             ->with('action1')
             ->willThrowException(new \Exception('Sample error message.'));
-        $handlerRegistry = HandlerRegistry::Instance();
         $handlerRegistry->expects($this->once())
             ->method('FindHandler')
             ->with('handler1')
             ->willReturn($handler);
-        $response = $this->createMock(Response::class);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::InternalServerError)
@@ -283,7 +298,7 @@ class DispatcherTest extends TestCase
             ->method('SetBody')
             ->with('{"error":"Sample error message."}')
             ->willReturn($response);
-        $dispatcher = new Dispatcher();
+
         AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
@@ -291,6 +306,12 @@ class DispatcherTest extends TestCase
     function testDispatchRequestWithHandleActionThrowingExceptionWithCodeSet()
     {
         $queryParams = $this->createMock(CArray::class);
+        $request = Request::Instance();
+        $handler = $this->createMock(IHandler::class);
+        $handlerRegistry = HandlerRegistry::Instance();
+        $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
         $queryParams->expects($this->exactly(2))
             ->method('Get')
             ->willReturnCallback(function($key) {
@@ -300,21 +321,17 @@ class DispatcherTest extends TestCase
                     default => null,
                 };
             });
-        $request = Request::Instance();
         $request->expects($this->exactly(2))
             ->method('QueryParams')
             ->willReturn($queryParams);
-        $handler = $this->createMock(IHandler::class);
         $handler->expects($this->once())
             ->method('HandleAction')
             ->with('action1')
             ->willThrowException(new \Exception('File is too large.', 413));
-        $handlerRegistry = HandlerRegistry::Instance();
         $handlerRegistry->expects($this->once())
             ->method('FindHandler')
             ->with('handler1')
             ->willReturn($handler);
-        $response = $this->createMock(Response::class);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::PayloadTooLarge)
@@ -327,7 +344,7 @@ class DispatcherTest extends TestCase
             ->method('SetBody')
             ->with('{"error":"File is too large."}')
             ->willReturn($response);
-        $dispatcher = new Dispatcher();
+
         AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->DispatchRequest();
     }
@@ -339,9 +356,11 @@ class DispatcherTest extends TestCase
     function testOnShutdownWithNoError()
     {
         $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
         $response->expects($this->once())
             ->method('Send');
-        $dispatcher = new Dispatcher();
+
         AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->OnShutdown(null);
     }
@@ -349,11 +368,13 @@ class DispatcherTest extends TestCase
     function testOnShutdownWithErrorInDebugMode()
     {
         $config = Config::Instance();
+        $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
         $config->expects($this->once())
             ->method('Option')
             ->with('IsDebug')
             ->willReturn(true);
-        $response = $this->createMock(Response::class);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::InternalServerError)
@@ -368,7 +389,7 @@ class DispatcherTest extends TestCase
             ->willReturn($response);
         $response->expects($this->once())
             ->method('Send');
-        $dispatcher = new Dispatcher();
+
         AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->OnShutdown("E_NOTICE: Something went wrong in 'file.php' on line 123.");
     }
@@ -376,11 +397,13 @@ class DispatcherTest extends TestCase
     function testOnShutdownWithErrorInLiveMode()
     {
         $config = Config::Instance();
+        $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
         $config->expects($this->once())
             ->method('Option')
             ->with('IsDebug')
             ->willReturn(false);
-        $response = $this->createMock(Response::class);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::InternalServerError)
@@ -395,7 +418,7 @@ class DispatcherTest extends TestCase
             ->willReturn($response);
         $response->expects($this->once())
             ->method('Send');
-        $dispatcher = new Dispatcher();
+
         AccessHelper::SetProperty($dispatcher, 'response', $response);
         $dispatcher->OnShutdown("E_NOTICE: Something went wrong in 'file.php' on line 123.");
     }
