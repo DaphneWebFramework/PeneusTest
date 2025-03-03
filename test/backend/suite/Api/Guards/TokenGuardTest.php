@@ -32,65 +32,71 @@ class TokenGuardTest extends TestCase
 
     function testVerifyWithMissingCookie()
     {
-        $cookies = $this->createMock(CArray::class);
-        $cookies->expects($this->once())
-            ->method('Get')
-            ->with('my_cookie')
-            ->willReturn(null);
         $request = Request::Instance();
+        $requestCookies = $this->createMock(CArray::class);
+        $securityService = SecurityService::Instance();
+
         $request->expects($this->once())
             ->method('Cookies')
-            ->willReturn($cookies);
-        $securityService = SecurityService::Instance();
+            ->willReturn($requestCookies);
+        $requestCookies->expects($this->once())
+            ->method('Get')
+            ->with('cookie-name')
+            ->willReturn(null);
         $securityService->expects($this->never())
             ->method('VerifyCsrfToken');
-        $tokenGuard = new TokenGuard('token', 'my_cookie');
+
+        $tokenGuard = new TokenGuard('token-value', 'cookie-name');
         $this->assertFalse($tokenGuard->Verify());
     }
 
     function testVerifyWithInvalidCookie()
     {
-        $cookies = $this->createMock(CArray::class);
-        $cookies->expects($this->once())
-            ->method('Get')
-            ->with('my_cookie')
-            ->willReturn('invalid');
         $request = Request::Instance();
+        $requestCookies = $this->createMock(CArray::class);
+        $securityService = SecurityService::Instance();
+
         $request->expects($this->once())
             ->method('Cookies')
-            ->willReturn($cookies);
-        $securityService = SecurityService::Instance();
+            ->willReturn($requestCookies);
+        $requestCookies->expects($this->once())
+            ->method('Get')
+            ->with('cookie-name')
+            ->willReturn('cookie-value');
         $securityService->expects($this->once())
             ->method('VerifyCsrfToken')
             ->with($this->callback(function($csrfToken) {
-                return $csrfToken->Token() === '123456'
-                    && $csrfToken->CookieValue() === 'invalid';
+                return $csrfToken->Token() === 'token-value'
+                    && $csrfToken->CookieValue() === 'cookie-value';
             }))
             ->willReturn(false);
-        $tokenGuard = new TokenGuard('123456', 'my_cookie');
+
+        $tokenGuard = new TokenGuard('token-value', 'cookie-name');
         $this->assertFalse($tokenGuard->Verify());
     }
 
     function testVerifyWithValidCookie()
     {
-        $cookies = $this->createMock(CArray::class);
-        $cookies->expects($this->once())
-            ->method('Get')
-            ->with('my_cookie')
-            ->willReturn('valid');
         $request = Request::Instance();
+        $requestCookies = $this->createMock(CArray::class);
+        $securityService = SecurityService::Instance();
+
         $request->expects($this->once())
             ->method('Cookies')
-            ->willReturn($cookies);
-        $securityService = SecurityService::Instance();
+            ->willReturn($requestCookies);
+        $requestCookies->expects($this->once())
+            ->method('Get')
+            ->with('cookie-name')
+            ->willReturn('cookie-value');
         $securityService->expects($this->once())
             ->method('VerifyCsrfToken')
             ->with($this->callback(function($csrfToken) {
-                return $csrfToken->Token() === '123456'
-                    && $csrfToken->CookieValue() === 'valid';
+                return $csrfToken->Token() === 'token-value'
+                    && $csrfToken->CookieValue() === 'cookie-value';
             }))
             ->willReturn(true);
-        $tokenGuard = new TokenGuard('123456', 'my_cookie');
+
+        $tokenGuard = new TokenGuard('token-value', 'cookie-name');
         $this->assertTrue($tokenGuard->Verify());
     }
 
