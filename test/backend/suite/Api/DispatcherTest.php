@@ -44,85 +44,81 @@ class DispatcherTest extends TestCase
 
     #region DispatchRequest ----------------------------------------------------
 
-    function testDispatchRequestWithMissingHandlerParameter()
+    function testDispatchRequestWithMissingHandlerQueryParameter()
     {
-        $queryParams = $this->createMock(CArray::class);
         $request = Request::Instance();
+        $queryParams = $this->createMock(CArray::class);
         $response = $this->createMock(Response::class);
         $dispatcher = new Dispatcher();
 
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
         $queryParams->expects($this->once())
             ->method('Get')
             ->with('handler')
             ->willReturn(null);
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::BadRequest)
-            ->willReturn($response);
+            ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
-            ->with('{"error":"Handler not specified."}')
-            ->willReturn($response);
+            ->with('{"error":"Handler not specified."}');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
         $dispatcher->DispatchRequest();
     }
 
-    function testDispatchRequestWithMissingActionParameter()
+    function testDispatchRequestWithMissingActionQueryParameter()
     {
-        $queryParams = $this->createMock(CArray::class);
         $request = Request::Instance();
+        $queryParams = $this->createMock(CArray::class);
         $response = $this->createMock(Response::class);
         $dispatcher = new Dispatcher();
 
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
         $queryParams->expects($this->exactly(2))
             ->method('Get')
             ->willReturnCallback(function($key) {
-                return match($key) {
+                return match ($key) {
                     'handler' => 'handler1',
-                    'action' => null,
-                    default => null,
+                    'action' => null
                 };
             });
-        $request->expects($this->exactly(2))
-            ->method('QueryParams')
-            ->willReturn($queryParams);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::BadRequest)
-            ->willReturn($response);
+            ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
-            ->with('{"error":"Action not specified."}')
-            ->willReturn($response);
+            ->with('{"error":"Action not specified."}');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
         $dispatcher->DispatchRequest();
     }
 
     function testDispatchRequestWithHandlerNotFound()
     {
-        $queryParams = $this->createMock(CArray::class);
         $request = Request::Instance();
+        $queryParams = $this->createMock(CArray::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $response = $this->createMock(Response::class);
         $dispatcher = new Dispatcher();
 
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
         $queryParams->expects($this->exactly(2))
             ->method('Get')
             ->willReturnCallback(function($key) {
-                return match($key) {
+                return match ($key) {
                     'handler' => 'handler1',
-                    'action' => 'action1',
-                    default => null,
+                    'action' => 'action1'
                 };
             });
-        $request->expects($this->exactly(2))
-            ->method('QueryParams')
-            ->willReturn($queryParams);
         $handlerRegistry->expects($this->once())
             ->method('FindHandler')
             ->with('handler1')
@@ -130,222 +126,216 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::NotFound)
-            ->willReturn($response);
+            ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
-            ->with('{"error":"Handler not found: handler1"}')
-            ->willReturn($response);
+            ->with('{"error":"Handler not found: handler1"}');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
         $dispatcher->DispatchRequest();
     }
 
-    function testDispatchRequestWithHandleActionReturningNull()
+    function testDispatchRequestWithHandleActionReturnsNull()
     {
-        $queryParams = $this->createMock(CArray::class);
         $request = Request::Instance();
-        $handler = $this->createMock(Handler::class);
+        $queryParams = $this->createMock(CArray::class);
         $handlerRegistry = HandlerRegistry::Instance();
+        $handler = $this->createMock(Handler::class);
         $response = $this->createMock(Response::class);
         $dispatcher = new Dispatcher();
 
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
         $queryParams->expects($this->exactly(2))
             ->method('Get')
             ->willReturnCallback(function($key) {
-                return match($key) {
+                return match ($key) {
                     'handler' => 'handler1',
-                    'action' => 'action1',
-                    default => null,
+                    'action' => 'action1'
                 };
             });
-        $request->expects($this->exactly(2))
-            ->method('QueryParams')
-            ->willReturn($queryParams);
+        $handlerRegistry->expects($this->once())
+            ->method('FindHandler')
+            ->with('handler1')
+            ->willReturn($handler);
         $handler->expects($this->once())
             ->method('HandleAction')
             ->with('action1')
             ->willReturn(null);
+        $response->expects($this->once())
+            ->method('SetStatusCode')
+            ->with(StatusCode::NoContent);
+
+        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
+        $dispatcher->DispatchRequest();
+    }
+
+    function testDispatchRequestWithHandleActionReturnsResponseObject()
+    {
+        $request = Request::Instance();
+        $queryParams = $this->createMock(CArray::class);
+        $handlerRegistry = HandlerRegistry::Instance();
+        $handler = $this->createMock(Handler::class);
+        $resultResponse = $this->createStub(Response::class);
+        $dispatcher = new Dispatcher();
+
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
+        $queryParams->expects($this->exactly(2))
+            ->method('Get')
+            ->willReturnCallback(function($key) {
+                return match ($key) {
+                    'handler' => 'handler1',
+                    'action' => 'action1'
+                };
+            });
         $handlerRegistry->expects($this->once())
             ->method('FindHandler')
             ->with('handler1')
             ->willReturn($handler);
-        $response->expects($this->once())
-            ->method('SetStatusCode')
-            ->with(StatusCode::NoContent)
-            ->willReturn($response);
-
-        AccessHelper::SetProperty($dispatcher, 'response', $response);
-        $dispatcher->DispatchRequest();
-    }
-
-    function testDispatchRequestWithHandleActionReturningResponseObject()
-    {
-        $queryParams = $this->createMock(CArray::class);
-        $request = Request::Instance();
-        $handler = $this->createMock(Handler::class);
-        $resultResponse = $this->createMock(Response::class);
-        $handlerRegistry = HandlerRegistry::Instance();
-        $dispatcher = new Dispatcher();
-
-        $queryParams->expects($this->exactly(2))
-            ->method('Get')
-            ->willReturnCallback(function($key) {
-                return match($key) {
-                    'handler' => 'handler1',
-                    'action' => 'action1',
-                    default => null,
-                };
-            });
-        $request->expects($this->exactly(2))
-            ->method('QueryParams')
-            ->willReturn($queryParams);
         $handler->expects($this->once())
             ->method('HandleAction')
             ->with('action1')
             ->willReturn($resultResponse);
+
+        $dispatcher->DispatchRequest();
+
+        $this->assertSame(
+            $resultResponse,
+            AccessHelper::GetProperty($dispatcher, 'response')
+        );
+    }
+
+    function testDispatchRequestWithHandleActionReturnsOtherResult()
+    {
+        $request = Request::Instance();
+        $queryParams = $this->createMock(CArray::class);
+        $handlerRegistry = HandlerRegistry::Instance();
+        $handler = $this->createMock(Handler::class);
+        $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
+        $queryParams->expects($this->exactly(2))
+            ->method('Get')
+            ->willReturnCallback(function($key) {
+                return match ($key) {
+                    'handler' => 'handler1',
+                    'action' => 'action1'
+                };
+            });
         $handlerRegistry->expects($this->once())
             ->method('FindHandler')
             ->with('handler1')
             ->willReturn($handler);
-
-        $dispatcher->DispatchRequest();
-
-        $this->assertSame($resultResponse,
-            AccessHelper::GetProperty($dispatcher, 'response'));
-    }
-
-    function testDispatchRequestWithHandleActionReturningOtherResult()
-    {
-        $queryParams = $this->createMock(CArray::class);
-        $request = Request::Instance();
-        $handler = $this->createMock(Handler::class);
-        $handlerRegistry = HandlerRegistry::Instance();
-        $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
-
-        $queryParams->expects($this->exactly(2))
-            ->method('Get')
-            ->willReturnCallback(function($key) {
-                return match($key) {
-                    'handler' => 'handler1',
-                    'action' => 'action1',
-                    default => null,
-                };
-            });
-        $request->expects($this->exactly(2))
-            ->method('QueryParams')
-            ->willReturn($queryParams);
         $handler->expects($this->once())
             ->method('HandleAction')
             ->with('action1')
-            ->willReturn(['question' => 'What is the meaning of life?',
-                          'answer' => 42]);
+            ->willReturn([
+                'question' => 'What is the meaning of life?',
+                'answer' => 42
+            ]);
+        $response->expects($this->once())
+            ->method('SetHeader')
+            ->with('Content-Type', 'application/json')
+            ->willReturn($response); // Chain
+        $response->expects($this->once())
+            ->method('SetBody')
+            ->with('{"question":"What is the meaning of life?","answer":42}');
+
+        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
+        $dispatcher->DispatchRequest();
+    }
+
+    function testDispatchRequestWithHandleActionThrowsWhenExceptionCodeNotSet()
+    {
+        $request = Request::Instance();
+        $queryParams = $this->createMock(CArray::class);
+        $handlerRegistry = HandlerRegistry::Instance();
+        $handler = $this->createMock(Handler::class);
+        $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
+        $queryParams->expects($this->exactly(2))
+            ->method('Get')
+            ->willReturnCallback(function($key) {
+                return match ($key) {
+                    'handler' => 'handler1',
+                    'action' => 'action1'
+                };
+            });
         $handlerRegistry->expects($this->once())
             ->method('FindHandler')
             ->with('handler1')
             ->willReturn($handler);
-        $response->expects($this->once())
-            ->method('SetHeader')
-            ->with('Content-Type', 'application/json')
-            ->willReturn($response);
-        $response->expects($this->once())
-            ->method('SetBody')
-            ->with('{"question":"What is the meaning of life?","answer":42}')
-            ->willReturn($response);
-
-        AccessHelper::SetProperty($dispatcher, 'response', $response);
-        $dispatcher->DispatchRequest();
-    }
-
-    function testDispatchRequestWithHandleActionThrowingExceptionWithCodeNotSet()
-    {
-        $queryParams = $this->createMock(CArray::class);
-        $request = Request::Instance();
-        $handler = $this->createMock(Handler::class);
-        $handlerRegistry = HandlerRegistry::Instance();
-        $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
-
-        $queryParams->expects($this->exactly(2))
-            ->method('Get')
-            ->willReturnCallback(function($key) {
-                return match($key) {
-                    'handler' => 'handler1',
-                    'action' => 'action1',
-                    default => null,
-                };
-            });
-        $request->expects($this->exactly(2))
-            ->method('QueryParams')
-            ->willReturn($queryParams);
         $handler->expects($this->once())
             ->method('HandleAction')
             ->with('action1')
             ->willThrowException(new \Exception('Sample error message.'));
+        $response->expects($this->once())
+            ->method('SetStatusCode')
+            ->with(StatusCode::InternalServerError) // Default (500)
+            ->willReturn($response); // Chain
+        $response->expects($this->once())
+            ->method('SetHeader')
+            ->with('Content-Type', 'application/json')
+            ->willReturn($response); // Chain
+        $response->expects($this->once())
+            ->method('SetBody')
+            ->with('{"error":"Sample error message."}');
+
+        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
+        $dispatcher->DispatchRequest();
+    }
+
+    function testDispatchRequestWithHandleActionThrowsWhenExceptionCodeSet()
+    {
+        $request = Request::Instance();
+        $queryParams = $this->createMock(CArray::class);
+        $handlerRegistry = HandlerRegistry::Instance();
+        $handler = $this->createMock(Handler::class);
+        $response = $this->createMock(Response::class);
+        $dispatcher = new Dispatcher();
+
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
+        $queryParams->expects($this->exactly(2))
+            ->method('Get')
+            ->willReturnCallback(function($key) {
+                return match ($key) {
+                    'handler' => 'handler1',
+                    'action' => 'action1'
+                };
+            });
         $handlerRegistry->expects($this->once())
             ->method('FindHandler')
             ->with('handler1')
             ->willReturn($handler);
-        $response->expects($this->once())
-            ->method('SetStatusCode')
-            ->with(StatusCode::InternalServerError)
-            ->willReturn($response);
-        $response->expects($this->once())
-            ->method('SetHeader')
-            ->with('Content-Type', 'application/json')
-            ->willReturn($response);
-        $response->expects($this->once())
-            ->method('SetBody')
-            ->with('{"error":"Sample error message."}')
-            ->willReturn($response);
-
-        AccessHelper::SetProperty($dispatcher, 'response', $response);
-        $dispatcher->DispatchRequest();
-    }
-
-    function testDispatchRequestWithHandleActionThrowingExceptionWithCodeSet()
-    {
-        $queryParams = $this->createMock(CArray::class);
-        $request = Request::Instance();
-        $handler = $this->createMock(Handler::class);
-        $handlerRegistry = HandlerRegistry::Instance();
-        $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
-
-        $queryParams->expects($this->exactly(2))
-            ->method('Get')
-            ->willReturnCallback(function($key) {
-                return match($key) {
-                    'handler' => 'handler1',
-                    'action' => 'action1',
-                    default => null,
-                };
-            });
-        $request->expects($this->exactly(2))
-            ->method('QueryParams')
-            ->willReturn($queryParams);
         $handler->expects($this->once())
             ->method('HandleAction')
             ->with('action1')
             ->willThrowException(new \Exception('File is too large.', 413));
-        $handlerRegistry->expects($this->once())
-            ->method('FindHandler')
-            ->with('handler1')
-            ->willReturn($handler);
         $response->expects($this->once())
             ->method('SetStatusCode')
-            ->with(StatusCode::PayloadTooLarge)
-            ->willReturn($response);
+            ->with(StatusCode::PayloadTooLarge) // 413
+            ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetHeader')
             ->with('Content-Type', 'application/json')
-            ->willReturn($response);
+            ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
-            ->with('{"error":"File is too large."}')
-            ->willReturn($response);
+            ->with('{"error":"File is too large."}');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
         $dispatcher->DispatchRequest();
     }
 
@@ -361,7 +351,7 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('Send');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
         $dispatcher->OnShutdown(null);
     }
 
@@ -378,19 +368,19 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::InternalServerError)
-            ->willReturn($response);
+            ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetHeader')
             ->with('Content-Type', 'application/json')
-            ->willReturn($response);
+            ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
             ->with('{"error":"E_NOTICE: Something went wrong in \'file.php\' on line 123."}')
-            ->willReturn($response);
+            ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('Send');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
         $dispatcher->OnShutdown("E_NOTICE: Something went wrong in 'file.php' on line 123.");
     }
 
@@ -407,19 +397,19 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::InternalServerError)
-            ->willReturn($response);
+            ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetHeader')
             ->with('Content-Type', 'application/json')
-            ->willReturn($response);
+            ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
             ->with('{"error":"An unexpected error occurred."}')
-            ->willReturn($response);
+            ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('Send');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response);
+        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
         $dispatcher->OnShutdown("E_NOTICE: Something went wrong in 'file.php' on line 123.");
     }
 
