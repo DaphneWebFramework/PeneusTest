@@ -6,7 +6,8 @@ use \Peneus\Api\Guards\TokenGuard;
 
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
-use \Peneus\Services\SecurityService;
+use \Harmonia\Services\Security\CsrfToken;
+use \Harmonia\Services\SecurityService;
 
 #[CoversClass(TokenGuard::class)]
 class TokenGuardTest extends TestCase
@@ -65,7 +66,7 @@ class TokenGuardTest extends TestCase
             ->willReturn('cookie-value');
         $securityService->expects($this->once())
             ->method('VerifyCsrfToken')
-            ->with($this->callback(function($csrfToken) {
+            ->with($this->callback(function(CsrfToken $csrfToken) {
                 return $csrfToken->Token() === 'token-value'
                     && $csrfToken->CookieValue() === 'cookie-value';
             }))
@@ -90,7 +91,7 @@ class TokenGuardTest extends TestCase
             ->willReturn('cookie-value');
         $securityService->expects($this->once())
             ->method('VerifyCsrfToken')
-            ->with($this->callback(function($csrfToken) {
+            ->with($this->callback(function(CsrfToken $csrfToken) {
                 return $csrfToken->Token() === 'token-value'
                     && $csrfToken->CookieValue() === 'cookie-value';
             }))

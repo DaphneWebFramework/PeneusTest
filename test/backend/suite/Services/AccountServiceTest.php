@@ -9,9 +9,10 @@ use \Peneus\Services\AccountService;
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Services\CookieService;
+use \Harmonia\Services\Security\CsrfToken;
+use \Harmonia\Services\SecurityService;
 use \Harmonia\Session;
 use \Peneus\Model\Account;
-use \Peneus\Services\SecurityService;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
@@ -223,7 +224,7 @@ class AccountServiceTest extends TestCase
             ->willReturn('integrity-cookie-value');
         $securityService->expects($this->once())
             ->method('VerifyCsrfToken')
-            ->with($this->callback(function($csrfToken) {
+            ->with($this->callback(function(CsrfToken $csrfToken) {
                 return $csrfToken->Token() === 'integrity-token-value'
                     && $csrfToken->CookieValue() === 'integrity-cookie-value';
             }))
