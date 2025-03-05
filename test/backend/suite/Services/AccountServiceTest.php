@@ -49,13 +49,13 @@ class AccountServiceTest extends TestCase
 
     #region IntegrityCookieName ------------------------------------------------
 
-    function testIntegrityCookieNameCallsGenerateCookieName()
+    function testIntegrityCookieNameCallsAppSpecificCookieName()
     {
         $cookieService = CookieService::Instance();
         $accountService = AccountService::Instance();
 
         $cookieService->expects($this->once())
-            ->method('GenerateCookieName')
+            ->method('AppSpecificCookieName')
             ->with('INTEGRITY')
             ->willReturn('MYAPP_INTEGRITY');
 
