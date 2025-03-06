@@ -35,7 +35,7 @@ class LogoutActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfDeleteCookieReturnsFalse()
+    function testOnExecuteThrowsIfDeleteCookieThrows()
     {
         $accountService = AccountService::Instance();
         $cookieService = CookieService::Instance();
@@ -48,14 +48,13 @@ class LogoutActionTest extends TestCase
         $cookieService->expects($this->once())
             ->method('DeleteCookie')
             ->with('MYAPP_INTEGRITY')
-            ->willReturn(false);
+            ->willThrowException(new \RuntimeException);
         $session->expects($this->never())
             ->method('Start');
         $session->expects($this->never())
             ->method('Destroy');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Failed to delete integrity cookie.');
         AccessHelper::CallMethod($logoutAction, 'onExecute');
     }
 
@@ -71,8 +70,7 @@ class LogoutActionTest extends TestCase
             ->willReturn('MYAPP_INTEGRITY');
         $cookieService->expects($this->once())
             ->method('DeleteCookie')
-            ->with('MYAPP_INTEGRITY')
-            ->willReturn(true);
+            ->with('MYAPP_INTEGRITY');
         $session->expects($this->once())
             ->method('Start')
             ->willThrowException(new \RuntimeException);
@@ -95,8 +93,7 @@ class LogoutActionTest extends TestCase
             ->willReturn('MYAPP_INTEGRITY');
         $cookieService->expects($this->once())
             ->method('DeleteCookie')
-            ->with('MYAPP_INTEGRITY')
-            ->willReturn(true);
+            ->with('MYAPP_INTEGRITY');
         $session->expects($this->once())
             ->method('Start')
             ->willReturn($session);
@@ -120,8 +117,7 @@ class LogoutActionTest extends TestCase
             ->willReturn('MYAPP_INTEGRITY');
         $cookieService->expects($this->once())
             ->method('DeleteCookie')
-            ->with('MYAPP_INTEGRITY')
-            ->willReturn(true);
+            ->with('MYAPP_INTEGRITY');
         $session->expects($this->once())
             ->method('Start')
             ->willReturn($session);
