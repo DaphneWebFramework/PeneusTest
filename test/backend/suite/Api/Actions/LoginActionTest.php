@@ -1,0 +1,683 @@
+<?php declare(strict_types=1);
+use \PHPUnit\Framework\TestCase;
+use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProviderExternal;
+
+use \Peneus\Api\Actions\LoginAction;
+
+use \Harmonia\Core\CArray;
+use \Harmonia\Database\Database;
+use \Harmonia\Database\Queries\SelectQuery;
+use \Harmonia\Database\ResultSet;
+use \Harmonia\Http\Request;
+use \Harmonia\Services\CookieService;
+use \Harmonia\Services\Security\CsrfToken;
+use \Harmonia\Services\SecurityService;
+use \Harmonia\Session;
+use \Peneus\Api\Actions\LogoutAction;
+use \Peneus\Model\Account;
+use \Peneus\Services\AccountService;
+use \TestToolkit\AccessHelper;
+use \TestToolkit\DataHelper;
+
+#[CoversClass(LoginAction::class)]
+class LoginActionTest extends TestCase
+{
+    private ?Request $originalRequest = null;
+    private ?Database $originalDatabase = null;
+    private ?Session $originalSession = null;
+    private ?SecurityService $originalSecurityService = null;
+    private ?CookieService $originalCookieService = null;
+    private ?AccountService $originalAccountService = null;
+
+    protected function setUp(): void
+    {
+        $this->originalRequest = Request::ReplaceInstance(
+            $this->createMock(Request::class));
+        $this->originalDatabase = Database::ReplaceInstance(
+            $this->createMock(Database::class));
+        $this->originalSession = Session::ReplaceInstance(
+            $this->createMock(Session::class));
+        $this->originalSecurityService = SecurityService::ReplaceInstance(
+            $this->createMock(SecurityService::class));
+        $this->originalCookieService = CookieService::ReplaceInstance(
+            $this->createMock(CookieService::class));
+        $this->originalAccountService = AccountService::ReplaceInstance(
+            $this->createMock(AccountService::class));
+    }
+
+    protected function tearDown(): void
+    {
+        Request::ReplaceInstance($this->originalRequest);
+        Database::ReplaceInstance($this->originalDatabase);
+        Session::ReplaceInstance($this->originalSession);
+        SecurityService::ReplaceInstance($this->originalSecurityService);
+        CookieService::ReplaceInstance($this->originalCookieService);
+        AccountService::ReplaceInstance($this->originalAccountService);
+    }
+
+    private function systemUnderTest(string ...$mockedMethods): LoginAction
+    {
+        return $this->getMockBuilder(LoginAction::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods($mockedMethods)
+            ->getMock();
+    }
+
+    #region onExecute ----------------------------------------------------------
+
+    function testOnExecuteThrowsIfUsernameIsMissing()
+    {
+        $loginAction = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('Get')
+            ->with('username')
+            ->willReturn(null);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Username is required.');
+        AccessHelper::CallMethod($loginAction, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfPasswordIsMissing()
+    {
+        $loginAction = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->exactly(2))
+            ->method('Get')
+            ->willReturnMap([
+                ['username', 'john'],
+                ['password', null]
+            ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Password is required.');
+        AccessHelper::CallMethod($loginAction, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfAccountNotFound()
+    {
+        $loginAction = $this->systemUnderTest('findAccount');
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->exactly(2))
+            ->method('Get')
+            ->willReturnMap([
+                ['username', 'john'],
+                ['password', 'pass123']
+            ]);
+        $loginAction->expects($this->once())
+            ->method('findAccount')
+            ->with('john')
+            ->willReturn(null);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Invalid username or password.');
+        AccessHelper::CallMethod($loginAction, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfPasswordVerificationFails()
+    {
+        $loginAction = $this->systemUnderTest('findAccount', 'verifyPassword');
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $account = $this->createStub(Account::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->exactly(2))
+            ->method('Get')
+            ->willReturnMap([
+                ['username', 'john'],
+                ['password', 'pass123']
+            ]);
+        $loginAction->expects($this->once())
+            ->method('findAccount')
+            ->with('john')
+            ->willReturn($account);
+        $loginAction->expects($this->once())
+            ->method('verifyPassword')
+            ->with($account, 'pass123')
+            ->willReturn(false);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Invalid username or password.');
+        AccessHelper::CallMethod($loginAction, 'onExecute');
+    }
+
+    function testOnExecuteLogsOutAndThrowsIfUpdateLastLoginTimeFails()
+    {
+        $loginAction = $this->systemUnderTest('findAccount', 'verifyPassword',
+            'updateLastLoginTime', 'createLogoutAction');
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $account = $this->createStub(Account::class);
+        $database = Database::Instance();
+        $logoutAction = $this->createMock(LogoutAction::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->exactly(2))
+            ->method('Get')
+            ->willReturnMap([
+                ['username', 'john'],
+                ['password', 'pass123']
+            ]);
+        $loginAction->expects($this->once())
+            ->method('findAccount')
+            ->with('john')
+            ->willReturn($account);
+        $loginAction->expects($this->once())
+            ->method('verifyPassword')
+            ->with($account, 'pass123')
+            ->willReturn(true);
+        $loginAction->expects($this->once())
+            ->method('updateLastLoginTime')
+            ->with($account)
+            ->willReturn(false);
+        $database->expects($this->once())
+            ->method('WithTransaction')
+            ->willReturnCallback(function($callback) {
+                try {
+                    return $callback();
+                } catch (\Throwable $e) {
+                    $this->assertSame('Failed to update last login time.',
+                                      $e->getMessage());
+                    return false;
+                }
+            });
+        $loginAction->expects($this->once())
+            ->method('createLogoutAction')
+            ->willReturn($logoutAction);
+        $logoutAction->expects($this->once())
+            ->method('Execute');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Failed to log in.');
+        AccessHelper::CallMethod($loginAction, 'onExecute');
+    }
+
+    function testOnExecuteLogsOutAndThrowsIfEstablishSessionIntegrityFails()
+    {
+        $loginAction = $this->systemUnderTest('findAccount', 'verifyPassword',
+            'updateLastLoginTime', 'establishSessionIntegrity',
+            'createLogoutAction');
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $account = $this->createStub(Account::class);
+        $database = Database::Instance();
+        $logoutAction = $this->createMock(LogoutAction::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->exactly(2))
+            ->method('Get')
+            ->willReturnMap([
+                ['username', 'john'],
+                ['password', 'pass123']
+            ]);
+        $loginAction->expects($this->once())
+            ->method('findAccount')
+            ->with('john')
+            ->willReturn($account);
+        $loginAction->expects($this->once())
+            ->method('verifyPassword')
+            ->with($account, 'pass123')
+            ->willReturn(true);
+        $loginAction->expects($this->once())
+            ->method('updateLastLoginTime')
+            ->with($account)
+            ->willReturn(true);
+        $loginAction->expects($this->once())
+            ->method('establishSessionIntegrity')
+            ->with($account)
+            ->willReturn(false);
+        $database->expects($this->once())
+            ->method('WithTransaction')
+            ->willReturnCallback(function($callback) {
+                try {
+                    return $callback();
+                } catch (\Throwable $e) {
+                    $this->assertSame('Failed to establish session integrity.',
+                                      $e->getMessage());
+                    return false;
+                }
+            });
+        $loginAction->expects($this->once())
+            ->method('createLogoutAction')
+            ->willReturn($logoutAction);
+        $logoutAction->expects($this->once())
+            ->method('Execute');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Failed to log in.');
+        AccessHelper::CallMethod($loginAction, 'onExecute');
+    }
+
+    function testOnExecuteLogsOutAndThrowsIfDeleteCsrfCookieFails()
+    {
+        $loginAction = $this->systemUnderTest('findAccount', 'verifyPassword',
+            'updateLastLoginTime', 'establishSessionIntegrity',
+            'createLogoutAction');
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $account = $this->createStub(Account::class);
+        $database = Database::Instance();
+        $logoutAction = $this->createMock(LogoutAction::class);
+        $cookieService = CookieService::Instance();
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->exactly(2))
+            ->method('Get')
+            ->willReturnMap([
+                ['username', 'john'],
+                ['password', 'pass123']
+            ]);
+        $loginAction->expects($this->once())
+            ->method('findAccount')
+            ->with('john')
+            ->willReturn($account);
+        $loginAction->expects($this->once())
+            ->method('verifyPassword')
+            ->with($account, 'pass123')
+            ->willReturn(true);
+        $loginAction->expects($this->once())
+            ->method('updateLastLoginTime')
+            ->with($account)
+            ->willReturn(true);
+        $loginAction->expects($this->once())
+            ->method('establishSessionIntegrity')
+            ->with($account)
+            ->willReturn(true);
+        $cookieService->expects($this->once())
+            ->method('DeleteCsrfCookie')
+            ->willThrowException(new \RuntimeException);
+        $database->expects($this->once())
+            ->method('WithTransaction')
+            ->willReturnCallback(function($callback) {
+                try {
+                    return $callback();
+                } catch (\Throwable $e) {
+                    return false;
+                }
+            });
+        $loginAction->expects($this->once())
+            ->method('createLogoutAction')
+            ->willReturn($logoutAction);
+        $logoutAction->expects($this->once())
+            ->method('Execute');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Failed to log in.');
+        AccessHelper::CallMethod($loginAction, 'onExecute');
+    }
+
+    function testOnExecuteSucceedsIfDatabaseTransactionSucceeds()
+    {
+        $loginAction = $this->systemUnderTest('findAccount', 'verifyPassword',
+            'updateLastLoginTime', 'establishSessionIntegrity',
+            'createLogoutAction');
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $account = $this->createStub(Account::class);
+        $database = Database::Instance();
+        $cookieService = CookieService::Instance();
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->exactly(2))
+            ->method('Get')
+            ->willReturnMap([
+                ['username', 'john'],
+                ['password', 'pass123']
+            ]);
+        $loginAction->expects($this->once())
+            ->method('findAccount')
+            ->with('john')
+            ->willReturn($account);
+        $loginAction->expects($this->once())
+            ->method('verifyPassword')
+            ->with($account, 'pass123')
+            ->willReturn(true);
+        $loginAction->expects($this->once())
+            ->method('updateLastLoginTime')
+            ->with($account)
+            ->willReturn(true);
+        $loginAction->expects($this->once())
+            ->method('establishSessionIntegrity')
+            ->with($account)
+            ->willReturn(true);
+        $cookieService->expects($this->once())
+            ->method('DeleteCsrfCookie');
+        $database->expects($this->once())
+            ->method('WithTransaction')
+            ->willReturnCallback(function($callback) {
+                try {
+                    return $callback();
+                } catch (\Throwable $e) {
+                    return false;
+                }
+            });
+        $loginAction->expects($this->never())
+            ->method('createLogoutAction');
+
+        $this->assertNull(AccessHelper::CallMethod($loginAction, 'onExecute'));
+    }
+
+    #endregion onExecute
+
+    #region findAccount --------------------------------------------------------
+
+    function testFindAccountReturnsNullWhenNotFound()
+    {
+        $loginAction = $this->systemUnderTest();
+        $database = Database::Instance();
+        $resultSet = $this->createMock(ResultSet::class);
+
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn($resultSet);
+        $resultSet->expects($this->once())
+            ->method('Row')
+            ->willReturn(null);
+
+        $account = AccessHelper::CallMethod(
+            $loginAction,
+            'findAccount',
+            ['john']
+        );
+        $this->assertNull($account);
+    }
+
+    function testFindAccountReturnsAccountWhenFound()
+    {
+        $loginAction = $this->systemUnderTest();
+        $database = Database::Instance();
+        $resultSet = $this->createMock(ResultSet::class);
+
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame('account', AccessHelper::GetProperty($query, 'table'));
+                $this->assertSame('*', AccessHelper::GetProperty($query, 'columns'));
+                $this->assertSame('username = :username', AccessHelper::GetProperty($query, 'condition'));
+                $this->assertNull(AccessHelper::GetProperty($query, 'orderBy'));
+                $this->assertSame('1', AccessHelper::GetProperty($query, 'limit'));
+                $this->assertSame(['username' => 'john'], $query->Bindings());
+                return true;
+            }))
+            ->willReturn($resultSet);
+        $resultSet->expects($this->once())
+            ->method('Row')
+            ->willReturn([
+                'id' => 23,
+                'email' => 'john@example.com',
+                'username' => 'john',
+                'passwordHash' => 'password-hash',
+                'timeActivated' => '2024-01-01 00:00:00',
+                'timeLastLogin' => '2025-01-01 00:00:00'
+            ]);
+
+        $account = AccessHelper::CallMethod(
+            $loginAction,
+            'findAccount',
+            ['john']
+        );
+        $this->assertInstanceOf(Account::class, $account);
+        $this->assertSame(23, $account->id);
+        $this->assertSame('john@example.com', $account->email);
+        $this->assertSame('john', $account->username);
+        $this->assertSame('password-hash', $account->passwordHash);
+        $this->assertSame('2024-01-01 00:00:00', $account->timeActivated->format('Y-m-d H:i:s'));
+        $this->assertSame('2025-01-01 00:00:00', $account->timeLastLogin->format('Y-m-d H:i:s'));
+    }
+
+    #endregion findAccount
+
+    #region verifyPassword -----------------------------------------------------
+
+    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
+    function testVerifyPassword($returnValue)
+    {
+        $loginAction = $this->systemUnderTest();
+        $account = new Account(['passwordHash' => 'password-hash']);
+        $securityService = SecurityService::Instance();
+
+        $securityService->expects($this->once())
+            ->method('VerifyPassword')
+            ->with('plain-password', 'password-hash')
+            ->willReturn($returnValue);
+
+        $this->assertSame(
+            $returnValue,
+            AccessHelper::CallMethod(
+                $loginAction,
+                'verifyPassword',
+                [$account, 'plain-password']
+            )
+        );
+    }
+
+    #endregion verifyPassword
+
+    #region updateLastLoginTime ------------------------------------------------
+
+    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
+    function testUpdateLastLoginTime($returnValue)
+    {
+        $loginAction = $this->systemUnderTest();
+        $account = $this->createMock(Account::class);
+
+        $account->expects($this->once())
+            ->method('Save')
+            ->willReturn($returnValue);
+
+        $this->assertSame(
+            $returnValue,
+            AccessHelper::CallMethod(
+                $loginAction,
+                'updateLastLoginTime',
+                [$account]
+            )
+        );
+        $timeLastLogin = $account->timeLastLogin;
+        $this->assertInstanceOf(\DateTime::class, $timeLastLogin);
+        $this->assertEqualsWithDelta(time(), $timeLastLogin->getTimestamp(), 1);
+    }
+
+    #endregion updateLastLoginTime
+
+    #region establishSessionIntegrity ------------------------------------------
+
+    function testEstablishSessionIntegrityFailsIfSessionStartThrows()
+    {
+        $loginAction = $this->systemUnderTest();
+        $securityService = SecurityService::Instance();
+        $session = Session::Instance();
+
+        $securityService->expects($this->once())
+            ->method('GenerateCsrfToken');
+        $session->expects($this->once())
+            ->method('Start')
+            ->willThrowException(new \RuntimeException);
+
+        $this->assertFalse(AccessHelper::CallMethod(
+            $loginAction,
+            'establishSessionIntegrity',
+            [new Account]
+        ));
+    }
+
+    function testEstablishSessionIntegrityFailsIfSessionClearThrows()
+    {
+        $loginAction = $this->systemUnderTest();
+        $securityService = SecurityService::Instance();
+        $session = Session::Instance();
+
+        $securityService->expects($this->once())
+            ->method('GenerateCsrfToken');
+        $session->expects($this->once())
+            ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Clear')
+            ->willThrowException(new \RuntimeException);
+
+        $this->assertFalse(AccessHelper::CallMethod(
+            $loginAction,
+            'establishSessionIntegrity',
+            [new Account]
+        ));
+    }
+
+    function testEstablishSessionIntegrityFailsIfSessionCloseThrows()
+    {
+        $loginAction = $this->systemUnderTest();
+        $securityService = SecurityService::Instance();
+        $session = Session::Instance();
+
+        $securityService->expects($this->once())
+            ->method('GenerateCsrfToken');
+        $session->expects($this->once())
+            ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Clear')
+            ->willReturn($session);
+        $session->expects($this->exactly(2))
+            ->method('Set')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Close')
+            ->willThrowException(new \RuntimeException);
+
+        $this->assertFalse(AccessHelper::CallMethod(
+            $loginAction,
+            'establishSessionIntegrity',
+            [new Account]
+        ));
+    }
+
+    function testEstablishSessionIntegrityFailsIfSetCookieThrows()
+    {
+        $loginAction = $this->systemUnderTest();
+        $securityService = SecurityService::Instance();
+        $session = Session::Instance();
+        $cookieService = CookieService::Instance();
+
+        $securityService->expects($this->once())
+            ->method('GenerateCsrfToken');
+        $session->expects($this->once())
+            ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Clear')
+            ->willReturn($session);
+        $session->expects($this->exactly(2))
+            ->method('Set')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Close');
+        $cookieService->expects($this->once())
+            ->method('SetCookie')
+            ->willThrowException(new \RuntimeException);
+
+        $this->assertFalse(AccessHelper::CallMethod(
+            $loginAction,
+            'establishSessionIntegrity',
+            [new Account]
+        ));
+    }
+
+    function testEstablishSessionIntegritySucceeds()
+    {
+        $loginAction = $this->systemUnderTest();
+        $account = new Account(['id' => 23]);
+        $securityService = SecurityService::Instance();
+        $csrfToken = $this->createMock(CsrfToken::class);
+        $session = Session::Instance();
+        $accountService = AccountService::Instance();
+        $cookieService = CookieService::Instance();
+
+        $securityService->expects($this->once())
+            ->method('GenerateCsrfToken')
+            ->willReturn($csrfToken);
+        $session->expects($this->once())
+            ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Clear')
+            ->willReturn($session);
+        $csrfToken->expects($this->once())
+            ->method('Token')
+            ->willReturn('integrity-token');
+        $session->expects($this->exactly(2))
+            ->method('Set')
+            ->with($this->callback(function(...$args) {
+                [$key, $value] = $args;
+                return match ($key) {
+                    AccountService::INTEGRITY_TOKEN_SESSION_KEY =>
+                        $value === 'integrity-token',
+                    AccountService::ACCOUNT_ID_SESSION_KEY =>
+                        $value === 23,
+                    default => false
+                };
+            }))
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Close');
+        $accountService->expects($this->once())
+            ->method('IntegrityCookieName')
+            ->willReturn('integrity-cookie-name');
+        $csrfToken->expects($this->once())
+            ->method('CookieValue')
+            ->willReturn('integrity-cookie-value');
+        $cookieService->expects($this->once())
+            ->method('SetCookie')
+            ->with('integrity-cookie-name', 'integrity-cookie-value');
+
+        $this->assertTrue(AccessHelper::CallMethod(
+            $loginAction,
+            'establishSessionIntegrity',
+            [$account]
+        ));
+    }
+
+    #endregion establishSessionIntegrity
+
+    #region createLogoutAction -------------------------------------------------
+
+    function testCreateLogoutAction()
+    {
+        $loginAction = $this->systemUnderTest();
+
+        $this->assertInstanceOf(
+            LogoutAction::class,
+            AccessHelper::CallMethod($loginAction, 'createLogoutAction')
+        );
+    }
+
+    #endregion createLogoutAction
+}

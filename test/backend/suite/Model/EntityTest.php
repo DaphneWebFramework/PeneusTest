@@ -519,7 +519,8 @@ class EntityTest extends TestCase
     function testFindByIdFailsIfResultSetIsEmpty()
     {
         $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->method('Row')
+        $resultSet->expects($this->once())
+            ->method('Row')
             ->willReturn(null);
         $database = Database::Instance();
         $database->expects($this->once())
@@ -558,7 +559,8 @@ class EntityTest extends TestCase
     function testFindByIdSucceedsIfResultSetIsNotEmpty()
     {
         $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->method('Row')
+        $resultSet->expects($this->once())
+            ->method('Row')
             ->willReturn([
                 'id' => 1,
                 'name' => 'John',
@@ -620,7 +622,8 @@ class EntityTest extends TestCase
     function testFindFirstFailsIfResultSetIsEmpty()
     {
         $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->method('Row')
+        $resultSet->expects($this->once())
+            ->method('Row')
             ->willReturn(null);
         $database = Database::Instance();
         $database->expects($this->once())
@@ -659,7 +662,8 @@ class EntityTest extends TestCase
     function testFindFirstSucceedsIfResultSetIsNotEmpty()
     {
         $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->method('Row')
+        $resultSet->expects($this->once())
+            ->method('Row')
             ->willReturn([
                 'id' => 1,
                 'name' => 'John',
@@ -728,7 +732,8 @@ class EntityTest extends TestCase
     function testFindFailsIfResultSetIsEmpty()
     {
         $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->method('Row')
+        $resultSet->expects($this->once())
+            ->method('Row')
             ->willReturn(null);
         $database = Database::Instance();
         $database->expects($this->once())

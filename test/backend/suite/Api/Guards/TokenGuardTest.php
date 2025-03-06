@@ -34,13 +34,13 @@ class TokenGuardTest extends TestCase
     function testVerifyWithMissingCookie()
     {
         $request = Request::Instance();
-        $requestCookies = $this->createMock(CArray::class);
+        $cookies = $this->createMock(CArray::class);
         $securityService = SecurityService::Instance();
 
         $request->expects($this->once())
             ->method('Cookies')
-            ->willReturn($requestCookies);
-        $requestCookies->expects($this->once())
+            ->willReturn($cookies);
+        $cookies->expects($this->once())
             ->method('Get')
             ->with('cookie-name')
             ->willReturn(null);
@@ -54,13 +54,13 @@ class TokenGuardTest extends TestCase
     function testVerifyWithInvalidCookie()
     {
         $request = Request::Instance();
-        $requestCookies = $this->createMock(CArray::class);
+        $cookies = $this->createMock(CArray::class);
         $securityService = SecurityService::Instance();
 
         $request->expects($this->once())
             ->method('Cookies')
-            ->willReturn($requestCookies);
-        $requestCookies->expects($this->once())
+            ->willReturn($cookies);
+        $cookies->expects($this->once())
             ->method('Get')
             ->with('cookie-name')
             ->willReturn('cookie-value');
@@ -79,13 +79,13 @@ class TokenGuardTest extends TestCase
     function testVerifyWithValidCookie()
     {
         $request = Request::Instance();
-        $requestCookies = $this->createMock(CArray::class);
+        $cookies = $this->createMock(CArray::class);
         $securityService = SecurityService::Instance();
 
         $request->expects($this->once())
             ->method('Cookies')
-            ->willReturn($requestCookies);
-        $requestCookies->expects($this->once())
+            ->willReturn($cookies);
+        $cookies->expects($this->once())
             ->method('Get')
             ->with('cookie-name')
             ->willReturn('cookie-value');
