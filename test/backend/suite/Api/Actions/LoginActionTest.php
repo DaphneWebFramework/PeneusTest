@@ -18,6 +18,7 @@ use \Harmonia\Session;
 use \Peneus\Api\Actions\LogoutAction;
 use \Peneus\Model\Account;
 use \Peneus\Services\AccountService;
+use \Peneus\Translation;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
@@ -31,6 +32,7 @@ class LoginActionTest extends TestCase
     private ?CookieService $originalCookieService = null;
     private ?AccountService $originalAccountService = null;
     private ?Config $originalConfig = null;
+    private ?Translation $originalTranslation = null;
 
     protected function setUp(): void
     {
@@ -48,6 +50,8 @@ class LoginActionTest extends TestCase
             AccountService::ReplaceInstance($this->createMock(AccountService::class));
         $this->originalConfig =
             Config::ReplaceInstance($this->config());
+        $this->originalTranslation =
+            Translation::ReplaceInstance($this->createMock(Translation::class));
     }
 
     protected function tearDown(): void
@@ -59,6 +63,7 @@ class LoginActionTest extends TestCase
         CookieService::ReplaceInstance($this->originalCookieService);
         AccountService::ReplaceInstance($this->originalAccountService);
         Config::ReplaceInstance($this->originalConfig);
+        Translation::ReplaceInstance($this->originalTranslation);
     }
 
     private function config()
@@ -82,13 +87,19 @@ class LoginActionTest extends TestCase
     {
         $loginAction = $this->systemUnderTest();
         $accountService = AccountService::Instance();
+        $translation = Translation::Instance();
 
         $accountService->expects($this->once())
             ->method('GetAuthenticatedAccount')
             ->willReturn($this->createStub(Account::class));
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_already_logged_in')
+            ->willReturn('You are already logged in.');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Already logged in.');
+        $this->expectExceptionMessage('You are already logged in.');
+        $this->expectExceptionCode(409);
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
 
@@ -137,6 +148,7 @@ class LoginActionTest extends TestCase
         $loginAction = $this->systemUnderTest('findAccount');
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
+        $translation = Translation::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -151,9 +163,14 @@ class LoginActionTest extends TestCase
             ->method('findAccount')
             ->with('john')
             ->willReturn(null);
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_incorrect_username_or_password')
+            ->willReturn('Incorrect username or password.');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Invalid username or password.');
+        $this->expectExceptionMessage('Incorrect username or password.');
+        $this->expectExceptionCode(401);
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
 
@@ -163,6 +180,7 @@ class LoginActionTest extends TestCase
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $account = $this->createStub(Account::class);
+        $translation = Translation::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -181,9 +199,14 @@ class LoginActionTest extends TestCase
             ->method('verifyPassword')
             ->with($account, 'pass123')
             ->willReturn(false);
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_incorrect_username_or_password')
+            ->willReturn('Incorrect username or password.');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Invalid username or password.');
+        $this->expectExceptionMessage('Incorrect username or password.');
+        $this->expectExceptionCode(401);
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
 
@@ -196,6 +219,7 @@ class LoginActionTest extends TestCase
         $account = $this->createStub(Account::class);
         $database = Database::Instance();
         $logoutAction = $this->createMock(LogoutAction::class);
+        $translation = Translation::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -234,9 +258,14 @@ class LoginActionTest extends TestCase
             ->willReturn($logoutAction);
         $logoutAction->expects($this->once())
             ->method('Execute');
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_login_failed')
+            ->willReturn('Login failed.');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Failed to log in.');
+        $this->expectExceptionMessage('Login failed.');
+        $this->expectExceptionCode(500);
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
 
@@ -250,6 +279,7 @@ class LoginActionTest extends TestCase
         $account = $this->createStub(Account::class);
         $database = Database::Instance();
         $logoutAction = $this->createMock(LogoutAction::class);
+        $translation = Translation::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -292,9 +322,14 @@ class LoginActionTest extends TestCase
             ->willReturn($logoutAction);
         $logoutAction->expects($this->once())
             ->method('Execute');
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_login_failed')
+            ->willReturn('Login failed.');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Failed to log in.');
+        $this->expectExceptionMessage('Login failed.');
+        $this->expectExceptionCode(500);
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
 
@@ -309,6 +344,7 @@ class LoginActionTest extends TestCase
         $database = Database::Instance();
         $logoutAction = $this->createMock(LogoutAction::class);
         $cookieService = CookieService::Instance();
+        $translation = Translation::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -352,9 +388,14 @@ class LoginActionTest extends TestCase
             ->willReturn($logoutAction);
         $logoutAction->expects($this->once())
             ->method('Execute');
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_login_failed')
+            ->willReturn('Login failed.');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Failed to log in.');
+        $this->expectExceptionMessage('Login failed.');
+        $this->expectExceptionCode(500);
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
 

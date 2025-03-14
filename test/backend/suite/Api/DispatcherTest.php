@@ -12,6 +12,7 @@ use \Harmonia\Http\StatusCode;
 use \Harmonia\Shutdown\ShutdownHandler;
 use \Peneus\Api\HandlerRegistry;
 use \Peneus\Api\Handlers\Handler;
+use \Peneus\Translation;
 use \TestToolkit\AccessHelper;
 
 #[CoversClass(Dispatcher::class)]
@@ -21,17 +22,20 @@ class DispatcherTest extends TestCase
     private ?Request $originalRequest = null;
     private ?HandlerRegistry $originalHandlerRegistry = null;
     private ?Config $originalConfig = null;
+    private ?Translation $originalTranslation = null;
 
     protected function setUp(): void
     {
-        $this->originalShutdownHandler = ShutdownHandler::ReplaceInstance(
-            $this->createMock(ShutdownHandler::class));
-        $this->originalRequest = Request::ReplaceInstance(
-            $this->createMock(Request::class));
-        $this->originalHandlerRegistry = HandlerRegistry::ReplaceInstance(
-            $this->createMock(HandlerRegistry::class));
-        $this->originalConfig = Config::ReplaceInstance(
-            $this->createMock(Config::class));
+        $this->originalShutdownHandler =
+            ShutdownHandler::ReplaceInstance($this->createMock(ShutdownHandler::class));
+        $this->originalRequest =
+            Request::ReplaceInstance($this->createMock(Request::class));
+        $this->originalHandlerRegistry =
+            HandlerRegistry::ReplaceInstance($this->createMock(HandlerRegistry::class));
+        $this->originalConfig =
+            Config::ReplaceInstance($this->createMock(Config::class));
+        $this->originalTranslation =
+            Translation::ReplaceInstance($this->createMock(Translation::class));
     }
 
     protected function tearDown(): void
@@ -40,17 +44,23 @@ class DispatcherTest extends TestCase
         Request::ReplaceInstance($this->originalRequest);
         HandlerRegistry::ReplaceInstance($this->originalHandlerRegistry);
         Config::ReplaceInstance($this->originalConfig);
+        Translation::ReplaceInstance($this->originalTranslation);
     }
 
     #region DispatchRequest ----------------------------------------------------
 
     function testDispatchRequestWithMissingHandlerQueryParameter()
     {
+        $translation = Translation::Instance();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $response = $this->createMock(Response::class);
         $dispatcher = new Dispatcher();
 
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_handler_not_specified')
+            ->willReturn('Handler not specified.');
         $request->expects($this->once())
             ->method('QueryParams')
             ->willReturn($queryParams);
@@ -72,11 +82,16 @@ class DispatcherTest extends TestCase
 
     function testDispatchRequestWithMissingActionQueryParameter()
     {
+        $translation = Translation::Instance();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $response = $this->createMock(Response::class);
         $dispatcher = new Dispatcher();
 
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_action_not_specified')
+            ->willReturn('Action not specified.');
         $request->expects($this->once())
             ->method('QueryParams')
             ->willReturn($queryParams);
@@ -102,12 +117,17 @@ class DispatcherTest extends TestCase
 
     function testDispatchRequestWithHandlerNotFound()
     {
+        $translation = Translation::Instance();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $response = $this->createMock(Response::class);
         $dispatcher = new Dispatcher();
 
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_handler_not_found', 'handler1')
+            ->willReturn('Handler not found: handler1');
         $request->expects($this->once())
             ->method('QueryParams')
             ->willReturn($queryParams);
@@ -281,7 +301,7 @@ class DispatcherTest extends TestCase
             ->willThrowException(new \Exception('Sample error message.'));
         $response->expects($this->once())
             ->method('SetStatusCode')
-            ->with(StatusCode::InternalServerError) // Default (500)
+            ->with(StatusCode::BadRequest) // Default (400)
             ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetHeader')
@@ -387,6 +407,7 @@ class DispatcherTest extends TestCase
     function testOnShutdownWithErrorInLiveMode()
     {
         $config = Config::Instance();
+        $translation = Translation::Instance();
         $response = $this->createMock(Response::class);
         $dispatcher = new Dispatcher();
 
@@ -394,6 +415,10 @@ class DispatcherTest extends TestCase
             ->method('Option')
             ->with('IsDebug')
             ->willReturn(false);
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_unexpected')
+            ->willReturn('An unexpected error occurred.');
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::InternalServerError)

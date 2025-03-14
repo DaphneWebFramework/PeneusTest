@@ -5,11 +5,25 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 use \Peneus\Api\Handlers\Handler;
 
 use \Peneus\Api\Actions\Action;
+use \Peneus\Translation;
 
 #[CoversClass(Handler::class)]
 class HandlerTest extends TestCase
 {
-    private function createHandler(): Handler
+    private ?Translation $originalTranslation = null;
+
+    protected function setUp(): void
+    {
+        $this->originalTranslation = Translation::ReplaceInstance(
+            $this->createMock(Translation::class));
+    }
+
+    protected function tearDown(): void
+    {
+        Translation::ReplaceInstance($this->originalTranslation);
+    }
+
+    private function systemUnderTest(): Handler
     {
         return $this->getMockBuilder(Handler::class)
             ->onlyMethods(['createAction'])
@@ -20,24 +34,29 @@ class HandlerTest extends TestCase
 
     function testHandleActionWhenActionIsUnknown()
     {
-        $handler = $this->createHandler();
+        $sut = $this->systemUnderTest();
+        $translation = Translation::Instance();
 
-        $handler->expects($this->once())
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_action_not_found', 'action1')
+            ->willReturn('Action not found: action1');
+        $sut->expects($this->once())
             ->method('createAction')
             ->willReturn(null);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Unknown action: unknown');
+        $this->expectExceptionMessage('Action not found: action1');
         $this->expectExceptionCode(404);
-        $handler->HandleAction('unknown');
+        $sut->HandleAction('action1');
     }
 
     function testHandleActionWithCaseInsensitiveActionName()
     {
-        $handler = $this->createHandler();
+        $sut = $this->systemUnderTest();
         $action = $this->createMock(Action::class);
 
-        $handler->expects($this->once())
+        $sut->expects($this->once())
             ->method('createAction')
             ->with('test')
             ->willReturn($action);
@@ -45,15 +64,15 @@ class HandlerTest extends TestCase
             ->method('Execute')
             ->willReturn(42);
 
-        $this->assertSame(42, $handler->HandleAction('TEST'));
+        $this->assertSame(42, $sut->HandleAction('TEST'));
     }
 
     function testHandleActionWithActionNameWithSurroundingWhitespace()
     {
-        $handler = $this->createHandler();
+        $sut = $this->systemUnderTest();
         $action = $this->createMock(Action::class);
 
-        $handler->expects($this->once())
+        $sut->expects($this->once())
             ->method('createAction')
             ->with('test')
             ->willReturn($action);
@@ -61,7 +80,7 @@ class HandlerTest extends TestCase
             ->method('Execute')
             ->willReturn(42);
 
-        $this->assertSame(42, $handler->HandleAction('  test  '));
+        $this->assertSame(42, $sut->HandleAction('  test  '));
     }
 
     #endregion HandleAction

@@ -5,6 +5,7 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 use \Peneus\Api\Actions\Action;
 
 use \Peneus\Api\Guards\IGuard;
+use \Peneus\Translation;
 
 class DummyAction extends Action {
     protected function onExecute(): mixed { return 42; }
@@ -13,6 +14,21 @@ class DummyAction extends Action {
 #[CoversClass(Action::class)]
 class ActionTest extends TestCase
 {
+    private ?Translation $originalTranslation = null;
+
+    protected function setUp(): void
+    {
+        $this->originalTranslation =
+            Translation::ReplaceInstance($this->createMock(Translation::class));
+    }
+
+    protected function tearDown(): void
+    {
+        Translation::ReplaceInstance($this->originalTranslation);
+    }
+
+    #region Execute ------------------------------------------------------------
+
     function testExecuteWithoutGuards()
     {
         $action = new DummyAction();
@@ -21,9 +37,10 @@ class ActionTest extends TestCase
 
     function testExecuteWithGuardsWhenFirstGuardDoesNotVerify()
     {
+        $action = new DummyAction();
         $guard1 = $this->createMock(IGuard::class);
         $guard2 = $this->createMock(IGuard::class);
-        $action = new DummyAction();
+        $translation = Translation::Instance();
 
         $guard1->expects($this->once())
             ->method('Verify')
@@ -32,9 +49,14 @@ class ActionTest extends TestCase
             ->method('Verify');
         $action->AddGuard($guard1)
                ->AddGuard($guard2);
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_no_permission_for_action')
+            ->willReturn('You do not have permission to perform this action.');
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('You do not have permission to execute this action.');
+        $this->expectExceptionMessage(
+            'You do not have permission to perform this action.');
         $this->expectExceptionCode(401);
         $action->Execute();
     }
@@ -44,6 +66,7 @@ class ActionTest extends TestCase
         $guard1 = $this->createMock(IGuard::class);
         $guard2 = $this->createMock(IGuard::class);
         $action = new DummyAction();
+        $translation = Translation::Instance();
 
         $guard1->expects($this->once())
             ->method('Verify')
@@ -53,9 +76,14 @@ class ActionTest extends TestCase
             ->willReturn(false);
         $action->AddGuard($guard1)
                ->AddGuard($guard2);
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_no_permission_for_action')
+            ->willReturn('You do not have permission to perform this action.');
 
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('You do not have permission to execute this action.');
+        $this->expectExceptionMessage(
+            'You do not have permission to perform this action.');
         $this->expectExceptionCode(401);
         $action->Execute();
     }
@@ -77,4 +105,6 @@ class ActionTest extends TestCase
 
         $this->assertSame(42, $action->Execute());
     }
+
+    #endregion Execute
 }
