@@ -5,6 +5,7 @@ use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\LoginAction;
 
+use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Database\Database;
 use \Harmonia\Database\Queries\SelectQuery;
@@ -29,21 +30,24 @@ class LoginActionTest extends TestCase
     private ?SecurityService $originalSecurityService = null;
     private ?CookieService $originalCookieService = null;
     private ?AccountService $originalAccountService = null;
+    private ?Config $originalConfig = null;
 
     protected function setUp(): void
     {
-        $this->originalRequest = Request::ReplaceInstance(
-            $this->createMock(Request::class));
-        $this->originalDatabase = Database::ReplaceInstance(
-            $this->createMock(Database::class));
-        $this->originalSession = Session::ReplaceInstance(
-            $this->createMock(Session::class));
-        $this->originalSecurityService = SecurityService::ReplaceInstance(
-            $this->createMock(SecurityService::class));
-        $this->originalCookieService = CookieService::ReplaceInstance(
-            $this->createMock(CookieService::class));
-        $this->originalAccountService = AccountService::ReplaceInstance(
-            $this->createMock(AccountService::class));
+        $this->originalRequest =
+            Request::ReplaceInstance($this->createMock(Request::class));
+        $this->originalDatabase =
+            Database::ReplaceInstance($this->createMock(Database::class));
+        $this->originalSession =
+            Session::ReplaceInstance($this->createMock(Session::class));
+        $this->originalSecurityService =
+            SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
+        $this->originalCookieService =
+            CookieService::ReplaceInstance($this->createMock(CookieService::class));
+        $this->originalAccountService =
+            AccountService::ReplaceInstance($this->createMock(AccountService::class));
+        $this->originalConfig =
+            Config::ReplaceInstance($this->config());
     }
 
     protected function tearDown(): void
@@ -54,6 +58,14 @@ class LoginActionTest extends TestCase
         SecurityService::ReplaceInstance($this->originalSecurityService);
         CookieService::ReplaceInstance($this->originalCookieService);
         AccountService::ReplaceInstance($this->originalAccountService);
+        Config::ReplaceInstance($this->originalConfig);
+    }
+
+    private function config()
+    {
+        $mock = $this->createMock(Config::class);
+        $mock->method('Option')->with('Language')->willReturn('en');
+        return $mock;
     }
 
     private function systemUnderTest(string ...$mockedMethods): LoginAction
@@ -66,6 +78,20 @@ class LoginActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
+    function testOnExecuteThrowsIfAlreadyLoggedIn()
+    {
+        $loginAction = $this->systemUnderTest();
+        $accountService = AccountService::Instance();
+
+        $accountService->expects($this->once())
+            ->method('GetAuthenticatedAccount')
+            ->willReturn($this->createStub(Account::class));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Already logged in.');
+        AccessHelper::CallMethod($loginAction, 'onExecute');
+    }
+
     function testOnExecuteThrowsIfUsernameIsMissing()
     {
         $loginAction = $this->systemUnderTest();
@@ -76,12 +102,13 @@ class LoginActionTest extends TestCase
             ->method('FormParams')
             ->willReturn($formParams);
         $formParams->expects($this->once())
-            ->method('Get')
-            ->with('username')
-            ->willReturn(null);
+            ->method('ToArray')
+            ->willReturn([
+                'password' => 'pass123'
+            ]);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Username is required.');
+        $this->expectExceptionMessage("Required field 'username' is missing.");
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
 
@@ -94,15 +121,14 @@ class LoginActionTest extends TestCase
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->exactly(2))
-            ->method('Get')
-            ->willReturnMap([
-                ['username', 'john'],
-                ['password', null]
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'username' => 'john'
             ]);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Password is required.');
+        $this->expectExceptionMessage("Required field 'password' is missing.");
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
 
@@ -115,11 +141,11 @@ class LoginActionTest extends TestCase
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->exactly(2))
-            ->method('Get')
-            ->willReturnMap([
-                ['username', 'john'],
-                ['password', 'pass123']
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'username' => 'john',
+                'password' => 'pass123'
             ]);
         $loginAction->expects($this->once())
             ->method('findAccount')
@@ -141,11 +167,11 @@ class LoginActionTest extends TestCase
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->exactly(2))
-            ->method('Get')
-            ->willReturnMap([
-                ['username', 'john'],
-                ['password', 'pass123']
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'username' => 'john',
+                'password' => 'pass123'
             ]);
         $loginAction->expects($this->once())
             ->method('findAccount')
@@ -174,11 +200,11 @@ class LoginActionTest extends TestCase
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->exactly(2))
-            ->method('Get')
-            ->willReturnMap([
-                ['username', 'john'],
-                ['password', 'pass123']
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'username' => 'john',
+                'password' => 'pass123'
             ]);
         $loginAction->expects($this->once())
             ->method('findAccount')
@@ -228,11 +254,11 @@ class LoginActionTest extends TestCase
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->exactly(2))
-            ->method('Get')
-            ->willReturnMap([
-                ['username', 'john'],
-                ['password', 'pass123']
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'username' => 'john',
+                'password' => 'pass123'
             ]);
         $loginAction->expects($this->once())
             ->method('findAccount')
@@ -287,11 +313,11 @@ class LoginActionTest extends TestCase
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->exactly(2))
-            ->method('Get')
-            ->willReturnMap([
-                ['username', 'john'],
-                ['password', 'pass123']
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'username' => 'john',
+                'password' => 'pass123'
             ]);
         $loginAction->expects($this->once())
             ->method('findAccount')
@@ -346,11 +372,11 @@ class LoginActionTest extends TestCase
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->exactly(2))
-            ->method('Get')
-            ->willReturnMap([
-                ['username', 'john'],
-                ['password', 'pass123']
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'username' => 'john',
+                'password' => 'pass123'
             ]);
         $loginAction->expects($this->once())
             ->method('findAccount')
