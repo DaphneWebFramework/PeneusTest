@@ -11,6 +11,7 @@ use \Harmonia\Database\Queries\InsertQuery;
 use \Harmonia\Database\Queries\SelectQuery;
 use \Harmonia\Database\Queries\UpdateQuery;
 use \Harmonia\Database\ResultSet;
+use \Harmonia\Logger;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
@@ -133,16 +134,20 @@ class TestEntity extends Entity {
 class EntityTest extends TestCase
 {
     private ?Database $originalDatabase = null;
+    private ?Logger $originalLogger = null;
 
     protected function setUp(): void
     {
-        $this->originalDatabase = Database::ReplaceInstance(
-            $this->createMock(Database::class));
+        $this->originalDatabase =
+            Database::ReplaceInstance($this->createMock(Database::class));
+        $this->originalLogger =
+            Logger::ReplaceInstance($this->createStub(Logger::class));
     }
 
     protected function tearDown(): void
     {
         Database::ReplaceInstance($this->originalDatabase);
+        Logger::ReplaceInstance($this->originalLogger);
     }
 
     #region __construct --------------------------------------------------------
