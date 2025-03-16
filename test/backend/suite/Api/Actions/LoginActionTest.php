@@ -11,6 +11,7 @@ use \Harmonia\Database\Database;
 use \Harmonia\Database\Queries\SelectQuery;
 use \Harmonia\Database\ResultSet;
 use \Harmonia\Http\Request;
+use \Harmonia\Logger;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\Security\CsrfToken;
 use \Harmonia\Services\SecurityService;
@@ -33,6 +34,7 @@ class LoginActionTest extends TestCase
     private ?AccountService $originalAccountService = null;
     private ?Config $originalConfig = null;
     private ?Translation $originalTranslation = null;
+    private ?Logger $originalLogger = null;
 
     protected function setUp(): void
     {
@@ -52,6 +54,8 @@ class LoginActionTest extends TestCase
             Config::ReplaceInstance($this->config());
         $this->originalTranslation =
             Translation::ReplaceInstance($this->createMock(Translation::class));
+        $this->originalLogger =
+            Logger::ReplaceInstance($this->createStub(Logger::class));
     }
 
     protected function tearDown(): void
@@ -64,6 +68,7 @@ class LoginActionTest extends TestCase
         AccountService::ReplaceInstance($this->originalAccountService);
         Config::ReplaceInstance($this->originalConfig);
         Translation::ReplaceInstance($this->originalTranslation);
+        Logger::ReplaceInstance($this->originalLogger);
     }
 
     private function config()
