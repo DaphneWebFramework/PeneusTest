@@ -1,7 +1,6 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
-use \PHPUnit\Framework\Attributes\RequiresOperatingSystem;
 
 use \Peneus\Resource;
 
