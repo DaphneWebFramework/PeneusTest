@@ -5,27 +5,68 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 use \Peneus\Resource;
 
 use \Harmonia\Core\CPath;
+use \Harmonia\Core\CUrl;
 use \TestToolkit\AccessHelper;
 
 #[CoversClass(Resource::class)]
 class ResourceTest extends TestCase
 {
+    private ?\Harmonia\Resource $originalHarmoniaResource = null;
+
+    protected function setUp(): void
+    {
+        $this->originalHarmoniaResource =
+            \Harmonia\Resource::ReplaceInstance($this->createMock(\Harmonia\Resource::class));
+    }
+
+    protected function tearDown(): void
+    {
+        \Harmonia\Resource::ReplaceInstance($this->originalHarmoniaResource);
+    }
+
     private function systemUnderTest(string ...$mockedMethods): Resource
     {
-        return $this->getMockBuilder(Resource::class)
+        $sut = $this->getMockBuilder(Resource::class)
             ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
+        return AccessHelper::CallConstructor($sut);
     }
+
+    #region __call -------------------------------------------------------------
+
+    function testCallDelegatesToBaseWhenMethodExists()
+    {
+        $sut = $this->systemUnderTest();
+        $harmoniaResource = \Harmonia\Resource::Instance();
+
+        $harmoniaResource->expects($this->once())
+            ->method('AppUrl')
+            ->willReturn(new CUrl('https://example.com/app/'));
+
+        $this->assertEquals('https://example.com/app/', $sut->AppUrl());
+    }
+
+    function testCallThrowsWhenBaseMethodDoesNotExist()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->expectException(\BadMethodCallException::class);
+        $this->expectExceptionMessage('Method `Nonexistent` does not exist');
+        $sut->Nonexistent();
+    }
+
+    #endregion __call
 
     #region TemplateFilePath ---------------------------------------------------
 
     function testTemplateFilePath()
     {
-        $sut = $this->systemUnderTest('appSubdirectoryPath');
+        $sut = $this->systemUnderTest();
+        $harmoniaResource = \Harmonia\Resource::Instance();
 
-        $sut->expects($this->once())
-            ->method('appSubdirectoryPath')
+        $harmoniaResource->expects($this->once())
+            ->method('AppSubdirectoryPath')
             ->with('templates')
             ->willReturn(new CPath('path/to/app/templates'));
 
@@ -41,10 +82,11 @@ class ResourceTest extends TestCase
 
     function testMasterpageFilePath()
     {
-        $sut = $this->systemUnderTest('appSubdirectoryPath');
+        $sut = $this->systemUnderTest();
+        $harmoniaResource = \Harmonia\Resource::Instance();
 
-        $sut->expects($this->once())
-            ->method('appSubdirectoryPath')
+        $harmoniaResource->expects($this->once())
+            ->method('AppSubdirectoryPath')
             ->with('masterpages')
             ->willReturn(new CPath('path/to/app/masterpages'));
 
@@ -56,30 +98,4 @@ class ResourceTest extends TestCase
 
     #endregion MasterpageFilePath
 
-    #region appSubdirectoryPath ------------------------------------------------
-
-    function testAppSubdirectoryPath()
-    {
-        $sut = $this->systemUnderTest('AppPath');
-
-        $sut->expects($this->once())
-            ->method('AppPath')
-            ->willReturn(new CPath('path/to/app'));
-
-        // Call the constructor to initialize cache in the parent class.
-        AccessHelper::CallConstructor($sut);
-
-        $expected = 'path/to/app' . \DIRECTORY_SEPARATOR . 'subdir';
-        $this->assertEquals(
-            $expected,
-            AccessHelper::CallMethod($sut, 'appSubdirectoryPath', ['subdir'])
-        );
-        // Ensure that the method returns the cached value.
-        $this->assertEquals(
-            $expected,
-            AccessHelper::CallMethod($sut, 'appSubdirectoryPath', ['subdir'])
-        );
-    }
-
-    #endregion appSubdirectoryPath
 }
