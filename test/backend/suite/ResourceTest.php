@@ -98,4 +98,38 @@ class ResourceTest extends TestCase
 
     #endregion MasterpageFilePath
 
+    #region FrontendDirectoryPath ----------------------------------------------
+
+    function testFrontendDirectoryPath()
+    {
+        $sut = $this->systemUnderTest();
+        $harmoniaResource = \Harmonia\Resource::Instance();
+
+        $harmoniaResource->expects($this->once())
+            ->method('AppSubdirectoryPath')
+            ->with('frontend')
+            ->willReturn(new CPath('path/to/app/frontend'));
+
+        $this->assertEquals('path/to/app/frontend', $sut->FrontendDirectoryPath());
+    }
+
+    #endregion FrontendDirectoryPath
+
+    #region FrontendLibrariesManifestFilePath ----------------------------------
+
+    function testFrontendLibrariesManifestFilePath()
+    {
+        $sut = $this->systemUnderTest('FrontendDirectoryPath');
+
+        $sut->expects($this->once())
+            ->method('FrontendDirectoryPath')
+            ->willReturn(new CPath('path/to/app/frontend'));
+
+        $this->assertEquals(
+            'path/to/app/frontend' . \DIRECTORY_SEPARATOR . 'libraries.json',
+            $sut->FrontendLibrariesManifestFilePath()
+        );
+    }
+
+    #endregion FrontendLibrariesManifestFilePath
 }
