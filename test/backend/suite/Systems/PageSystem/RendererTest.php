@@ -94,7 +94,7 @@ class RendererTest extends TestCase
 
     function testRenderWhenFileReadReturnsTemplate()
     {
-        $sut = $this->systemUnderTest('openFile', 'masterContents', '_echo');
+        $sut = $this->systemUnderTest('openFile', 'contents', '_echo');
         $resource = Resource::Instance();
         $file = $this->createMock(CFile::class);
         $config = Config::Instance();
@@ -132,7 +132,7 @@ class RendererTest extends TestCase
             ->method('Title')
             ->willReturn('Home | MyWebsite');
         $sut->expects($this->once())
-            ->method('masterContents')
+            ->method('contents')
             ->with($page)
             ->willReturn('	Welcome to MyWebsite!');
         $sut->expects($this->once())
@@ -155,9 +155,9 @@ class RendererTest extends TestCase
 
     #endregion Render
 
-    #region masterContents -----------------------------------------------------
+    #region contents -----------------------------------------------------------
 
-    function testMasterContentsWhenMasterpageNameIsEmpty()
+    function testContentsWhenMasterpageNameIsEmpty()
     {
         $sut = $this->systemUnderTest('_ob_start', '_ob_get_clean', '_echo');
         $page = $this->createMock(Page::class);
@@ -179,11 +179,11 @@ class RendererTest extends TestCase
 
         $this->assertSame(
             'Welcome to MyWebsite!',
-            AccessHelper::CallMethod($sut, 'masterContents', [$page])
+            AccessHelper::CallMethod($sut, 'contents', [$page])
         );
     }
 
-    function testMasterContentsWhenMasterpageDoesNotExist()
+    function testContentsWhenMasterpageDoesNotExist()
     {
         $sut = $this->systemUnderTest('_ob_start', '_ob_get_clean', '_echo');
         $page = $this->createMock(Page::class);
@@ -210,16 +210,16 @@ class RendererTest extends TestCase
 
         $this->assertSame(
             '',
-            AccessHelper::CallMethod($sut, 'masterContents', [$page])
+            AccessHelper::CallMethod($sut, 'contents', [$page])
         );
     }
 
-    function testMasterContentsWhenMasterpageExists()
+    function testContentsWhenMasterpageExists()
     {
         $sut = $this->systemUnderTest();
         $page = $this->createMock(Page::class);
         $resource = Resource::Instance();
-        $masterpagePath = new CPath(__DIR__ . '/test.masterpage.php');
+        $masterpagePath = new CPath(__DIR__ . '/test-masterpage.php');
 
         \file_put_contents((string)$masterpagePath, <<<PHP
             <h1>This is a test masterpage.</h1>
@@ -229,16 +229,16 @@ class RendererTest extends TestCase
 
         $page->expects($this->once())
             ->method('Masterpage')
-            ->willReturn('test.masterpage');
+            ->willReturn('test-masterpage');
         $resource->expects($this->once())
             ->method('MasterpageFilePath')
-            ->with('test.masterpage')
+            ->with('test-masterpage')
             ->willReturn($masterpagePath);
         $page->expects($this->once())
             ->method('Contents')
             ->willReturn("Hello, World!\n");
 
-        $result = AccessHelper::CallMethod($sut, 'masterContents', [$page]);
+        $result = AccessHelper::CallMethod($sut, 'contents', [$page]);
 
         $this->assertSame(<<<HTML
             <h1>This is a test masterpage.</h1>
@@ -249,5 +249,5 @@ class RendererTest extends TestCase
         \unlink((string)$masterpagePath);
     }
 
-    #endregion masterContents
+    #endregion contents
 }

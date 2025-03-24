@@ -115,9 +115,9 @@ class ResourceTest extends TestCase
 
     #endregion FrontendDirectoryPath
 
-    #region FrontendLibrariesManifestFilePath ----------------------------------
+    #region FrontendManifestFilePath -------------------------------------------
 
-    function testFrontendLibrariesManifestFilePath()
+    function testFrontendManifestFilePath()
     {
         $sut = $this->systemUnderTest('FrontendDirectoryPath');
 
@@ -126,10 +126,10 @@ class ResourceTest extends TestCase
             ->willReturn(new CPath('path/to/app/frontend'));
 
         $this->assertEquals(
-            'path/to/app/frontend' . \DIRECTORY_SEPARATOR . 'libraries.json',
-            $sut->FrontendLibrariesManifestFilePath()
+            'path/to/app/frontend' . \DIRECTORY_SEPARATOR . 'manifest.json',
+            $sut->FrontendManifestFilePath()
         );
     }
 
-    #endregion FrontendLibrariesManifestFilePath
+    #endregion FrontendManifestFilePath
 }
