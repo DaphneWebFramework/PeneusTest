@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProvider;
 
 use \Peneus\Systems\PageSystem\LibraryManifest;
 
@@ -199,6 +200,39 @@ class LibraryManifestTest extends TestCase
         $sut->__construct();
     }
 
+    #[DataProvider('invalidAssetValueDataProvider')]
+    function testConstructorThrowsOnInvalidCssValues(string $jsonValue)
+    {
+        $sut = $this->systemUnderTest('openFile');
+        $path = $this->createStub(CPath::class);
+        $resource = Resource::Instance();
+        $file = $this->createMock(CFile::class);
+
+        $resource->expects($this->once())
+            ->method('FrontendManifestFilePath')
+            ->willReturn($path);
+        $sut->expects($this->once())
+            ->method('openFile')
+            ->with($path)
+            ->willReturn($file);
+        $file->expects($this->once())
+            ->method('Read')
+            ->willReturn(<<<JSON
+                {
+                  "lib": {
+                    "css": $jsonValue
+                  }
+                }
+            JSON);
+        $file->expects($this->once())
+            ->method('Close');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches(
+            '/^Library asset value must be a string( or an array of strings)?\.$/');
+        $sut->__construct();
+    }
+
     function testConstructorLoadsLibraryItemsFromManifest()
     {
         $sut = $this->systemUnderTest('openFile');
@@ -345,4 +379,26 @@ class LibraryManifestTest extends TestCase
     }
 
     #endregion Defaults
+
+    #region Data Providers -----------------------------------------------------
+
+    static function invalidAssetValueDataProvider()
+    {
+        return [
+            'null' => ['null'],
+            'boolean true' => ['true'],
+            'boolean false' => ['false'],
+            'integer' => ['123'],
+            'float' => ['3.14'],
+            //'object' => ['{"key":"value"}'], // becomes a PHP associative array
+            'array with null' => ['[null]'],
+            'array with boolean' => ['[true, false]'],
+            'array with integer' => ['[42]'],
+            'array with float' => ['[3.14]'],
+            'array with object' => ['[{"key":"value"}]'],
+            'array with array' => ['[["a.css"], ["a.js"]]']
+        ];
+    }
+
+    #endregion Data Providers
 }

@@ -10,11 +10,17 @@ use \TestToolkit\DataHelper;
 #[CoversClass(LibraryItem::class)]
 class LibraryItemTest extends TestCase
 {
+    #region Name ---------------------------------------------------------------
+
     function testNamePropertyIsStoredCorrectly()
     {
         $sut = new LibraryItem('foo', null, null, null, false);
         $this->assertSame('foo', $sut->Name());
     }
+
+    #endregion Name
+
+    #region Css ----------------------------------------------------------------
 
     function testCssAcceptsNull()
     {
@@ -35,6 +41,10 @@ class LibraryItemTest extends TestCase
         $this->assertSame($paths, $sut->Css());
     }
 
+    #endregion Css
+
+    #region Js -----------------------------------------------------------------
+
     function testJsAcceptsNull()
     {
         $sut = new LibraryItem('foo', null, null, null, false);
@@ -53,6 +63,10 @@ class LibraryItemTest extends TestCase
         $sut = new LibraryItem('foo', null, $paths, null, false);
         $this->assertSame($paths, $sut->Js());
     }
+
+    #endregion Js
+
+    #region Extras -------------------------------------------------------------
 
     function testExtrasAcceptsNull()
     {
@@ -73,10 +87,16 @@ class LibraryItemTest extends TestCase
         $this->assertSame($paths, $sut->Extras());
     }
 
+    #endregion Extras
+
+    #region IsDefault ----------------------------------------------------------
+
     #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
     function testIsDefaultFlag($isDefault)
     {
         $sut = new LibraryItem('foo', null, null, null, $isDefault);
         $this->assertSame($isDefault, $sut->IsDefault());
     }
+
+    #endregion IsDefault
 }
