@@ -6,6 +6,7 @@ use \Peneus\Systems\PageSystem\LibraryManifest;
 
 use \Harmonia\Core\CFile;
 use \Harmonia\Core\CPath;
+use \Harmonia\Core\CSequentialArray;
 use \Peneus\Resource;
 use \Peneus\Systems\PageSystem\LibraryItem;
 use \TestToolkit\AccessHelper;
@@ -239,8 +240,9 @@ class LibraryManifestTest extends TestCase
             ->method('Close');
 
         $sut->__construct();
+        $items = $sut->Items();
 
-        $item = $sut->Get('jquery');
+        $item = $items->Get('jquery');
         $this->assertInstanceOf(LibraryItem::class, $item);
         $this->assertSame('jquery', $item->Name());
         $this->assertSame(['jquery-ui-1.12.1.custom/jquery-ui'], $item->Css());
@@ -251,7 +253,7 @@ class LibraryManifestTest extends TestCase
         $this->assertSame([], $item->Extras());
         $this->assertTrue($item->IsDefault());
 
-        $item = $sut->Get('selectize');
+        $item = $items->Get('selectize');
         $this->assertInstanceOf(LibraryItem::class, $item);
         $this->assertSame('selectize', $item->Name());
         $this->assertSame(['selectize-0.13.6/css/selectize.bootstrap4.css'], $item->Css());
@@ -259,7 +261,7 @@ class LibraryManifestTest extends TestCase
         $this->assertSame([], $item->Extras());
         $this->assertFalse($item->IsDefault());
 
-        $item = $sut->Get('audiojs');
+        $item = $items->Get('audiojs');
         $this->assertInstanceOf(LibraryItem::class, $item);
         $this->assertSame('audiojs', $item->Name());
         $this->assertSame(['audiojs-1.0.1/audio'], $item->Css());
@@ -270,9 +272,9 @@ class LibraryManifestTest extends TestCase
 
     #endregion __construct
 
-    #region Get ----------------------------------------------------------------
+    #region Item ---------------------------------------------------------------
 
-    function testGetReturnsNullWhenLibraryIsNotFound()
+    function testItemReturnsNullWhenLibraryIsNotFound()
     {
         $sut = $this->systemUnderTest('openFile');
         $path = $this->createStub(CPath::class);
@@ -300,10 +302,10 @@ class LibraryManifestTest extends TestCase
 
         $sut->__construct();
 
-        $this->assertNull($sut->Get('bar'));
+        $this->assertNull($sut->Items()->Get('bar'));
     }
 
-    #endregion Get
+    #endregion Item
 
     #region Defaults -----------------------------------------------------------
 
@@ -337,11 +339,9 @@ class LibraryManifestTest extends TestCase
         $sut->__construct();
         $defaults = $sut->Defaults();
 
+        $this->assertInstanceOf(CSequentialArray::class, $defaults);
         $this->assertCount(2, $defaults);
-        $this->assertTrue($defaults->Has('a'));
-        $this->assertTrue($defaults->Has('c'));
-        $this->assertFalse($defaults->Has('b'));
-        $this->assertFalse($defaults->Has('d'));
+        $this->assertSame(['a', 'c'], $defaults->ToArray());
     }
 
     #endregion Defaults
