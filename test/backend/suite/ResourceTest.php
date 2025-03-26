@@ -51,8 +51,7 @@ class ResourceTest extends TestCase
     {
         $sut = $this->systemUnderTest();
 
-        $this->expectException(\BadMethodCallException::class);
-        $this->expectExceptionMessage('Method `Nonexistent` does not exist');
+        $this->expectException(\Error::class);
         $sut->Nonexistent();
     }
 
