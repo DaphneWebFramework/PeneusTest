@@ -1,14 +1,18 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProvider;
 
 use \Peneus\Systems\PageSystem\Renderer;
 
 use \Harmonia\Config;
 use \Harmonia\Core\CFile;
 use \Harmonia\Core\CPath;
+use \Harmonia\Core\CSequentialArray;
+use \Harmonia\Core\CUrl;
 use \Harmonia\Logger;
 use \Peneus\Resource;
+use \Peneus\Systems\PageSystem\LibraryItem;
 use \Peneus\Systems\PageSystem\Page;
 use \TestToolkit\AccessHelper;
 
@@ -39,9 +43,51 @@ class RendererTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): Renderer
     {
         return $this->getMockBuilder(Renderer::class)
-            ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
+    }
+
+    private function libraries(): CSequentialArray
+    {
+        return new CSequentialArray([
+            $this->createConfiguredMock(LibraryItem::class, [
+                'Name' => 'jquery',
+                'Css' => ['jquery-ui-1.12.1.custom/jquery-ui'],
+                'Js' => [
+                    'jquery-3.5.1/jquery',
+                    'jquery-ui-1.12.1.custom/jquery-ui'
+                ],
+                'Extras' => [],
+                'IsDefault' => true
+            ]),
+            $this->createConfiguredMock(LibraryItem::class, [
+                'Name' => 'bootstrap',
+                'Css' => ['bootstrap-4.6.2/css/bootstrap'],
+                'Js' => ['bootstrap-4.6.2/js/bootstrap.bundle'],
+                'Extras' => [
+                    'bootstrap-4.6.2/css/bootstrap.min.css.map',
+                    'bootstrap-4.6.2/js/bootstrap.bundle.min.js.map'
+                ],
+                'IsDefault' => true
+            ]),
+            $this->createConfiguredMock(LibraryItem::class, [
+                'Name' => 'bootstrap-icons',
+                'Css' => ['bootstrap-icons-1.9.1/bootstrap-icons'],
+                'Js' => [],
+                'Extras' => ['bootstrap-icons-1.9.1/fonts/*'],
+                'IsDefault' => true
+            ]),
+            $this->createConfiguredMock(LibraryItem::class, [
+                'Name' => 'dataTables',
+                'Css' => ['dataTables-1.11.3/css/dataTables.bootstrap4'],
+                'Js' => [
+                    'dataTables-1.11.3/js/jquery.dataTables',
+                    'dataTables-1.11.3/js/dataTables.bootstrap4'
+                ],
+                'Extras' => ['dataTables-1.11.3/i18n/*.json'],
+                'IsDefault' => false
+            ]),
+        ]);
     }
 
     #region Render -------------------------------------------------------------
@@ -94,11 +140,18 @@ class RendererTest extends TestCase
 
     function testRenderWhenFileReadReturnsTemplate()
     {
-        $sut = $this->systemUnderTest('openFile', 'contents', '_echo');
+        $sut = $this->systemUnderTest(
+            'openFile',
+            'contents',
+            'libraryStylesheetLinks',
+            'libraryJavascriptLinks',
+            '_echo'
+        );
         $resource = Resource::Instance();
         $file = $this->createMock(CFile::class);
         $config = Config::Instance();
         $page = $this->createMock(Page::class);
+        $libraries = $this->createStub(CSequentialArray::class);
 
         $resource->expects($this->once())
             ->method('TemplateFilePath')
@@ -116,9 +169,11 @@ class RendererTest extends TestCase
                 <head>
                 	<meta charset="utf-8">
                 	<title>{{Title}}</title>
+                	{{LibraryStylesheetLinks}}
                 </head>
                 <body>
                 	{{Contents}}
+                	{{LibraryJavascriptLinks}}
                 </body>
                 </html>
             HTML);
@@ -131,10 +186,21 @@ class RendererTest extends TestCase
         $page->expects($this->once())
             ->method('Title')
             ->willReturn('Home | MyWebsite');
+        $page->expects($this->once())
+            ->method('IncludedLibraries')
+            ->willReturn($libraries);
+        $sut->expects($this->once())
+            ->method('libraryStylesheetLinks')
+            ->with($libraries)
+            ->willReturn('	<link rel="stylesheet" href="url/to/bootstrap-4.6.2/css/bootstrap.css">');
         $sut->expects($this->once())
             ->method('contents')
             ->with($page)
             ->willReturn('	Welcome to MyWebsite!');
+        $sut->expects($this->once())
+            ->method('libraryJavascriptLinks')
+            ->with($libraries)
+            ->willReturn('	<script src="url/to/bootstrap-4.6.2/js/bootstrap.bundle.js"></script>');
         $sut->expects($this->once())
             ->method('_echo')
             ->with(<<<HTML
@@ -143,9 +209,11 @@ class RendererTest extends TestCase
                 <head>
                 	<meta charset="utf-8">
                 	<title>Home | MyWebsite</title>
+                	<link rel="stylesheet" href="url/to/bootstrap-4.6.2/css/bootstrap.css">
                 </head>
                 <body>
                 	Welcome to MyWebsite!
+                	<script src="url/to/bootstrap-4.6.2/js/bootstrap.bundle.js"></script>
                 </body>
                 </html>
             HTML);
@@ -250,4 +318,147 @@ class RendererTest extends TestCase
     }
 
     #endregion contents
+
+    #region libraryStylesheetLinks ---------------------------------------------
+
+    function testLibraryStylesheetLinks()
+    {
+        $sut = $this->systemUnderTest('resolveAssetUrl');
+        $config = Config::Instance();
+
+        $config->expects($this->once())
+            ->method('OptionOrDefault')
+            ->with('IsDebug', false)
+            ->willReturn(true);
+        $sut->expects($this->any())
+            ->method('resolveAssetUrl')
+            ->willReturnCallback(function($path, $extension, $isDebug) {
+                return "url/to/{$path}.{$extension}";
+            });
+
+        $this->assertSame(
+            "\t<link rel=\"stylesheet\" href=\"url/to/jquery-ui-1.12.1.custom/jquery-ui.css\">\n"
+          . "\t<link rel=\"stylesheet\" href=\"url/to/bootstrap-4.6.2/css/bootstrap.css\">\n"
+          . "\t<link rel=\"stylesheet\" href=\"url/to/bootstrap-icons-1.9.1/bootstrap-icons.css\">\n"
+          . "\t<link rel=\"stylesheet\" href=\"url/to/dataTables-1.11.3/css/dataTables.bootstrap4.css\">"
+          , AccessHelper::CallMethod($sut, 'libraryStylesheetLinks', [$this->libraries()])
+        );
+    }
+
+    #endregion libraryStylesheetLinks
+
+    #region libraryJavascriptLinks ---------------------------------------------
+
+    function testLibraryJavascriptLinks()
+    {
+        $sut = $this->systemUnderTest('resolveAssetUrl');
+        $config = Config::Instance();
+
+        $config->expects($this->once())
+            ->method('OptionOrDefault')
+            ->with('IsDebug', false)
+            ->willReturn(true);
+        $sut->expects($this->any())
+            ->method('resolveAssetUrl')
+            ->willReturnCallback(function($path, $extension, $isDebug) {
+                return "url/to/{$path}.{$extension}";
+            });
+
+        $this->assertSame(
+            "\t<script src=\"url/to/jquery-3.5.1/jquery.js\"></script>\n"
+          . "\t<script src=\"url/to/jquery-ui-1.12.1.custom/jquery-ui.js\"></script>\n"
+          . "\t<script src=\"url/to/bootstrap-4.6.2/js/bootstrap.bundle.js\"></script>\n"
+          . "\t<script src=\"url/to/dataTables-1.11.3/js/jquery.dataTables.js\"></script>\n"
+          . "\t<script src=\"url/to/dataTables-1.11.3/js/dataTables.bootstrap4.js\"></script>"
+          , AccessHelper::CallMethod($sut, 'libraryJavascriptLinks', [$this->libraries()])
+        );
+    }
+
+    #endregion libraryJavascriptLinks
+
+    #region resolveAssetUrl ----------------------------------------------------
+
+    function testResolveAssetUrlWhenPathIsHttpUrl()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->assertSame(
+            'http://cdn.example.com/assets/style.css',
+            AccessHelper::CallMethod($sut, 'resolveAssetUrl', [
+                'http://cdn.example.com/assets/style.css',
+                'css',
+                true
+            ])
+        );
+    }
+
+    function testResolveAssetUrlWhenPathIsHttpsUrl()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->assertSame(
+            'https://cdn.example.com/assets/style.css',
+            AccessHelper::CallMethod($sut, 'resolveAssetUrl', [
+                'https://cdn.example.com/assets/style.css',
+                'css',
+                true
+            ])
+        );
+    }
+
+    #[DataProvider('resolveAssetUrlDataProvider')]
+    function testResolveAssetUrlWhenPathIsLocal($expected, $path, $extension, $isDebug)
+    {
+        $sut = $this->systemUnderTest();
+        $resource = Resource::Instance();
+
+        $resource->expects($this->once())
+            ->method('FrontendLibraryFileUrl')
+            ->with($expected)
+            ->willReturn(new CUrl("http://localhost/app/frontend/{$expected}"));
+
+        $this->assertSame(
+            "http://localhost/app/frontend/{$expected}",
+            AccessHelper::CallMethod($sut, 'resolveAssetUrl', [
+                $path,
+                $extension,
+                $isDebug
+            ])
+        );
+    }
+
+    #endregion resolveAssetUrl
+
+    #region Data Providers -----------------------------------------------------
+
+    static function resolveAssetUrlDataProvider()
+    {
+        return [
+        // No extension
+            ['bootstrap/css/bootstrap.css',     'bootstrap/css/bootstrap', 'css', true],
+            ['bootstrap/css/bootstrap.min.css', 'bootstrap/css/bootstrap', 'css', false],
+            ['jquery/js/jquery.js',             'jquery/js/jquery',        'js',  true],
+            ['jquery/js/jquery.min.js',         'jquery/js/jquery',        'js',  false],
+        // Already has extension
+            ['bootstrap/css/bootstrap.css', 'bootstrap/css/bootstrap.css', 'css', true],
+            ['bootstrap/css/bootstrap.css', 'bootstrap/css/bootstrap.css', 'css', false],
+            ['jquery/js/jquery.js',         'jquery/js/jquery.js',         'js',  true],
+            ['jquery/js/jquery.js',         'jquery/js/jquery.js',         'js',  false],
+        // Already has minified extension
+            ['bootstrap/css/bootstrap.min.css', 'bootstrap/css/bootstrap.min.css', 'css', true],
+            ['bootstrap/css/bootstrap.min.css', 'bootstrap/css/bootstrap.min.css', 'css', false],
+            ['jquery/js/jquery.min.js',         'jquery/js/jquery.min.js',         'js',  true],
+            ['jquery/js/jquery.min.js',         'jquery/js/jquery.min.js',         'js',  false],
+        // Case-insensitive extensions
+            ['bootstrap/css/bootstrap.CSS', 'bootstrap/css/bootstrap.CSS', 'css', true],
+            ['jquery/js/jquery.JS',         'jquery/js/jquery.JS',         'js',  false],
+            ['jquery/js/jquery.Min.Js',     'jquery/js/jquery.Min.Js',     'js',  false],
+        // No real extension
+            ['lib/selectize.v5.min.css',     'lib/selectize.v5',         'css', false],
+            ['bootstrap/css/bootstrap..css', 'bootstrap/css/bootstrap.', 'css', true],
+            ['jquery/js/jquery.min..min.js', 'jquery/js/jquery.min.',    'js',  false],
+        ];
+    }
+
+    #endregion Data Providers
 }
