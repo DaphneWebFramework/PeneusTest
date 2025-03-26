@@ -5,6 +5,8 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 use \Peneus\Systems\PageSystem\Page;
 
 use \Harmonia\Config;
+use \Harmonia\Core\CSequentialArray;
+use \Peneus\Systems\PageSystem\LibraryManager;
 use \Peneus\Systems\PageSystem\Renderer;
 use \TestToolkit\AccessHelper;
 
@@ -12,11 +14,13 @@ use \TestToolkit\AccessHelper;
 class PageTest extends TestCase
 {
     private ?Renderer $renderer = null;
+    private ?LibraryManager $libraryManager = null;
     private ?Config $originalConfig = null;
 
     protected function setUp(): void
     {
         $this->renderer = $this->createMock(Renderer::class);
+        $this->libraryManager = $this->createMock(LibraryManager::class);
         $this->originalConfig =
             Config::ReplaceInstance($this->createMock(Config::class));
     }
@@ -24,13 +28,14 @@ class PageTest extends TestCase
     protected function tearDown(): void
     {
         $this->renderer = null;
+        $this->libraryManager = null;
         Config::ReplaceInstance($this->originalConfig);
     }
 
     private function systemUnderTest(string ...$mockedMethods): Page
     {
         return $this->getMockBuilder(Page::class)
-            ->setConstructorArgs([$this->renderer])
+            ->setConstructorArgs([$this->renderer, $this->libraryManager])
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
@@ -323,4 +328,64 @@ class PageTest extends TestCase
     }
 
     #endregion End
+
+    #region AddLibrary ---------------------------------------------------------
+
+    function testAddLibrary()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->libraryManager->expects($this->once())
+            ->method('Add')
+            ->with('jquery');
+
+        $this->assertSame($sut, $sut->AddLibrary('jquery'));
+    }
+
+    #endregion AddLibrary
+
+    #region RemoveLibrary ------------------------------------------------------
+
+    function testRemoveLibrary()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->libraryManager->expects($this->once())
+            ->method('Remove')
+            ->with('jquery');
+
+        $this->assertSame($sut, $sut->RemoveLibrary('jquery'));
+    }
+
+    #endregion RemoveLibrary
+
+    #region RemoveAllLibraries -------------------------------------------------
+
+    function testRemoveAllLibraries()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->libraryManager->expects($this->once())
+            ->method('RemoveAll');
+
+        $this->assertSame($sut, $sut->RemoveAllLibraries());
+    }
+
+    #endregion RemoveAllLibraries
+
+    #region IncludedLibraries --------------------------------------------------
+
+    function testIncludedLibraries()
+    {
+        $sut = $this->systemUnderTest();
+        $included = $this->createStub(CSequentialArray::class);
+
+        $this->libraryManager->expects($this->once())
+            ->method('Included')
+            ->willReturn($included);
+
+        $this->assertSame($included, $sut->IncludedLibraries());
+    }
+
+    #endregion IncludedLibraries
 }

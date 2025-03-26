@@ -129,21 +129,21 @@ class LibraryManagerTest extends TestCase
 
     #endregion Remove
 
-    #region Clear -------------------------------------------------------------
+    #region RemoveAll ----------------------------------------------------------
 
-    function testClearRemovesAllIncludedLibraries()
+    function testRemoveAllIncludedLibraries()
     {
         $sut = $this->systemUnderTest(['jquery' => true, 'bootstrap' => true]);
 
-        $sut->Clear();
+        $sut->RemoveAll();
         $this->assertCount(0, $sut->Included());
     }
 
-    function testClearFollowedByAddIncludesLibrary()
+    function testRemoveAllFollowedByAddIncludesLibrary()
     {
         $sut = $this->systemUnderTest(['jquery' => true, 'selectize' => false]);
 
-        $sut->Clear();
+        $sut->RemoveAll();
         $sut->Add('selectize');
 
         $included = $sut->Included();
@@ -151,7 +151,7 @@ class LibraryManagerTest extends TestCase
         $this->assertSame('selectize', $included[0]->Name());
     }
 
-    #endregion Clear
+    #endregion RemoveAll
 
     #region Included ----------------------------------------------------------
 
