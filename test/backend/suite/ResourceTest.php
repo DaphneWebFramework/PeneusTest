@@ -4,24 +4,29 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Resource;
 
+use \Harmonia\Core\CFileSystem;
 use \Harmonia\Core\CPath;
 use \Harmonia\Core\CUrl;
+use \Harmonia\Resource as _BaseResource;
 use \TestToolkit\AccessHelper;
 
 #[CoversClass(Resource::class)]
 class ResourceTest extends TestCase
 {
-    private ?\Harmonia\Resource $originalHarmoniaResource = null;
+    private ?_BaseResource $originalBaseResource = null;
+    private ?CFileSystem $originalFileSystem = null;
 
     protected function setUp(): void
     {
-        $this->originalHarmoniaResource =
-            \Harmonia\Resource::ReplaceInstance($this->createMock(\Harmonia\Resource::class));
+        $this->originalBaseResource =
+            _BaseResource::ReplaceInstance($this->createMock(_BaseResource::class));
+        $this->originalFileSystem =
+            CFileSystem::ReplaceInstance($this->createMock(CFileSystem::class));
     }
 
     protected function tearDown(): void
     {
-        \Harmonia\Resource::ReplaceInstance($this->originalHarmoniaResource);
+        _BaseResource::ReplaceInstance($this->originalBaseResource);
     }
 
     private function systemUnderTest(string ...$mockedMethods): Resource
@@ -38,9 +43,9 @@ class ResourceTest extends TestCase
     function testCallDelegatesToBaseWhenMethodExists()
     {
         $sut = $this->systemUnderTest();
-        $harmoniaResource = \Harmonia\Resource::Instance();
+        $baseResource = _BaseResource::Instance();
 
-        $harmoniaResource->expects($this->once())
+        $baseResource->expects($this->once())
             ->method('AppUrl')
             ->willReturn(new CUrl('https://example.com/app/'));
 
@@ -62,15 +67,15 @@ class ResourceTest extends TestCase
     function testTemplateFilePath()
     {
         $sut = $this->systemUnderTest();
-        $harmoniaResource = \Harmonia\Resource::Instance();
+        $baseResource = _BaseResource::Instance();
 
-        $harmoniaResource->expects($this->once())
+        $baseResource->expects($this->once())
             ->method('AppSubdirectoryPath')
             ->with('templates')
-            ->willReturn(new CPath('path/to/app/templates'));
+            ->willReturn(new CPath('path/to/templates'));
 
         $this->assertEquals(
-            'path/to/app/templates' . \DIRECTORY_SEPARATOR . 'page.html',
+            'path/to/templates' . \DIRECTORY_SEPARATOR . 'page.html',
             $sut->TemplateFilePath('page')
         );
     }
@@ -82,53 +87,96 @@ class ResourceTest extends TestCase
     function testMasterpageFilePath()
     {
         $sut = $this->systemUnderTest();
-        $harmoniaResource = \Harmonia\Resource::Instance();
+        $baseResource = _BaseResource::Instance();
 
-        $harmoniaResource->expects($this->once())
+        $baseResource->expects($this->once())
             ->method('AppSubdirectoryPath')
             ->with('masterpages')
-            ->willReturn(new CPath('path/to/app/masterpages'));
+            ->willReturn(new CPath('path/to/masterpages'));
 
         $this->assertEquals(
-            'path/to/app/masterpages' . \DIRECTORY_SEPARATOR . 'basic.php',
+            'path/to/masterpages' . \DIRECTORY_SEPARATOR . 'basic.php',
             $sut->MasterpageFilePath('basic')
         );
     }
 
     #endregion MasterpageFilePath
 
-    #region FrontendDirectoryPath ----------------------------------------------
-
-    function testFrontendDirectoryPath()
-    {
-        $sut = $this->systemUnderTest();
-        $harmoniaResource = \Harmonia\Resource::Instance();
-
-        $harmoniaResource->expects($this->once())
-            ->method('AppSubdirectoryPath')
-            ->with('frontend')
-            ->willReturn(new CPath('path/to/app/frontend'));
-
-        $this->assertEquals('path/to/app/frontend', $sut->FrontendDirectoryPath());
-    }
-
-    #endregion FrontendDirectoryPath
-
     #region FrontendManifestFilePath -------------------------------------------
 
     function testFrontendManifestFilePath()
     {
-        $sut = $this->systemUnderTest('FrontendDirectoryPath');
+        $sut = $this->systemUnderTest();
+        $baseResource = _BaseResource::Instance();
 
-        $sut->expects($this->once())
-            ->method('FrontendDirectoryPath')
-            ->willReturn(new CPath('path/to/app/frontend'));
+        $baseResource->expects($this->once())
+            ->method('AppSubdirectoryPath')
+            ->with('frontend')
+            ->willReturn(new CPath('path/to/frontend'));
 
         $this->assertEquals(
-            'path/to/app/frontend' . \DIRECTORY_SEPARATOR . 'manifest.json',
+            'path/to/frontend' . \DIRECTORY_SEPARATOR . 'manifest.json',
             $sut->FrontendManifestFilePath()
         );
     }
 
     #endregion FrontendManifestFilePath
+
+    #region FrontendLibraryFileUrl ---------------------------------------------
+
+    function testFrontendLibraryFileUrlAppendsCacheBuster()
+    {
+        $sut = $this->systemUnderTest();
+        $baseResource = _BaseResource::Instance();
+        $fileSystem = CFileSystem::Instance();
+
+        $baseResource->expects($this->once())
+            ->method('AppSubdirectoryPath')
+            ->with('frontend')
+            ->willReturn(new CPath('path/to/frontend'));
+        $baseResource->expects($this->once())
+            ->method('AppSubdirectoryUrl')
+            ->with('frontend')
+            ->willReturn(new CUrl('https://example.com/frontend/'));
+        $fileSystem->expects($this->once())
+            ->method('ModificationTime')
+            ->with(new CPath('path/to/frontend'
+                           . \DIRECTORY_SEPARATOR
+                           . 'bootstrap-5.3.3/css/bootstrap.css'))
+            ->willReturn(1711234567);
+
+        $this->assertEquals(
+            'https://example.com/frontend/bootstrap-5.3.3/css/bootstrap.css?1711234567',
+            $sut->FrontendLibraryFileUrl('bootstrap-5.3.3/css/bootstrap.css')
+        );
+    }
+
+    function testFrontendLibraryFileUrlWithoutCacheBusterIfFileMissing()
+    {
+        $sut = $this->systemUnderTest();
+        $baseResource = _BaseResource::Instance();
+        $fileSystem = CFileSystem::Instance();
+
+        $baseResource->expects($this->once())
+            ->method('AppSubdirectoryPath')
+            ->with('frontend')
+            ->willReturn(new CPath('path/to/frontend'));
+        $baseResource->expects($this->once())
+            ->method('AppSubdirectoryUrl')
+            ->with('frontend')
+            ->willReturn(new CUrl('https://example.com/frontend/'));
+        $fileSystem->expects($this->once())
+            ->method('ModificationTime')
+            ->with(new CPath('path/to/frontend'
+                           . \DIRECTORY_SEPARATOR
+                           . 'bootstrap/css/bootstrap.min.css'))
+            ->willReturn(0); // simulates missing or unreadable file
+
+        $this->assertEquals(
+            'https://example.com/frontend/bootstrap/css/bootstrap.min.css',
+            $sut->FrontendLibraryFileUrl('bootstrap/css/bootstrap.min.css')
+        );
+    }
+
+    #endregion FrontendLibraryFileUrl
 }
