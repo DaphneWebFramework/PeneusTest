@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 /**
- * bootstrap.php
+ * autoload.php
  *
  * (C) 2024 by Eylem Ugurel
  *
@@ -11,12 +11,12 @@
  */
 
 \spl_autoload_register(function(string $className): void {
-    $classFilePath = \rtrim(__DIR__, '/\\')
-                   . '/../../source/backend/'
-                   . \str_replace('\\', '/', $className)
-                   . '.php';
-    if (!\is_file($classFilePath)) {
+    $classPath = \rtrim(__DIR__, '/\\')
+        . '/../../source/backend/'
+        . \str_replace('\\', '/', $className)
+        . '.php';
+    if (!\is_file($classPath)) {
         return;
     }
-    require $classFilePath;
+    require $classPath;
 });
