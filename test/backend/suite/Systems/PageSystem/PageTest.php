@@ -275,23 +275,23 @@ class PageTest extends TestCase
 
     #endregion Masterpage
 
-    #region Contents -----------------------------------------------------------
+    #region Content ------------------------------------------------------------
 
-    function testContents()
+    function testContent()
     {
         $sut = $this->systemUnderTest();
 
         AccessHelper::SetMockProperty(
             Page::class,
             $sut,
-            'contents',
+            'content',
             'Welcome to MyWebsite!'
         );
 
-        $this->assertSame('Welcome to MyWebsite!', $sut->Contents());
+        $this->assertSame('Welcome to MyWebsite!', $sut->Content());
     }
 
-    #endregion Contents
+    #endregion Content
 
     #region Begin --------------------------------------------------------------
 
@@ -304,7 +304,7 @@ class PageTest extends TestCase
 
         $sut->Begin();
 
-        $this->assertSame('', $sut->Contents());
+        $this->assertSame('', $sut->Content());
     }
 
     #endregion Begin
@@ -324,7 +324,7 @@ class PageTest extends TestCase
 
         $sut->End();
 
-        $this->assertSame('Welcome to MyWebsite!', $sut->Contents());
+        $this->assertSame('Welcome to MyWebsite!', $sut->Content());
     }
 
     #endregion End

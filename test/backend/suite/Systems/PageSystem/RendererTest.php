@@ -142,7 +142,7 @@ class RendererTest extends TestCase
     {
         $sut = $this->systemUnderTest(
             'openFile',
-            'contents',
+            'content',
             'libraryStylesheetLinks',
             'libraryJavascriptLinks',
             '_echo'
@@ -172,7 +172,7 @@ class RendererTest extends TestCase
                 	{{LibraryStylesheetLinks}}
                 </head>
                 <body>
-                	{{Contents}}
+                	{{Content}}
                 	{{LibraryJavascriptLinks}}
                 </body>
                 </html>
@@ -194,7 +194,7 @@ class RendererTest extends TestCase
             ->with($libraries)
             ->willReturn('	<link rel="stylesheet" href="url/to/bootstrap-4.6.2/css/bootstrap.css">');
         $sut->expects($this->once())
-            ->method('contents')
+            ->method('content')
             ->with($page)
             ->willReturn('	Welcome to MyWebsite!');
         $sut->expects($this->once())
@@ -223,9 +223,9 @@ class RendererTest extends TestCase
 
     #endregion Render
 
-    #region contents -----------------------------------------------------------
+    #region content ------------------------------------------------------------
 
-    function testContentsWhenMasterpageNameIsEmpty()
+    function testContentWhenMasterpageNameIsEmpty()
     {
         $sut = $this->systemUnderTest('_ob_start', '_ob_get_clean', '_echo');
         $page = $this->createMock(Page::class);
@@ -236,7 +236,7 @@ class RendererTest extends TestCase
             ->method('Masterpage')
             ->willReturn('');
         $page->expects($this->once())
-            ->method('Contents')
+            ->method('Content')
             ->willReturn('Welcome to MyWebsite!');
         $sut->expects($this->once())
             ->method('_echo')
@@ -247,11 +247,11 @@ class RendererTest extends TestCase
 
         $this->assertSame(
             'Welcome to MyWebsite!',
-            AccessHelper::CallMethod($sut, 'contents', [$page])
+            AccessHelper::CallMethod($sut, 'content', [$page])
         );
     }
 
-    function testContentsWhenMasterpageDoesNotExist()
+    function testContentWhenMasterpageDoesNotExist()
     {
         $sut = $this->systemUnderTest('_ob_start', '_ob_get_clean', '_echo');
         $page = $this->createMock(Page::class);
@@ -278,11 +278,11 @@ class RendererTest extends TestCase
 
         $this->assertSame(
             '',
-            AccessHelper::CallMethod($sut, 'contents', [$page])
+            AccessHelper::CallMethod($sut, 'content', [$page])
         );
     }
 
-    function testContentsWhenMasterpageExists()
+    function testContentWhenMasterpageExists()
     {
         $sut = $this->systemUnderTest();
         $page = $this->createMock(Page::class);
@@ -291,7 +291,7 @@ class RendererTest extends TestCase
 
         \file_put_contents((string)$masterpagePath, <<<PHP
             <h1>This is a test masterpage.</h1>
-            <?=\$this->Contents()?>
+            <?=\$this->Content()?>
             <footer>&copy; 2025</footer>
         PHP);
 
@@ -303,10 +303,10 @@ class RendererTest extends TestCase
             ->with('test-masterpage')
             ->willReturn($masterpagePath);
         $page->expects($this->once())
-            ->method('Contents')
+            ->method('Content')
             ->willReturn("Hello, World!\n");
 
-        $result = AccessHelper::CallMethod($sut, 'contents', [$page]);
+        $result = AccessHelper::CallMethod($sut, 'content', [$page]);
 
         $this->assertSame(<<<HTML
             <h1>This is a test masterpage.</h1>
@@ -317,7 +317,7 @@ class RendererTest extends TestCase
         \unlink((string)$masterpagePath);
     }
 
-    #endregion contents
+    #endregion content
 
     #region libraryStylesheetLinks ---------------------------------------------
 
