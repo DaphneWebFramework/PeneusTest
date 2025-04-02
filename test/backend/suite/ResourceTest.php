@@ -137,7 +137,7 @@ class ResourceTest extends TestCase
         $baseResource->expects($this->once())
             ->method('AppSubdirectoryUrl')
             ->with('frontend')
-            ->willReturn(new CUrl('https://example.com/frontend/'));
+            ->willReturn(new CUrl('https://example.com/frontend'));
         $fileSystem->expects($this->once())
             ->method('ModificationTime')
             ->with(new CPath('path/to/frontend'
@@ -164,7 +164,7 @@ class ResourceTest extends TestCase
         $baseResource->expects($this->once())
             ->method('AppSubdirectoryUrl')
             ->with('frontend')
-            ->willReturn(new CUrl('https://example.com/frontend/'));
+            ->willReturn(new CUrl('https://example.com/frontend'));
         $fileSystem->expects($this->once())
             ->method('ModificationTime')
             ->with(new CPath('path/to/frontend'
@@ -179,4 +179,24 @@ class ResourceTest extends TestCase
     }
 
     #endregion FrontendLibraryFileUrl
+
+    #region PageUrl ------------------------------------------------------------
+
+    function testPageUrl()
+    {
+        $sut = $this->systemUnderTest();
+        $baseResource = _BaseResource::Instance();
+
+        $baseResource->expects($this->once())
+            ->method('AppSubdirectoryUrl')
+            ->with('pages')
+            ->willReturn(new CUrl('https://example.com/pages'));
+
+        $this->assertEquals(
+            'https://example.com/pages/mypage/',
+            $sut->PageUrl('mypage')
+        );
+    }
+
+    #endregion PageUrl
 }
