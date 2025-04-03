@@ -278,7 +278,6 @@ class LibraryManifestTest extends TestCase
 
         $item = $items->Get('jquery');
         $this->assertInstanceOf(LibraryItem::class, $item);
-        $this->assertSame('jquery', $item->Name());
         $this->assertSame(['jquery-ui-1.12.1.custom/jquery-ui'], $item->Css());
         $this->assertSame([
             'jquery-3.5.1/jquery',
@@ -289,7 +288,6 @@ class LibraryManifestTest extends TestCase
 
         $item = $items->Get('selectize');
         $this->assertInstanceOf(LibraryItem::class, $item);
-        $this->assertSame('selectize', $item->Name());
         $this->assertSame(['selectize-0.13.6/css/selectize.bootstrap4.css'], $item->Css());
         $this->assertSame(['selectize-0.13.6/js/standalone/selectize'], $item->Js());
         $this->assertSame([], $item->Extras());
@@ -297,7 +295,6 @@ class LibraryManifestTest extends TestCase
 
         $item = $items->Get('audiojs');
         $this->assertInstanceOf(LibraryItem::class, $item);
-        $this->assertSame('audiojs', $item->Name());
         $this->assertSame(['audiojs-1.0.1/audio'], $item->Css());
         $this->assertSame(['audiojs-1.0.1/audio'], $item->Js());
         $this->assertSame(['audiojs-1.0.1/player-graphics.gif'], $item->Extras());

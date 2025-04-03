@@ -10,34 +10,24 @@ use \TestToolkit\DataHelper;
 #[CoversClass(LibraryItem::class)]
 class LibraryItemTest extends TestCase
 {
-    #region Name ---------------------------------------------------------------
-
-    function testNamePropertyIsStoredCorrectly()
-    {
-        $sut = new LibraryItem('foo', null, null, null, false);
-        $this->assertSame('foo', $sut->Name());
-    }
-
-    #endregion Name
-
     #region Css ----------------------------------------------------------------
 
     function testCssAcceptsNull()
     {
-        $sut = new LibraryItem('foo', null, null, null, false);
+        $sut = new LibraryItem(null, null, null, false);
         $this->assertSame([], $sut->Css());
     }
 
     function testCssAcceptsString()
     {
-        $sut = new LibraryItem('foo', 'foo/bar', null, null, false);
+        $sut = new LibraryItem('foo/bar', null, null, false);
         $this->assertSame(['foo/bar'], $sut->Css());
     }
 
     function testCssAcceptsArray()
     {
         $paths = ['foo/bar', 'foo/baz'];
-        $sut = new LibraryItem('foo', $paths, null, null, false);
+        $sut = new LibraryItem($paths, null, null, false);
         $this->assertSame($paths, $sut->Css());
     }
 
@@ -47,20 +37,20 @@ class LibraryItemTest extends TestCase
 
     function testJsAcceptsNull()
     {
-        $sut = new LibraryItem('foo', null, null, null, false);
+        $sut = new LibraryItem(null, null, null, false);
         $this->assertSame([], $sut->Js());
     }
 
     function testJsAcceptsString()
     {
-        $sut = new LibraryItem('foo', null, 'foo/bar', null, false);
+        $sut = new LibraryItem(null, 'foo/bar', null, false);
         $this->assertSame(['foo/bar'], $sut->Js());
     }
 
     function testJsAcceptsArray()
     {
         $paths = ['foo/bar', 'foo/baz'];
-        $sut = new LibraryItem('foo', null, $paths, null, false);
+        $sut = new LibraryItem(null, $paths, null, false);
         $this->assertSame($paths, $sut->Js());
     }
 
@@ -70,20 +60,20 @@ class LibraryItemTest extends TestCase
 
     function testExtrasAcceptsNull()
     {
-        $sut = new LibraryItem('foo', null, null, null, false);
+        $sut = new LibraryItem(null, null, null, false);
         $this->assertSame([], $sut->Extras());
     }
 
     function testExtrasAcceptsString()
     {
-        $sut = new LibraryItem('foo', null, null, 'foo/bar.map', false);
+        $sut = new LibraryItem(null, null, 'foo/bar.map', false);
         $this->assertSame(['foo/bar.map'], $sut->Extras());
     }
 
     function testExtrasAcceptsArray()
     {
         $paths = ['foo/a.txt', 'foo/b.png'];
-        $sut = new LibraryItem('foo', null, null, $paths, false);
+        $sut = new LibraryItem(null, null, $paths, false);
         $this->assertSame($paths, $sut->Extras());
     }
 
@@ -94,7 +84,7 @@ class LibraryItemTest extends TestCase
     #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
     function testIsDefaultFlag($isDefault)
     {
-        $sut = new LibraryItem('foo', null, null, null, $isDefault);
+        $sut = new LibraryItem(null, null, null, $isDefault);
         $this->assertSame($isDefault, $sut->IsDefault());
     }
 

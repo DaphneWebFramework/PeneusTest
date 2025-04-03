@@ -51,7 +51,6 @@ class RendererTest extends TestCase
     {
         return new CSequentialArray([
             $this->createConfiguredMock(LibraryItem::class, [
-                'Name' => 'jquery',
                 'Css' => ['jquery-ui-1.12.1.custom/jquery-ui'],
                 'Js' => [
                     'jquery-3.5.1/jquery',
@@ -61,7 +60,6 @@ class RendererTest extends TestCase
                 'IsDefault' => true
             ]),
             $this->createConfiguredMock(LibraryItem::class, [
-                'Name' => 'bootstrap',
                 'Css' => ['bootstrap-4.6.2/css/bootstrap'],
                 'Js' => ['bootstrap-4.6.2/js/bootstrap.bundle'],
                 'Extras' => [
@@ -71,14 +69,12 @@ class RendererTest extends TestCase
                 'IsDefault' => true
             ]),
             $this->createConfiguredMock(LibraryItem::class, [
-                'Name' => 'bootstrap-icons',
                 'Css' => ['bootstrap-icons-1.9.1/bootstrap-icons'],
                 'Js' => [],
                 'Extras' => ['bootstrap-icons-1.9.1/fonts/*'],
                 'IsDefault' => true
             ]),
             $this->createConfiguredMock(LibraryItem::class, [
-                'Name' => 'dataTables',
                 'Css' => ['dataTables-1.11.3/css/dataTables.bootstrap4'],
                 'Js' => [
                     'dataTables-1.11.3/js/jquery.dataTables',
