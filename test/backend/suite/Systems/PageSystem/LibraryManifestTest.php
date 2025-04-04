@@ -252,12 +252,12 @@ class LibraryManifestTest extends TestCase
             ->willReturn(<<<JSON
                 {
                   "jquery": {
-                    "default": true,
                     "css": "jquery-ui-1.12.1.custom/jquery-ui",
                     "js": [
                       "jquery-3.5.1/jquery",
                       "jquery-ui-1.12.1.custom/jquery-ui"
-                    ]
+                    ],
+                    "default": true
                   },
                   "selectize": {
                     "css": "selectize-0.13.6/css/selectize.bootstrap4.css",
