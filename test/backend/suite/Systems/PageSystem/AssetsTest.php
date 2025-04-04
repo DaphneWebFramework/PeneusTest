@@ -11,20 +11,21 @@ class AssetsTest extends TestCase
 
     function testCssAcceptsNull()
     {
-        $sut = new Assets(null, null, null);
+        $sut = new Assets(null);
         $this->assertSame([], $sut->Css());
     }
 
     function testCssAcceptsString()
     {
-        $sut = new Assets('foo/bar', null, null);
-        $this->assertSame(['foo/bar'], $sut->Css());
+        $path = 'foo/bar';
+        $sut = new Assets($path);
+        $this->assertSame([$path], $sut->Css());
     }
 
     function testCssAcceptsArray()
     {
         $paths = ['foo/bar', 'foo/baz'];
-        $sut = new Assets($paths, null, null);
+        $sut = new Assets($paths);
         $this->assertSame($paths, $sut->Css());
     }
 
@@ -34,20 +35,21 @@ class AssetsTest extends TestCase
 
     function testJsAcceptsNull()
     {
-        $sut = new Assets(null, null, null);
+        $sut = new Assets(null, null);
         $this->assertSame([], $sut->Js());
     }
 
     function testJsAcceptsString()
     {
-        $sut = new Assets(null, 'foo/bar', null);
-        $this->assertSame(['foo/bar'], $sut->Js());
+        $path = 'foo/bar';
+        $sut = new Assets(null, $path);
+        $this->assertSame([$path], $sut->Js());
     }
 
     function testJsAcceptsArray()
     {
         $paths = ['foo/bar', 'foo/baz'];
-        $sut = new Assets(null, $paths, null);
+        $sut = new Assets(null, $paths);
         $this->assertSame($paths, $sut->Js());
     }
 
@@ -63,8 +65,9 @@ class AssetsTest extends TestCase
 
     function testExtrasAcceptsString()
     {
-        $sut = new Assets(null, null, 'foo/bar.map');
-        $this->assertSame(['foo/bar.map'], $sut->Extras());
+        $path = 'foo/bar.map';
+        $sut = new Assets(null, null, $path);
+        $this->assertSame([$path], $sut->Extras());
     }
 
     function testExtrasAcceptsArray()

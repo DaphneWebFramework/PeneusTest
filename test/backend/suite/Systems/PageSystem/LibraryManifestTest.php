@@ -5,6 +5,7 @@ use \PHPUnit\Framework\Attributes\DataProvider;
 
 use \Peneus\Systems\PageSystem\LibraryManifest;
 
+use \Harmonia\Core\CArray;
 use \Harmonia\Core\CFile;
 use \Harmonia\Core\CPath;
 use \Harmonia\Core\CSequentialArray;
@@ -38,14 +39,82 @@ class LibraryManifestTest extends TestCase
 
     #region __construct --------------------------------------------------------
 
-    function testConstructorThrowsWhenFileCannotBeOpened()
+    function testConstructorStoresItemsReturnedByLoadFile()
+    {
+        $sut = $this->systemUnderTest('loadFile');
+        $items = $this->createStub(CArray::class);
+
+        $sut->expects($this->once())
+            ->method('loadFile')
+            ->willReturn($items);
+
+        $sut->__construct();
+
+        $this->assertSame($items, AccessHelper::GetProperty($sut, 'items'));
+    }
+
+    #endregion __construct
+
+    #region Items --------------------------------------------------------------
+
+    function testItemsReturnsItems()
+    {
+        $sut = $this->systemUnderTest();
+        $items = $this->createStub(CArray::class);
+
+        AccessHelper::SetMockProperty(
+            LibraryManifest::class,
+            $sut,
+            'items',
+            $items
+        );
+
+        $this->assertSame($items, $sut->Items());
+    }
+
+    #endregion Items
+
+    #region Defaults -----------------------------------------------------------
+
+    function testDefaultsReturnsOnlyDefaultItems()
+    {
+        $sut = $this->systemUnderTest();
+        $items = new CArray([
+            'lib1' => $this->createConfiguredMock(LibraryItem::class, [
+                'IsDefault' => true
+            ]),
+            'lib2' => $this->createConfiguredMock(LibraryItem::class, [
+                'IsDefault' => false
+            ]),
+            'lib3' => $this->createConfiguredMock(LibraryItem::class, [
+                'IsDefault' => true
+            ]),
+        ]);
+
+        AccessHelper::SetMockProperty(
+            LibraryManifest::class,
+            $sut,
+            'items',
+            $items
+        );
+
+        $this->assertEquals(
+            new CSequentialArray(['lib1', 'lib3']),
+            $sut->Defaults()
+        );
+    }
+
+    #endregion Defaults
+
+    #region loadFile -----------------------------------------------------------
+
+    function testLoadFileThrowsWhenFileCannotBeOpened()
     {
         $sut = $this->systemUnderTest('openFile');
         $path = $this->createStub(CPath::class);
         $resource = Resource::Instance();
 
-        $resource->expects($this->once())
-            ->method('FrontendManifestFilePath')
+        $resource->method('FrontendManifestFilePath')
             ->willReturn($path);
         $sut->expects($this->once())
             ->method('openFile')
@@ -54,18 +123,17 @@ class LibraryManifestTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Manifest file could not be opened.');
-        $sut->__construct();
+        AccessHelper::CallMethod($sut, 'loadFile');
     }
 
-    function testConstructorThrowsWhenFileCannotBeRead()
+    function testLoadFileThrowsWhenFileCannotBeRead()
     {
         $sut = $this->systemUnderTest('openFile');
+        $file = $this->createMock(CFile::class);
         $path = $this->createStub(CPath::class);
         $resource = Resource::Instance();
-        $file = $this->createMock(CFile::class);
 
-        $resource->expects($this->once())
-            ->method('FrontendManifestFilePath')
+        $resource->method('FrontendManifestFilePath')
             ->willReturn($path);
         $sut->expects($this->once())
             ->method('openFile')
@@ -79,18 +147,17 @@ class LibraryManifestTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Manifest file could not be read.');
-        $sut->__construct();
+        AccessHelper::CallMethod($sut, 'loadFile');
     }
 
-    function testConstructorThrowsWhenJsonIsInvalid()
+    function testLoadFileThrowsWhenJsonCannotBeDecoded()
     {
         $sut = $this->systemUnderTest('openFile');
+        $file = $this->createMock(CFile::class);
         $path = $this->createStub(CPath::class);
         $resource = Resource::Instance();
-        $file = $this->createMock(CFile::class);
 
-        $resource->expects($this->once())
-            ->method('FrontendManifestFilePath')
+        $resource->method('FrontendManifestFilePath')
             ->willReturn($path);
         $sut->expects($this->once())
             ->method('openFile')
@@ -98,16 +165,16 @@ class LibraryManifestTest extends TestCase
             ->willReturn($file);
         $file->expects($this->once())
             ->method('Read')
-            ->willReturn('{invalid'); // malformed JSON
+            ->willReturn('{invalid');
         $file->expects($this->once())
             ->method('Close');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Manifest file contains invalid JSON.');
-        $sut->__construct();
+        AccessHelper::CallMethod($sut, 'loadFile');
     }
 
-    function testConstructorThrowsWhenLibraryNameIsNotString()
+    function testLoadFileThrowsWhenLibraryNameIsNotString()
     {
         $sut = $this->systemUnderTest('openFile');
         $path = $this->createStub(CPath::class);
@@ -136,10 +203,10 @@ class LibraryManifestTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Library name must be a string.');
-        $sut->__construct();
+        AccessHelper::CallMethod($sut, 'loadFile');
     }
 
-    function testConstructorThrowsWhenLibraryNameIsEmpty()
+    function testLoadFileThrowsWhenLibraryNameIsEmpty()
     {
         $sut = $this->systemUnderTest('openFile');
         $path = $this->createStub(CPath::class);
@@ -168,10 +235,10 @@ class LibraryManifestTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Library name cannot be empty.');
-        $sut->__construct();
+        AccessHelper::CallMethod($sut, 'loadFile');
     }
 
-    function testConstructorThrowsWhenLibraryDataIsNotArray()
+    function testLoadFileThrowsWhenLibraryDataIsNotArray()
     {
         $sut = $this->systemUnderTest('openFile');
         $path = $this->createStub(CPath::class);
@@ -189,7 +256,7 @@ class LibraryManifestTest extends TestCase
             ->method('Read')
             ->willReturn(<<<JSON
                 {
-                  "foo": "this should be an object"
+                  "lib1": "I should have been an object"
                 }
             JSON);
         $file->expects($this->once())
@@ -197,51 +264,21 @@ class LibraryManifestTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Library data must be an object.');
-        $sut->__construct();
+        AccessHelper::CallMethod($sut, 'loadFile');
     }
 
-    #[DataProvider('invalidAssetValueDataProvider')]
-    function testConstructorThrowsOnInvalidCssValues(string $jsonValue)
+    function testLoadFileReturnsParsedItemsFromValidJson()
     {
-        $sut = $this->systemUnderTest('openFile');
-        $path = $this->createStub(CPath::class);
-        $resource = Resource::Instance();
+        $sut = $this->systemUnderTest(
+            'openFile',
+            'validateAssetField',
+            'validateBooleanField'
+        );
         $file = $this->createMock(CFile::class);
-
-        $resource->expects($this->once())
-            ->method('FrontendManifestFilePath')
-            ->willReturn($path);
-        $sut->expects($this->once())
-            ->method('openFile')
-            ->with($path)
-            ->willReturn($file);
-        $file->expects($this->once())
-            ->method('Read')
-            ->willReturn(<<<JSON
-                {
-                  "lib": {
-                    "css": $jsonValue
-                  }
-                }
-            JSON);
-        $file->expects($this->once())
-            ->method('Close');
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageMatches(
-            '/^Library asset value must be a string( or an array of strings)?\.$/');
-        $sut->__construct();
-    }
-
-    function testConstructorLoadsLibraryItemsFromManifest()
-    {
-        $sut = $this->systemUnderTest('openFile');
-        $path = $this->createStub(CPath::class);
         $resource = Resource::Instance();
-        $file = $this->createMock(CFile::class);
+        $path = $this->createStub(CPath::class);
 
-        $resource->expects($this->once())
-            ->method('FrontendManifestFilePath')
+        $resource->method('FrontendManifestFilePath')
             ->willReturn($path);
         $sut->expects($this->once())
             ->method('openFile')
@@ -272,110 +309,152 @@ class LibraryManifestTest extends TestCase
             JSON);
         $file->expects($this->once())
             ->method('Close');
+        $sut->expects($this->exactly(9))
+            ->method('validateAssetField')
+            ->willReturnCallback(function(array $data, string $key) {
+                return $data[$key] ?? null;
+            });
+        $sut->expects($this->exactly(3))
+            ->method('validateBooleanField')
+            ->willReturnCallback(function(array $data, string $key) {
+                return $data[$key] ?? false;
+            });
 
-        $sut->__construct();
-        $items = $sut->Items();
+        $items = AccessHelper::CallMethod($sut, 'loadFile');
 
-        $item = $items->Get('jquery');
-        $this->assertInstanceOf(LibraryItem::class, $item);
-        $this->assertSame(['jquery-ui-1.12.1.custom/jquery-ui'], $item->Css());
-        $this->assertSame([
-            'jquery-3.5.1/jquery',
-            'jquery-ui-1.12.1.custom/jquery-ui'
-        ], $item->Js());
-        $this->assertSame([], $item->Extras());
-        $this->assertTrue($item->IsDefault());
+        $this->assertInstanceOf(LibraryItem::class, $items->Get('jquery'));
+        $this->assertSame(['jquery-ui-1.12.1.custom/jquery-ui'],
+                          $items->Get('jquery')->Css());
+        $this->assertSame(['jquery-3.5.1/jquery', 'jquery-ui-1.12.1.custom/jquery-ui'],
+                          $items->Get('jquery')->Js());
+        $this->assertSame([], $items->Get('jquery')->Extras());
+        $this->assertTrue($items->Get('jquery')->IsDefault());
 
-        $item = $items->Get('selectize');
-        $this->assertInstanceOf(LibraryItem::class, $item);
-        $this->assertSame(['selectize-0.13.6/css/selectize.bootstrap4.css'], $item->Css());
-        $this->assertSame(['selectize-0.13.6/js/standalone/selectize'], $item->Js());
-        $this->assertSame([], $item->Extras());
-        $this->assertFalse($item->IsDefault());
+        $this->assertInstanceOf(LibraryItem::class, $items->Get('selectize'));
+        $this->assertSame(['selectize-0.13.6/css/selectize.bootstrap4.css'],
+                          $items->Get('selectize')->Css());
+        $this->assertSame(['selectize-0.13.6/js/standalone/selectize'],
+                          $items->Get('selectize')->Js());
+        $this->assertSame([], $items->Get('selectize')->Extras());
+        $this->assertFalse($items->Get('selectize')->IsDefault());
 
-        $item = $items->Get('audiojs');
-        $this->assertInstanceOf(LibraryItem::class, $item);
-        $this->assertSame(['audiojs-1.0.1/audio'], $item->Css());
-        $this->assertSame(['audiojs-1.0.1/audio'], $item->Js());
-        $this->assertSame(['audiojs-1.0.1/player-graphics.gif'], $item->Extras());
-        $this->assertFalse($item->IsDefault());
+        $this->assertInstanceOf(LibraryItem::class, $items->Get('audiojs'));
+        $this->assertSame(['audiojs-1.0.1/audio'], $items->Get('audiojs')->Css());
+        $this->assertSame(['audiojs-1.0.1/audio'], $items->Get('audiojs')->Js());
+        $this->assertSame(['audiojs-1.0.1/player-graphics.gif'],
+                          $items->Get('audiojs')->Extras());
+        $this->assertFalse($items->Get('audiojs')->IsDefault());
     }
 
-    #endregion __construct
+    #endregion loadFile
 
-    #region Item ---------------------------------------------------------------
+    #region validateAssetField -------------------------------------------------
 
-    function testItemReturnsNullWhenLibraryIsNotFound()
+    function testValidateAssetFieldReturnsNullIfKeyIsMissing()
     {
-        $sut = $this->systemUnderTest('openFile');
-        $path = $this->createStub(CPath::class);
-        $resource = Resource::Instance();
-        $file = $this->createMock(CFile::class);
+        $sut = $this->systemUnderTest('validateAssetValue');
+        $data = ['js' => ['a.js']];
+        $key = 'css';
 
-        $resource->expects($this->once())
-            ->method('FrontendManifestFilePath')
-            ->willReturn($path);
-        $sut->expects($this->once())
-            ->method('openFile')
-            ->with($path)
-            ->willReturn($file);
-        $file->expects($this->once())
-            ->method('Read')
-            ->willReturn(<<<JSON
-                {
-                  "foo": {
-                    "css": "foo.css"
-                  }
-                }
-            JSON);
-        $file->expects($this->once())
-            ->method('Close');
+        $sut->expects($this->never())
+            ->method('validateAssetValue');
 
-        $sut->__construct();
-
-        $this->assertNull($sut->Items()->Get('bar'));
+        $this->assertNull(AccessHelper::CallMethod(
+            $sut,
+            'validateAssetField',
+            [$data, $key]
+        ));
     }
 
-    #endregion Item
-
-    #region Defaults -----------------------------------------------------------
-
-    function testDefaultsReturnsOnlyDefaultLibraries()
+    function testValidateAssetFieldDelegatesToValidateAssetValue()
     {
-        $sut = $this->systemUnderTest('openFile');
-        $path = $this->createStub(CPath::class);
-        $resource = Resource::Instance();
-        $file = $this->createMock(CFile::class);
+        $sut = $this->systemUnderTest('validateAssetValue');
+        $value = ['a.js'];
+        $data = ['js' => $value];
+        $key = 'js';
 
-        $resource->expects($this->once())
-            ->method('FrontendManifestFilePath')
-            ->willReturn($path);
         $sut->expects($this->once())
-            ->method('openFile')
-            ->with($path)
-            ->willReturn($file);
-        $file->expects($this->once())
-            ->method('Read')
-            ->willReturn(<<<JSON
-                {
-                  "a": { "css": "a.css", "default": true },
-                  "b": { "css": "b.css" },
-                  "c": { "css": "c.css", "default": true },
-                  "d": { "css": "d.css", "default": false }
-                }
-            JSON);
-        $file->expects($this->once())
-            ->method('Close');
+            ->method('validateAssetValue')
+            ->with($value)
+            ->willReturn($value);
 
-        $sut->__construct();
-        $defaults = $sut->Defaults();
-
-        $this->assertInstanceOf(CSequentialArray::class, $defaults);
-        $this->assertCount(2, $defaults);
-        $this->assertSame(['a', 'c'], $defaults->ToArray());
+        $this->assertSame($value, AccessHelper::CallMethod(
+            $sut,
+            'validateAssetField',
+            [$data, $key]
+        ));
     }
 
-    #endregion Defaults
+    #endregion validateAssetField
+
+    #region validateAssetValue -------------------------------------------------
+
+    function testValidateAssetValueReturnsStringWhenInputIsString()
+    {
+        $sut = $this->systemUnderTest();
+        $value = 'foo.css';
+
+        $result = AccessHelper::CallMethod($sut, 'validateAssetValue', [$value]);
+        $this->assertSame($value, $result);
+    }
+
+    function testValidateAssetValueReturnsArrayWhenInputIsArrayOfStrings()
+    {
+        $sut = $this->systemUnderTest();
+        $value = ['a.css', 'b.css'];
+
+        $result = AccessHelper::CallMethod($sut, 'validateAssetValue', [$value]);
+        $this->assertSame($value, $result);
+    }
+
+    #[DataProvider('invalidAssetValueDataProvider')]
+    function testValidateAssetValueThrowsOnInvalidInput(string $jsonValue)
+    {
+        $sut = $this->systemUnderTest();
+        $value = \json_decode($jsonValue, true);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches(
+            '/^Library asset value must be a string( or an array of strings)?\.$/');
+        AccessHelper::CallMethod($sut, 'validateAssetValue', [$value]);
+    }
+
+    #endregion validateAssetValue
+
+    #region validateBooleanField -----------------------------------------------
+
+    function testValidateBooleanFieldCastsValidBooleans()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->assertTrue(AccessHelper::CallMethod(
+            $sut,
+            'validateBooleanField',
+            [['default' => true], 'default']
+        ));
+        $this->assertFalse(AccessHelper::CallMethod(
+            $sut,
+            'validateBooleanField',
+            [['default' => false], 'default']
+        ));
+        $this->assertTrue(AccessHelper::CallMethod(
+            $sut,
+            'validateBooleanField',
+            [['default' => 1], 'default']
+        ));
+        $this->assertFalse(AccessHelper::CallMethod(
+            $sut,
+            'validateBooleanField',
+            [['default' => 0], 'default']
+        ));
+        $this->assertFalse(AccessHelper::CallMethod(
+            $sut,
+            'validateBooleanField',
+            [['other' => true], 'default']
+        ));
+    }
+
+    #endregion validateBooleanField
 
     #region Data Providers -----------------------------------------------------
 
