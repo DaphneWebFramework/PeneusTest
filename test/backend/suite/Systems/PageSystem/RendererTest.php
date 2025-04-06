@@ -14,6 +14,7 @@ use \Harmonia\Logger;
 use \Peneus\Resource;
 use \Peneus\Systems\PageSystem\LibraryItem;
 use \Peneus\Systems\PageSystem\Page;
+use \Peneus\Systems\PageSystem\PageManifest;
 use \TestToolkit\AccessHelper;
 
 #[CoversClass(Renderer::class)]
@@ -86,6 +87,27 @@ class RendererTest extends TestCase
         ]);
     }
 
+    private function pageManifest(): PageManifest
+    {
+        return $this->createConfiguredMock(PageManifest::class, [
+            'Css' => [
+                'https://cdn.example.com/fonts.css',
+                'index',
+                'theme'
+            ],
+            'Js' => [
+                'http://cdn.example.com/script.js',
+                'Model',
+                'View',
+                'Controller'
+            ],
+            'Extras' => [
+                'locales/en.json',
+                'fonts/*.woff2'
+            ]
+        ]);
+    }
+
     #region Render -------------------------------------------------------------
 
     function testRenderWhenOpenFileReturnsNull()
@@ -140,7 +162,9 @@ class RendererTest extends TestCase
             'openFile',
             'content',
             'libraryStylesheetLinks',
+            'pageStylesheetLinks',
             'libraryJavascriptLinks',
+            'pageJavascriptLinks',
             '_echo'
         );
         $resource = Resource::Instance();
@@ -166,10 +190,12 @@ class RendererTest extends TestCase
                 	<meta charset="utf-8">
                 	<title>{{Title}}</title>
                 	{{LibraryStylesheetLinks}}
+                	{{PageStylesheetLinks}}
                 </head>
                 <body>
                 	{{Content}}
                 	{{LibraryJavascriptLinks}}
+                	{{PageJavascriptLinks}}
                 </body>
                 </html>
             HTML);
@@ -190,6 +216,10 @@ class RendererTest extends TestCase
             ->with($libraries)
             ->willReturn('	<link rel="stylesheet" href="url/to/bootstrap-4.6.2/css/bootstrap.css">');
         $sut->expects($this->once())
+            ->method('pageStylesheetLinks')
+            ->with($page)
+            ->willReturn('	<link rel="stylesheet" href="url/to/pages/home/style.css">');
+        $sut->expects($this->once())
             ->method('content')
             ->with($page)
             ->willReturn('	Welcome to MyWebsite!');
@@ -197,6 +227,10 @@ class RendererTest extends TestCase
             ->method('libraryJavascriptLinks')
             ->with($libraries)
             ->willReturn('	<script src="url/to/bootstrap-4.6.2/js/bootstrap.bundle.js"></script>');
+        $sut->expects($this->once())
+            ->method('pageJavascriptLinks')
+            ->with($page)
+            ->willReturn('	<script src="url/to/pages/home/script.js"></script>');
         $sut->expects($this->once())
             ->method('_echo')
             ->with(<<<HTML
@@ -206,10 +240,12 @@ class RendererTest extends TestCase
                 	<meta charset="utf-8">
                 	<title>Home | MyWebsite</title>
                 	<link rel="stylesheet" href="url/to/bootstrap-4.6.2/css/bootstrap.css">
+                	<link rel="stylesheet" href="url/to/pages/home/style.css">
                 </head>
                 <body>
                 	Welcome to MyWebsite!
                 	<script src="url/to/bootstrap-4.6.2/js/bootstrap.bundle.js"></script>
+                	<script src="url/to/pages/home/script.js"></script>
                 </body>
                 </html>
             HTML);
@@ -319,16 +355,11 @@ class RendererTest extends TestCase
 
     function testLibraryStylesheetLinks()
     {
-        $sut = $this->systemUnderTest('resolveAssetUrl');
-        $config = Config::Instance();
+        $sut = $this->systemUnderTest('resolveLibraryAssetUrl');
 
-        $config->expects($this->once())
-            ->method('OptionOrDefault')
-            ->with('IsDebug', false)
-            ->willReturn(true);
         $sut->expects($this->any())
-            ->method('resolveAssetUrl')
-            ->willReturnCallback(function($path, $extension, $isDebug) {
+            ->method('resolveLibraryAssetUrl')
+            ->willReturnCallback(function($path, $extension) {
                 return "url/to/{$path}.{$extension}";
             });
 
@@ -347,16 +378,11 @@ class RendererTest extends TestCase
 
     function testLibraryJavascriptLinks()
     {
-        $sut = $this->systemUnderTest('resolveAssetUrl');
-        $config = Config::Instance();
+        $sut = $this->systemUnderTest('resolveLibraryAssetUrl');
 
-        $config->expects($this->once())
-            ->method('OptionOrDefault')
-            ->with('IsDebug', false)
-            ->willReturn(true);
         $sut->expects($this->any())
-            ->method('resolveAssetUrl')
-            ->willReturnCallback(function($path, $extension, $isDebug) {
+            ->method('resolveLibraryAssetUrl')
+            ->willReturnCallback(function($path, $extension) {
                 return "url/to/{$path}.{$extension}";
             });
 
@@ -372,87 +398,446 @@ class RendererTest extends TestCase
 
     #endregion libraryJavascriptLinks
 
-    #region resolveAssetUrl ----------------------------------------------------
+    #region pageStylesheetLinks ------------------------------------------------
 
-    function testResolveAssetUrlWhenPathIsHttpUrl()
+    function testPageStylesheetLinksInDebugMode()
     {
-        $sut = $this->systemUnderTest();
+        $sut = $this->systemUnderTest('resolvePageAssetUrl');
+        $page = $this->createMock(Page::class);
+        $config = Config::Instance();
+
+        $page->expects($this->once())
+            ->method('Id')
+            ->willReturn('home');
+        $config->expects($this->once())
+            ->method('OptionOrDefault')
+            ->with('IsDebug', false)
+            ->willReturn(true);
+        $page->expects($this->once())
+            ->method('Manifest')
+            ->willReturn($this->pageManifest());
+        $sut->expects($this->any())
+            ->method('resolvePageAssetUrl')
+            ->willReturnCallback(function($pageId, $path, $extension) {
+                if (\str_starts_with($path, 'http')) {
+                    return $path;
+                }
+                return "url/to/pages/{$pageId}/{$path}.{$extension}";
+            });
 
         $this->assertSame(
-            'http://cdn.example.com/assets/style.css',
-            AccessHelper::CallMethod($sut, 'resolveAssetUrl', [
-                'http://cdn.example.com/assets/style.css',
-                'css',
-                true
-            ])
+            "\t<link rel=\"stylesheet\" href=\"https://cdn.example.com/fonts.css\">\n"
+          . "\t<link rel=\"stylesheet\" href=\"url/to/pages/home/index.css\">\n"
+          . "\t<link rel=\"stylesheet\" href=\"url/to/pages/home/theme.css\">"
+          , AccessHelper::CallMethod($sut, 'pageStylesheetLinks', [$page])
         );
     }
 
-    function testResolveAssetUrlWhenPathIsHttpsUrl()
+    function testPageStylesheetLinksInProductionMode()
     {
-        $sut = $this->systemUnderTest();
-
-        $this->assertSame(
-            'https://cdn.example.com/assets/style.css',
-            AccessHelper::CallMethod($sut, 'resolveAssetUrl', [
-                'https://cdn.example.com/assets/style.css',
-                'css',
-                true
-            ])
-        );
-    }
-
-    #[DataProvider('resolveAssetUrlDataProvider')]
-    function testResolveAssetUrlWhenPathIsLocal($expected, $path, $extension, $isDebug)
-    {
-        $sut = $this->systemUnderTest();
+        $sut = $this->systemUnderTest('isRemoteAsset', 'pageMinifiedAssetExists');
+        $config = Config::Instance();
         $resource = Resource::Instance();
+        $page = $this->createMock(Page::class);
+        $pageId = 'home';
 
+        $page->expects($this->once())
+            ->method('Id')
+            ->willReturn($pageId);
+        $config->expects($this->once())
+            ->method('OptionOrDefault')
+            ->with('IsDebug', false)
+            ->willReturn(false);
+        $page->expects($this->once())
+            ->method('Manifest')
+            ->willReturn($this->pageManifest());
+        $sut->expects($this->any())
+            ->method('isRemoteAsset')
+            ->willReturnCallback(function ($path) {
+                return \str_starts_with($path, 'http');
+            });
+        $sut->expects($this->once())
+            ->method('pageMinifiedAssetExists')
+            ->with($pageId, 'css')
+            ->willReturn(true);
+        $resource->expects($this->once())
+            ->method('PageFileUrl')
+            ->with($pageId, 'page.min.css')
+            ->willReturn(new CUrl('http://localhost/app/pages/home/page.min.css'));
+
+        $this->assertSame(
+            "\t<link rel=\"stylesheet\" href=\"https://cdn.example.com/fonts.css\">\n"
+          . "\t<link rel=\"stylesheet\" href=\"http://localhost/app/pages/home/page.min.css\">",
+            AccessHelper::CallMethod($sut, 'pageStylesheetLinks', [$page])
+        );
+    }
+
+    #endregion pageStylesheetLinks
+
+    #region pageJavascriptLinks ------------------------------------------------
+
+    function testPageJavascriptLinksInDebugMode()
+    {
+        $sut = $this->systemUnderTest('resolvePageAssetUrl');
+        $page = $this->createMock(Page::class);
+        $config = Config::Instance();
+
+        $page->expects($this->once())
+            ->method('Id')
+            ->willReturn('home');
+        $config->expects($this->once())
+            ->method('OptionOrDefault')
+            ->with('IsDebug', false)
+            ->willReturn(true);
+        $page->expects($this->once())
+            ->method('Manifest')
+            ->willReturn($this->pageManifest());
+        $sut->expects($this->any())
+            ->method('resolvePageAssetUrl')
+            ->willReturnCallback(function($pageId, $path, $extension) {
+                if (\str_starts_with($path, 'http')) {
+                    return $path;
+                }
+                return "url/to/pages/{$pageId}/{$path}.{$extension}";
+            });
+
+        $this->assertSame(
+            "\t<script src=\"http://cdn.example.com/script.js\"></script>\n"
+          . "\t<script src=\"url/to/pages/home/Model.js\"></script>\n"
+          . "\t<script src=\"url/to/pages/home/View.js\"></script>\n"
+          . "\t<script src=\"url/to/pages/home/Controller.js\"></script>",
+            AccessHelper::CallMethod($sut, 'pageJavascriptLinks', [$page])
+        );
+    }
+
+    function testPageJavascriptLinksInProductionMode()
+    {
+        $sut = $this->systemUnderTest('isRemoteAsset', 'pageMinifiedAssetExists');
+        $config = Config::Instance();
+        $resource = Resource::Instance();
+        $page = $this->createMock(Page::class);
+        $pageId = 'home';
+
+        $page->expects($this->once())
+            ->method('Id')
+            ->willReturn($pageId);
+        $config->expects($this->once())
+            ->method('OptionOrDefault')
+            ->with('IsDebug', false)
+            ->willReturn(false);
+        $page->expects($this->once())
+            ->method('Manifest')
+            ->willReturn($this->pageManifest());
+        $sut->expects($this->any())
+            ->method('isRemoteAsset')
+            ->willReturnCallback(function ($path) {
+                return \str_starts_with($path, 'http');
+            });
+        $sut->expects($this->once())
+            ->method('pageMinifiedAssetExists')
+            ->with($pageId, 'js')
+            ->willReturn(true);
+        $resource->expects($this->once())
+            ->method('PageFileUrl')
+            ->with($pageId, 'page.min.js')
+            ->willReturn(new CUrl('http://localhost/app/pages/home/page.min.js'));
+
+        $this->assertSame(
+            "\t<script src=\"http://cdn.example.com/script.js\"></script>\n"
+          . "\t<script src=\"http://localhost/app/pages/home/page.min.js\"></script>"
+          , AccessHelper::CallMethod($sut, 'pageJavascriptLinks', [$page])
+        );
+    }
+
+    #endregion pageJavascriptLinks
+
+    #region resolveLibraryAssetUrl ---------------------------------------------
+
+    function testResolveLibraryAssetUrlWhenPathIsRemote()
+    {
+        $sut = $this->systemUnderTest('isRemoteAsset', 'lowercaseExtension');
+        $config = Config::Instance();
+        $resource = Resource::Instance();
+        $path = 'https://cdn.example.com/style.css';
+
+        $sut->expects($this->once())
+            ->method('isRemoteAsset')
+            ->with($path)
+            ->willReturn(true);
+        $sut->expects($this->never())
+            ->method('lowercaseExtension');
+        $config->expects($this->never())
+            ->method('OptionOrDefault');
+        $resource->expects($this->never())
+            ->method('FrontendLibraryFileUrl');
+
+        $this->assertSame(
+            $path,
+            AccessHelper::CallMethod($sut, 'resolveLibraryAssetUrl', [
+                $path,
+                'css'
+            ])
+        );
+    }
+
+    #[DataProvider('resolveLibraryAssetUrlWhenPathIsLocalDataProvider')]
+    function testResolveLibraryAssetUrlWhenPathIsLocal(
+        string $expected,
+        string $path,
+        string $extension,
+        string $lowercaseExtension,
+        bool $isDebug
+    ) {
+        $sut = $this->systemUnderTest('isRemoteAsset', 'lowercaseExtension');
+        $config = Config::Instance();
+        $resource = Resource::Instance();
+        $resolvedUrl = "http://localhost/app/frontend/{$expected}";
+
+        $sut->expects($this->once())
+            ->method('isRemoteAsset')
+            ->with($path)
+            ->willReturn(false);
+        $sut->expects($this->once())
+            ->method('lowercaseExtension')
+            ->with($path)
+            ->willReturn($lowercaseExtension);
+        if ($extension !== $lowercaseExtension) {
+            $config->expects($this->once())
+                ->method('OptionOrDefault')
+                ->with('IsDebug', false)
+                ->willReturn($isDebug);
+        } else {
+            $config->expects($this->never())
+                ->method('OptionOrDefault');
+        }
         $resource->expects($this->once())
             ->method('FrontendLibraryFileUrl')
             ->with($expected)
-            ->willReturn(new CUrl("http://localhost/app/frontend/{$expected}"));
+            ->willReturn(new CUrl($resolvedUrl));
 
         $this->assertSame(
-            "http://localhost/app/frontend/{$expected}",
-            AccessHelper::CallMethod($sut, 'resolveAssetUrl', [
+            $resolvedUrl,
+            AccessHelper::CallMethod(
+                $sut,
+                'resolveLibraryAssetUrl',
+                [$path, $extension]
+            )
+        );
+    }
+
+    #endregion resolveLibraryAssetUrl
+
+    #region resolvePageAssetUrl ------------------------------------------------
+
+    function testResolvePageAssetUrlWhenPathIsRemote()
+    {
+        $sut = $this->systemUnderTest('isRemoteAsset', 'lowercaseExtension');
+        $resource = Resource::Instance();
+        $path = 'https://cdn.example.com/script.js';
+
+        $sut->expects($this->once())
+            ->method('isRemoteAsset')
+            ->with($path)
+            ->willReturn(true);
+        $sut->expects($this->never())
+            ->method('lowercaseExtension');
+        $resource->expects($this->never())
+            ->method('PageFileUrl');
+
+        $this->assertSame(
+            $path,
+            AccessHelper::CallMethod($sut, 'resolvePageAssetUrl', [
+                'home',
                 $path,
-                $extension,
-                $isDebug
+                'js'
             ])
         );
     }
 
-    #endregion resolveAssetUrl
+    #[DataProvider('resolvePageAssetUrlWhenPathIsLocalDataProvider')]
+    function testResolvePageAssetUrlWhenPathIsLocal(
+        string $expected,
+        string $path,
+        string $extension,
+        string $lowercaseExtension
+    ) {
+        $sut = $this->systemUnderTest('isRemoteAsset', 'lowercaseExtension');
+        $resource = Resource::Instance();
+        $pageId = 'home';
+        $pageAssetUrl = "http://localhost/app/pages/{$pageId}/{$expected}";
+
+        $sut->expects($this->once())
+            ->method('isRemoteAsset')
+            ->with($path)
+            ->willReturn(false);
+        $sut->expects($this->once())
+            ->method('lowercaseExtension')
+            ->with($path)
+            ->willReturn($lowercaseExtension);
+        $resource->expects($this->once())
+            ->method('PageFileUrl')
+            ->with($pageId, $expected)
+            ->willReturn(new CUrl($pageAssetUrl));
+
+        $this->assertSame(
+            $pageAssetUrl,
+            AccessHelper::CallMethod(
+                $sut,
+                'resolvePageAssetUrl',
+                [$pageId, $path, $extension]
+            )
+        );
+    }
+
+    #endregion resolvePageAssetUrl
+
+    #region isRemoteAsset ------------------------------------------------------
+
+    #[DataProvider('isRemoteAssetDataProvider')]
+    function testIsRemoteAsset($expected, $path)
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->assertSame(
+            $expected,
+            AccessHelper::CallMethod($sut, 'isRemoteAsset', [$path])
+        );
+    }
+
+    #endregion isRemoteAsset
+
+    #region lowercaseExtension -------------------------------------------------
+
+    #[DataProvider('lowercaseExtensionDataProvider')]
+    function testLowercaseExtension($expected, $path)
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->assertSame(
+            $expected,
+            AccessHelper::CallMethod($sut, 'lowercaseExtension', [$path])
+        );
+    }
+
+    #endregion lowercaseExtension
+
+    #region pageMinifiedAssetExists --------------------------------------------
+
+    function testPageMinifiedAssetExistsReturnsTrueIfFileExists()
+    {
+        $sut = $this->systemUnderTest();
+        $resource = Resource::Instance();
+        $pageId = 'home';
+        $extension = 'css';
+        $path = $this->createMock(CPath::class);
+
+        $resource->expects($this->once())
+            ->method('PageFilePath')
+            ->with($pageId, "page.min.{$extension}")
+            ->willReturn($path);
+        $path->expects($this->once())
+            ->method('IsFile')
+            ->willReturn(true);
+
+        $this->assertTrue(AccessHelper::CallMethod(
+            $sut,
+            'pageMinifiedAssetExists',
+            [$pageId, $extension]
+        ));
+    }
+
+    function testPageMinifiedAssetExistsReturnsFalseIfFileDoesNotExist()
+    {
+        $sut = $this->systemUnderTest();
+        $resource = Resource::Instance();
+        $pageId = 'home';
+        $extension = 'css';
+        $path = $this->createMock(CPath::class);
+
+        $resource->expects($this->once())
+            ->method('PageFilePath')
+            ->with($pageId, "page.min.{$extension}")
+            ->willReturn($path);
+        $path->expects($this->once())
+            ->method('IsFile')
+            ->willReturn(false);
+
+        $this->assertFalse(AccessHelper::CallMethod(
+            $sut,
+            'pageMinifiedAssetExists',
+            [$pageId, $extension]
+        ));
+    }
+
+    #endregion pageMinifiedAssetExists
 
     #region Data Providers -----------------------------------------------------
 
-    static function resolveAssetUrlDataProvider()
+    static function resolveLibraryAssetUrlWhenPathIsLocalDataProvider()
     {
+        // expected
+        // path
+        // extension
+        // lowercaseExtension
+        // isDebug
         return [
-        // No extension
-            ['bootstrap/css/bootstrap.css',     'bootstrap/css/bootstrap', 'css', true],
-            ['bootstrap/css/bootstrap.min.css', 'bootstrap/css/bootstrap', 'css', false],
-            ['jquery/js/jquery.js',             'jquery/js/jquery',        'js',  true],
-            ['jquery/js/jquery.min.js',         'jquery/js/jquery',        'js',  false],
-        // Already has extension
-            ['bootstrap/css/bootstrap.css', 'bootstrap/css/bootstrap.css', 'css', true],
-            ['bootstrap/css/bootstrap.css', 'bootstrap/css/bootstrap.css', 'css', false],
-            ['jquery/js/jquery.js',         'jquery/js/jquery.js',         'js',  true],
-            ['jquery/js/jquery.js',         'jquery/js/jquery.js',         'js',  false],
-        // Already has minified extension
-            ['bootstrap/css/bootstrap.min.css', 'bootstrap/css/bootstrap.min.css', 'css', true],
-            ['bootstrap/css/bootstrap.min.css', 'bootstrap/css/bootstrap.min.css', 'css', false],
-            ['jquery/js/jquery.min.js',         'jquery/js/jquery.min.js',         'js',  true],
-            ['jquery/js/jquery.min.js',         'jquery/js/jquery.min.js',         'js',  false],
-        // Case-insensitive extensions
-            ['bootstrap/css/bootstrap.CSS', 'bootstrap/css/bootstrap.CSS', 'css', true],
-            ['jquery/js/jquery.JS',         'jquery/js/jquery.JS',         'js',  false],
-            ['jquery/js/jquery.Min.Js',     'jquery/js/jquery.Min.Js',     'js',  false],
-        // No real extension
-            ['lib/selectize.v5.min.css',     'lib/selectize.v5',         'css', false],
-            ['bootstrap/css/bootstrap..css', 'bootstrap/css/bootstrap.', 'css', true],
-            ['jquery/js/jquery.min..min.js', 'jquery/js/jquery.min.',    'js',  false],
+            'no extension, debug'
+                => ['lib/foo.css', 'lib/foo', 'css', '', true],
+            'no extension, production'
+                => ['lib/foo.min.css', 'lib/foo', 'css', '', false],
+            'correct extension, debug'
+                => ['lib/foo.css', 'lib/foo.css', 'css', 'css', true],
+            'correct extension, production'
+                => ['lib/foo.css', 'lib/foo.css', 'css', 'css', false],
+            'wrong extension, debug'
+                => ['lib/foo.css', 'lib/foo', 'css', 'js', true],
+            'wrong extension, production'
+                => ['lib/foo.min.css', 'lib/foo', 'css', 'js', false],
+        ];
+    }
+
+    static function resolvePageAssetUrlWhenPathIsLocalDataProvider()
+    {
+        // expected
+        // path
+        // extension
+        // lowercaseExtension
+        return [
+            'no extension'
+                => ['foo.css', 'foo', 'css', ''],
+            'correct extension'
+                => ['foo.css', 'foo.css', 'css', 'css'],
+            'wrong extension'
+                => ['foo.js.css', 'foo.js', 'css', 'js'],
+        ];
+    }
+
+    static function isRemoteAssetDataProvider()
+    {
+        // expected
+        // path
+        return [
+            [true, 'http://example.com/assets/style.css'],
+            [true, 'https://example.com/assets/style.css'],
+            [true, 'http://localhost/app/frontend/assets/style.css'],
+            [true, 'https://localhost/app/frontend/assets/style.css'],
+            [false, 'assets/style.css'],
+        ];
+    }
+
+    static function lowercaseExtensionDataProvider()
+    {
+        // expected
+        // path
+        return [
+            ['css', 'assets/style.css'],
+            ['css', 'assets/style.CSS'],
+            ['css', 'assets/style.min.css'],
+            ['css', 'assets/style.min.CSS'],
+            ['css', 'assets/style..css'],
+            ['css', '.css'],
+            ['', 'assets/style.'],
+            ['', 'assets/style'],
         ];
     }
 

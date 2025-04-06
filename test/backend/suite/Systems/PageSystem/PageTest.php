@@ -7,6 +7,7 @@ use \Peneus\Systems\PageSystem\Page;
 use \Harmonia\Config;
 use \Harmonia\Core\CSequentialArray;
 use \Peneus\Systems\PageSystem\LibraryManager;
+use \Peneus\Systems\PageSystem\PageManifest;
 use \Peneus\Systems\PageSystem\Renderer;
 use \TestToolkit\AccessHelper;
 
@@ -15,12 +16,14 @@ class PageTest extends TestCase
 {
     private ?Renderer $renderer = null;
     private ?LibraryManager $libraryManager = null;
+    private ?PageManifest $pageManifest = null;
     private ?Config $originalConfig = null;
 
     protected function setUp(): void
     {
         $this->renderer = $this->createMock(Renderer::class);
         $this->libraryManager = $this->createMock(LibraryManager::class);
+        $this->pageManifest = $this->createMock(PageManifest::class);
         $this->originalConfig =
             Config::ReplaceInstance($this->createMock(Config::class));
     }
@@ -35,7 +38,12 @@ class PageTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): Page
     {
         return $this->getMockBuilder(Page::class)
-            ->setConstructorArgs([$this->renderer, $this->libraryManager])
+            ->setConstructorArgs([
+                __DIR__,
+                $this->renderer,
+                $this->libraryManager,
+                $this->pageManifest
+            ])
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
@@ -100,6 +108,20 @@ class PageTest extends TestCase
             AccessHelper::GetMockProperty(Page::class, $sut, 'masterpage')
         );
     }
+
+    #endregion SetMasterpage
+
+    #region Id -----------------------------------------------------------------
+
+    function testId()
+    {
+        $sut = $this->systemUnderTest();
+
+        // Note that `$sut` was constructed with `__DIR__` in `systemUnderTest`.
+        $this->assertSame(\basename(__DIR__), $sut->Id());
+    }
+
+    #endregion Id
 
     #region Title --------------------------------------------------------------
 
@@ -293,6 +315,33 @@ class PageTest extends TestCase
 
     #endregion Content
 
+    #region IncludedLibraries --------------------------------------------------
+
+    function testIncludedLibraries()
+    {
+        $sut = $this->systemUnderTest();
+        $included = $this->createStub(CSequentialArray::class);
+
+        $this->libraryManager->expects($this->once())
+            ->method('Included')
+            ->willReturn($included);
+
+        $this->assertSame($included, $sut->IncludedLibraries());
+    }
+
+    #endregion IncludedLibraries
+
+    #region Manifest -----------------------------------------------------------
+
+    function testManifest()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->assertSame($this->pageManifest, $sut->Manifest());
+    }
+
+    #endregion Manifest
+
     #region Begin --------------------------------------------------------------
 
     function testBegin()
@@ -372,20 +421,4 @@ class PageTest extends TestCase
     }
 
     #endregion RemoveAllLibraries
-
-    #region IncludedLibraries --------------------------------------------------
-
-    function testIncludedLibraries()
-    {
-        $sut = $this->systemUnderTest();
-        $included = $this->createStub(CSequentialArray::class);
-
-        $this->libraryManager->expects($this->once())
-            ->method('Included')
-            ->willReturn($included);
-
-        $this->assertSame($included, $sut->IncludedLibraries());
-    }
-
-    #endregion IncludedLibraries
 }

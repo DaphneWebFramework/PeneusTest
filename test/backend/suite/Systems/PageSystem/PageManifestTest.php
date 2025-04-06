@@ -7,12 +7,26 @@ use \Peneus\Systems\PageSystem\PageManifest;
 
 use \Harmonia\Core\CFile;
 use \Harmonia\Core\CPath;
+use \Peneus\Resource;
 use \Peneus\Systems\PageSystem\Assets;
 use \TestToolkit\AccessHelper;
 
 #[CoversClass(PageManifest::class)]
 class PageManifestTest extends TestCase
 {
+    private ?Resource $originalResource = null;
+
+    protected function setUp(): void
+    {
+        $this->originalResource =
+            Resource::ReplaceInstance($this->createMock(Resource::class));
+    }
+
+    protected function tearDown(): void
+    {
+        Resource::ReplaceInstance($this->originalResource);
+    }
+
     private function systemUnderTest(string ...$mockedMethods): PageManifest
     {
         return $this->getMockBuilder(PageManifest::class)
@@ -26,15 +40,15 @@ class PageManifestTest extends TestCase
     function testConstructorStoresAssetsReturnedByLoadFile()
     {
         $sut = $this->systemUnderTest('loadFile');
-        $path = $this->createStub(CPath::class);
+        $pageId = 'mypage';
         $assets = $this->createStub(Assets::class);
 
         $sut->expects($this->once())
             ->method('loadFile')
-            ->with($path)
+            ->with($pageId)
             ->willReturn($assets);
 
-        $sut->__construct($path);
+        $sut->__construct($pageId);
 
         $this->assertSame($assets, AccessHelper::GetProperty($sut, 'assets'));
     }
@@ -77,14 +91,19 @@ class PageManifestTest extends TestCase
     function testLoadFileReturnsEmptyAssetsWhenFileCannotBeOpened()
     {
         $sut = $this->systemUnderTest('openFile');
-        $path = 'path/to/page';
+        $resource = Resource::Instance();
+        $pageId = 'mypage';
+        $manifestFilePath = CPath::Join('path/to', $pageId, 'manifest.json');
 
+        $resource->method('PageFilePath')
+            ->with($pageId, 'manifest.json')
+            ->willReturn($manifestFilePath);
         $sut->expects($this->once())
             ->method('openFile')
-            ->with($path . DIRECTORY_SEPARATOR . 'manifest.json')
+            ->with($manifestFilePath)
             ->willReturn(null);
 
-        $assets = AccessHelper::CallMethod($sut, 'loadFile', [$path]);
+        $assets = AccessHelper::CallMethod($sut, 'loadFile', [$pageId]);
         $this->assertInstanceOf(Assets::class, $assets);
         $this->assertSame([], $assets->Css());
         $this->assertSame([], $assets->Js());
@@ -94,12 +113,17 @@ class PageManifestTest extends TestCase
     function testLoadFileReturnsEmptyAssetsWhenFileCannotBeRead()
     {
         $sut = $this->systemUnderTest('openFile');
+        $resource = Resource::Instance();
         $file = $this->createMock(CFile::class);
-        $path = 'path/to/page';
+        $pageId = 'mypage';
+        $manifestFilePath = CPath::Join('path/to', $pageId, 'manifest.json');
 
+        $resource->method('PageFilePath')
+            ->with($pageId, 'manifest.json')
+            ->willReturn($manifestFilePath);
         $sut->expects($this->once())
             ->method('openFile')
-            ->with($path . DIRECTORY_SEPARATOR . 'manifest.json')
+            ->with($manifestFilePath)
             ->willReturn($file);
         $file->expects($this->once())
             ->method('Read')
@@ -107,7 +131,7 @@ class PageManifestTest extends TestCase
         $file->expects($this->once())
             ->method('Close');
 
-        $assets = AccessHelper::CallMethod($sut, 'loadFile', [$path]);
+        $assets = AccessHelper::CallMethod($sut, 'loadFile', [$pageId]);
         $this->assertSame([], $assets->Css());
         $this->assertSame([], $assets->Js());
         $this->assertSame([], $assets->Extras());
@@ -116,12 +140,17 @@ class PageManifestTest extends TestCase
     function testLoadFileReturnsEmptyAssetsWhenJsonCannotBeDecoded()
     {
         $sut = $this->systemUnderTest('openFile');
+        $resource = Resource::Instance();
         $file = $this->createMock(CFile::class);
-        $path = 'path/to/page';
+        $pageId = 'mypage';
+        $manifestFilePath = CPath::Join('path/to', $pageId, 'manifest.json');
 
+        $resource->method('PageFilePath')
+            ->with($pageId, 'manifest.json')
+            ->willReturn($manifestFilePath);
         $sut->expects($this->once())
             ->method('openFile')
-            ->with($path . DIRECTORY_SEPARATOR . 'manifest.json')
+            ->with($manifestFilePath)
             ->willReturn($file);
         $file->expects($this->once())
             ->method('Read')
@@ -129,7 +158,7 @@ class PageManifestTest extends TestCase
         $file->expects($this->once())
             ->method('Close');
 
-        $assets = AccessHelper::CallMethod($sut, 'loadFile', [$path]);
+        $assets = AccessHelper::CallMethod($sut, 'loadFile', [$pageId]);
         $this->assertSame([], $assets->Css());
         $this->assertSame([], $assets->Js());
         $this->assertSame([], $assets->Extras());
@@ -138,12 +167,17 @@ class PageManifestTest extends TestCase
     function testLoadFileReturnsParsedAssetsFromValidJson()
     {
         $sut = $this->systemUnderTest('openFile', 'validateAssetField');
+        $resource = Resource::Instance();
         $file = $this->createMock(CFile::class);
-        $path = 'path/to/page';
+        $pageId = 'mypage';
+        $manifestFilePath = CPath::Join('path/to', $pageId, 'manifest.json');
 
+        $resource->method('PageFilePath')
+            ->with($pageId, 'manifest.json')
+            ->willReturn($manifestFilePath);
         $sut->expects($this->once())
             ->method('openFile')
-            ->with($path . DIRECTORY_SEPARATOR . 'manifest.json')
+            ->with($manifestFilePath)
             ->willReturn($file);
         $file->expects($this->once())
             ->method('Read')
@@ -162,7 +196,7 @@ class PageManifestTest extends TestCase
                 return $data[$key] ?? null;
             });
 
-        $assets = AccessHelper::CallMethod($sut, 'loadFile', [$path]);
+        $assets = AccessHelper::CallMethod($sut, 'loadFile', [$pageId]);
         $this->assertSame(['index.css'], $assets->Css());
         $this->assertSame(['app.js'], $assets->Js());
         $this->assertSame(['extra.json'], $assets->Extras());
