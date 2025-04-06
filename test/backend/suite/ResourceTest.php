@@ -180,9 +180,29 @@ class ResourceTest extends TestCase
 
     #endregion FrontendLibraryFileUrl
 
-    #region PageUrl ------------------------------------------------------------
+    #region PageDirectoryPath --------------------------------------------------
 
-    function testPageUrl()
+    function testPageDirectoryPath()
+    {
+        $sut = $this->systemUnderTest();
+        $baseResource = _BaseResource::Instance();
+
+        $baseResource->expects($this->once())
+            ->method('AppSubdirectoryPath')
+            ->with('pages')
+            ->willReturn(new CPath('path/to/pages'));
+
+        $this->assertEquals(
+            'path/to/pages' . \DIRECTORY_SEPARATOR . 'mypage',
+            $sut->PageDirectoryPath('mypage')
+        );
+    }
+
+    #endregion PageDirectoryPath
+
+    #region PageDirectoryUrl ---------------------------------------------------
+
+    function testPageDirectoryUrl()
     {
         $sut = $this->systemUnderTest();
         $baseResource = _BaseResource::Instance();
@@ -194,9 +214,101 @@ class ResourceTest extends TestCase
 
         $this->assertEquals(
             'https://example.com/pages/mypage/',
-            $sut->PageUrl('mypage')
+            $sut->PageDirectoryUrl('mypage')
         );
     }
 
-    #endregion PageUrl
+    #endregion PageDirectoryUrl
+
+    #region PageFilePath -------------------------------------------------------
+
+    function testPageFilePath()
+    {
+        $sut = $this->systemUnderTest('PageDirectoryPath');
+        $pageId = 'mypage';
+        $relativePath = 'script.js';
+        $pageDirectoryPath = 'path/to/pages' . \DIRECTORY_SEPARATOR . $pageId;
+
+        $sut->expects($this->once())
+            ->method('PageDirectoryPath')
+            ->with($pageId)
+            ->willReturn(new CPath($pageDirectoryPath));
+
+        $this->assertEquals(
+            $pageDirectoryPath . \DIRECTORY_SEPARATOR . $relativePath,
+            $sut->PageFilePath($pageId, $relativePath)
+        );
+    }
+
+    #endregion PageFilePath
+
+    #region PageFileUrl --------------------------------------------------------
+
+    function testPageFileUrlAppendsCacheBuster()
+    {
+        $sut = $this->systemUnderTest('PageDirectoryUrl', 'PageFilePath');
+        $baseResource = _BaseResource::Instance();
+        $fileSystem = CFileSystem::Instance();
+        $pageId = 'mypage';
+        $relativePath = 'style.css';
+        $pageFilePath = "path/to/pages"
+            . \DIRECTORY_SEPARATOR
+            . $pageId
+            . \DIRECTORY_SEPARATOR
+            . $relativePath;
+        $pageDirectoryUrl = "https://example.com/pages/{$pageId}/";
+
+        $sut->expects($this->once())
+            ->method('PageDirectoryUrl')
+            ->with($pageId)
+            ->willReturn(new CUrl($pageDirectoryUrl));
+        $sut->expects($this->once())
+            ->method('PageFilePath')
+            ->with($pageId, $relativePath)
+            ->willReturn(new CPath($pageFilePath));
+        $fileSystem->expects($this->once())
+            ->method('ModificationTime')
+            ->with(new CPath($pageFilePath))
+            ->willReturn(1712345678);
+
+        $this->assertEquals(
+            "{$pageDirectoryUrl}{$relativePath}?1712345678",
+            $sut->PageFileUrl($pageId, $relativePath)
+        );
+    }
+
+    function testPageFileUrlWithoutCacheBusterIfFileMissing()
+    {
+        $sut = $this->systemUnderTest('PageDirectoryUrl', 'PageFilePath');
+        $baseResource = _BaseResource::Instance();
+        $fileSystem = CFileSystem::Instance();
+        $pageId = 'mypage';
+        $relativePath = 'style.css';
+        $pageFilePath = "path/to/pages"
+            . \DIRECTORY_SEPARATOR
+            . $pageId
+            . \DIRECTORY_SEPARATOR
+            . $relativePath;
+        $pageDirectoryUrl = "https://example.com/pages/{$pageId}/";
+
+        $sut->expects($this->once())
+            ->method('PageDirectoryUrl')
+            ->with($pageId)
+            ->willReturn(new CUrl($pageDirectoryUrl));
+        $sut->expects($this->once())
+            ->method('PageFilePath')
+            ->with($pageId, $relativePath)
+            ->willReturn(new CPath($pageFilePath));
+        $fileSystem->expects($this->once())
+            ->method('ModificationTime')
+            ->with(new CPath($pageFilePath))
+            ->willReturn(0); // simulates missing or unreadable file
+
+        $this->assertEquals(
+            "{$pageDirectoryUrl}{$relativePath}",
+            $sut->PageFileUrl($pageId, $relativePath)
+        );
+    }
+
+    #endregion PageFileUrl
 }
