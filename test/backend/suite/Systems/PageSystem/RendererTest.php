@@ -6,6 +6,7 @@ use \PHPUnit\Framework\Attributes\DataProvider;
 use \Peneus\Systems\PageSystem\Renderer;
 
 use \Harmonia\Config;
+use \Harmonia\Core\CArray;
 use \Harmonia\Core\CFile;
 use \Harmonia\Core\CPath;
 use \Harmonia\Core\CSequentialArray;
@@ -165,6 +166,7 @@ class RendererTest extends TestCase
             'pageStylesheetLinks',
             'libraryJavascriptLinks',
             'pageJavascriptLinks',
+            'renderMetaTags',
             '_echo'
         );
         $resource = Resource::Instance();
@@ -189,6 +191,7 @@ class RendererTest extends TestCase
                 <head>
                 	<meta charset="utf-8">
                 	<title>{{Title}}</title>
+                	{{MetaTags}}
                 	{{LibraryStylesheetLinks}}
                 	{{PageStylesheetLinks}}
                 </head>
@@ -212,25 +215,29 @@ class RendererTest extends TestCase
             ->method('IncludedLibraries')
             ->willReturn($libraries);
         $sut->expects($this->once())
+            ->method('renderMetaTags')
+            ->with($page->MetaItems())
+            ->willReturn("\t" . '<meta name="description" content="my description">');
+        $sut->expects($this->once())
             ->method('libraryStylesheetLinks')
             ->with($libraries)
-            ->willReturn('	<link rel="stylesheet" href="url/to/bootstrap-4.6.2/css/bootstrap.css">');
+            ->willReturn("\t" . '<link rel="stylesheet" href="url/to/bootstrap-4.6.2/css/bootstrap.css">');
         $sut->expects($this->once())
             ->method('pageStylesheetLinks')
             ->with($page)
-            ->willReturn('	<link rel="stylesheet" href="url/to/pages/home/style.css">');
+            ->willReturn("\t" . '<link rel="stylesheet" href="url/to/pages/home/style.css">');
         $sut->expects($this->once())
             ->method('content')
             ->with($page)
-            ->willReturn('	Welcome to MyWebsite!');
+            ->willReturn("\t" . 'Welcome to MyWebsite!');
         $sut->expects($this->once())
             ->method('libraryJavascriptLinks')
             ->with($libraries)
-            ->willReturn('	<script src="url/to/bootstrap-4.6.2/js/bootstrap.bundle.js"></script>');
+            ->willReturn("\t" . '<script src="url/to/bootstrap-4.6.2/js/bootstrap.bundle.js"></script>');
         $sut->expects($this->once())
             ->method('pageJavascriptLinks')
             ->with($page)
-            ->willReturn('	<script src="url/to/pages/home/script.js"></script>');
+            ->willReturn("\t" . '<script src="url/to/pages/home/script.js"></script>');
         $sut->expects($this->once())
             ->method('_echo')
             ->with(<<<HTML
@@ -239,6 +246,7 @@ class RendererTest extends TestCase
                 <head>
                 	<meta charset="utf-8">
                 	<title>Home | MyWebsite</title>
+                	<meta name="description" content="my description">
                 	<link rel="stylesheet" href="url/to/bootstrap-4.6.2/css/bootstrap.css">
                 	<link rel="stylesheet" href="url/to/pages/home/style.css">
                 </head>
@@ -351,6 +359,34 @@ class RendererTest extends TestCase
 
     #endregion content
 
+    #region renderMetaTags -----------------------------------------------------
+
+    function testRenderMetaTags()
+    {
+        $sut = $this->systemUnderTest();
+        $metaItems = new CArray([
+            'name' => new CArray([
+                'description' => 'my description',
+                'viewport' => 'my viewport'
+            ]),
+            'property' => new CArray([
+                'og:locale' => 'my locale',
+                'og:type' => 'website'
+            ])
+        ]);
+
+        $this->assertSame(
+            "\t" . '<meta name="description" content="my description">' . "\n"
+          . "\t" . '<meta name="viewport" content="my viewport">' . "\n"
+          . "\t" . '<meta property="og:locale" content="my locale">' . "\n"
+          . "\t" . '<meta property="og:type" content="website">'
+          , AccessHelper::CallMethod($sut, 'renderMetaTags', [$metaItems])
+        );
+    }
+
+    #endregion renderMetaTags
+
+
     #region libraryStylesheetLinks ---------------------------------------------
 
     function testLibraryStylesheetLinks()
@@ -364,10 +400,10 @@ class RendererTest extends TestCase
             });
 
         $this->assertSame(
-            "\t<link rel=\"stylesheet\" href=\"url/to/jquery-ui-1.12.1.custom/jquery-ui.css\">\n"
-          . "\t<link rel=\"stylesheet\" href=\"url/to/bootstrap-4.6.2/css/bootstrap.css\">\n"
-          . "\t<link rel=\"stylesheet\" href=\"url/to/bootstrap-icons-1.9.1/bootstrap-icons.css\">\n"
-          . "\t<link rel=\"stylesheet\" href=\"url/to/dataTables-1.11.3/css/dataTables.bootstrap4.css\">"
+            "\t" . '<link rel="stylesheet" href="url/to/jquery-ui-1.12.1.custom/jquery-ui.css">' . "\n"
+          . "\t" . '<link rel="stylesheet" href="url/to/bootstrap-4.6.2/css/bootstrap.css">' . "\n"
+          . "\t" . '<link rel="stylesheet" href="url/to/bootstrap-icons-1.9.1/bootstrap-icons.css">' . "\n"
+          . "\t" . '<link rel="stylesheet" href="url/to/dataTables-1.11.3/css/dataTables.bootstrap4.css">'
           , AccessHelper::CallMethod($sut, 'libraryStylesheetLinks', [$this->libraries()])
         );
     }
@@ -387,11 +423,11 @@ class RendererTest extends TestCase
             });
 
         $this->assertSame(
-            "\t<script src=\"url/to/jquery-3.5.1/jquery.js\"></script>\n"
-          . "\t<script src=\"url/to/jquery-ui-1.12.1.custom/jquery-ui.js\"></script>\n"
-          . "\t<script src=\"url/to/bootstrap-4.6.2/js/bootstrap.bundle.js\"></script>\n"
-          . "\t<script src=\"url/to/dataTables-1.11.3/js/jquery.dataTables.js\"></script>\n"
-          . "\t<script src=\"url/to/dataTables-1.11.3/js/dataTables.bootstrap4.js\"></script>"
+            "\t" . '<script src="url/to/jquery-3.5.1/jquery.js"></script>' . "\n"
+          . "\t" . '<script src="url/to/jquery-ui-1.12.1.custom/jquery-ui.js"></script>' . "\n"
+          . "\t" . '<script src="url/to/bootstrap-4.6.2/js/bootstrap.bundle.js"></script>' . "\n"
+          . "\t" . '<script src="url/to/dataTables-1.11.3/js/jquery.dataTables.js"></script>' . "\n"
+          . "\t" . '<script src="url/to/dataTables-1.11.3/js/dataTables.bootstrap4.js"></script>'
           , AccessHelper::CallMethod($sut, 'libraryJavascriptLinks', [$this->libraries()])
         );
     }
@@ -426,9 +462,9 @@ class RendererTest extends TestCase
             });
 
         $this->assertSame(
-            "\t<link rel=\"stylesheet\" href=\"https://cdn.example.com/fonts.css\">\n"
-          . "\t<link rel=\"stylesheet\" href=\"url/to/pages/home/index.css\">\n"
-          . "\t<link rel=\"stylesheet\" href=\"url/to/pages/home/theme.css\">"
+            "\t" . '<link rel="stylesheet" href="https://cdn.example.com/fonts.css">' . "\n"
+          . "\t" . '<link rel="stylesheet" href="url/to/pages/home/index.css">' . "\n"
+          . "\t" . '<link rel="stylesheet" href="url/to/pages/home/theme.css">'
           , AccessHelper::CallMethod($sut, 'pageStylesheetLinks', [$page])
         );
     }
@@ -466,9 +502,9 @@ class RendererTest extends TestCase
             ->willReturn(new CUrl('http://localhost/app/pages/home/page.min.css'));
 
         $this->assertSame(
-            "\t<link rel=\"stylesheet\" href=\"https://cdn.example.com/fonts.css\">\n"
-          . "\t<link rel=\"stylesheet\" href=\"http://localhost/app/pages/home/page.min.css\">",
-            AccessHelper::CallMethod($sut, 'pageStylesheetLinks', [$page])
+            "\t" . '<link rel="stylesheet" href="https://cdn.example.com/fonts.css">' . "\n"
+          . "\t" . '<link rel="stylesheet" href="http://localhost/app/pages/home/page.min.css">'
+          , AccessHelper::CallMethod($sut, 'pageStylesheetLinks', [$page])
         );
     }
 
@@ -502,11 +538,11 @@ class RendererTest extends TestCase
             });
 
         $this->assertSame(
-            "\t<script src=\"http://cdn.example.com/script.js\"></script>\n"
-          . "\t<script src=\"url/to/pages/home/Model.js\"></script>\n"
-          . "\t<script src=\"url/to/pages/home/View.js\"></script>\n"
-          . "\t<script src=\"url/to/pages/home/Controller.js\"></script>",
-            AccessHelper::CallMethod($sut, 'pageJavascriptLinks', [$page])
+            "\t" . '<script src="http://cdn.example.com/script.js"></script>' . "\n"
+          . "\t" . '<script src="url/to/pages/home/Model.js"></script>' . "\n"
+          . "\t" . '<script src="url/to/pages/home/View.js"></script>' . "\n"
+          . "\t" . '<script src="url/to/pages/home/Controller.js"></script>'
+          , AccessHelper::CallMethod($sut, 'pageJavascriptLinks', [$page])
         );
     }
 
@@ -543,8 +579,8 @@ class RendererTest extends TestCase
             ->willReturn(new CUrl('http://localhost/app/pages/home/page.min.js'));
 
         $this->assertSame(
-            "\t<script src=\"http://cdn.example.com/script.js\"></script>\n"
-          . "\t<script src=\"http://localhost/app/pages/home/page.min.js\"></script>"
+            "\t" . '<script src="http://cdn.example.com/script.js"></script>' . "\n"
+          . "\t" . '<script src="http://localhost/app/pages/home/page.min.js"></script>'
           , AccessHelper::CallMethod($sut, 'pageJavascriptLinks', [$page])
         );
     }

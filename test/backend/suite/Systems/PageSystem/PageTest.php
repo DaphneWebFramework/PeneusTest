@@ -351,16 +351,44 @@ class PageTest extends TestCase
 
     #region MetaItems ----------------------------------------------------------
 
-    function testMetaItems()
+    function testMetaItemsDoesNotInjectOgTitleIfAlreadyPresent()
     {
         $sut = $this->systemUnderTest();
-        $metaItems = $this->createStub(CArray::class);
+        $metas = $this->createStub(CArray::class);
 
         $this->metaCollection->expects($this->once())
+            ->method('Has')
+            ->with('og:title', 'property')
+            ->willReturn(true);
+        $this->metaCollection->expects($this->never())
+            ->method('Add');
+        $this->metaCollection->expects($this->once())
             ->method('Items')
-            ->willReturn($metaItems);
+            ->willReturn($metas);
 
-        $this->assertSame($metaItems, $sut->MetaItems());
+        $this->assertSame($metas, $sut->MetaItems());
+    }
+
+    function testMetaItemsInjectsOgTitleIfMissing()
+    {
+        $sut = $this->systemUnderTest('Title');
+        $metas = $this->createStub(CArray::class);
+
+        $sut->expects($this->once())
+            ->method('Title')
+            ->willReturn('My Title');
+        $this->metaCollection->expects($this->once())
+            ->method('Has')
+            ->with('og:title', 'property')
+            ->willReturn(false);
+        $this->metaCollection->expects($this->once())
+            ->method('Add')
+            ->with('og:title','My Title', 'property');
+        $this->metaCollection->expects($this->once())
+            ->method('Items')
+            ->willReturn($metas);
+
+        $this->assertSame($metas, $sut->MetaItems());
     }
 
     #endregion MetaItems

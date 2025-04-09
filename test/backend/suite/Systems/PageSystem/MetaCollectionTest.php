@@ -45,6 +45,40 @@ class MetaCollectionTest extends TestCase
 
     #endregion __construct
 
+    #region Has ----------------------------------------------------------------
+
+    function testHasReturnsTrueWhenMetaExists()
+    {
+        $sut = $this->systemUnderTest('addDefaults');
+
+        $sut->__construct();
+        $sut->Add('description', 'value');
+        $sut->Add('og:title', 'value', 'property');
+
+        $this->assertTrue($sut->Has('description', 'name'));
+        $this->assertTrue($sut->Has('og:title', 'property'));
+    }
+
+    function testHasReturnsFalseWhenTypeIsMissing()
+    {
+        $sut = $this->systemUnderTest('addDefaults');
+
+        $sut->__construct();
+        $this->assertFalse($sut->Has('og:title', 'property'));
+    }
+
+    function testHasReturnsFalseWhenNameIsMissingInType()
+    {
+        $sut = $this->systemUnderTest('addDefaults');
+
+        $sut->__construct();
+        $sut->Add('description', 'value'); // under 'name'
+        $this->assertFalse($sut->Has('viewport', 'name'));
+        $this->assertFalse($sut->Has('description', 'property'));
+    }
+
+    #endregion Has
+
     #region Add ---------------------------------------------------------------
 
     function testAddStoresMetaUnderCorrectType()
@@ -92,7 +126,7 @@ class MetaCollectionTest extends TestCase
         $sut->Add('description', 'my description');
         $sut->Remove('description', 'name');
 
-        $this->assertFalse($sut->Items()->Has('name'));
+        $this->assertFalse($sut->Has('description', 'name'));
     }
 
     function testRemoveDeletesMetaButKeepsOtherTypes()
@@ -104,8 +138,8 @@ class MetaCollectionTest extends TestCase
         $sut->Add('og:title', 'title', 'property');
         $sut->Remove('description', 'name');
 
-        $this->assertFalse($sut->Items()->Has('name'));
-        $this->assertSame('title', $sut->Items()->Get('property')->Get('og:title'));
+        $this->assertFalse($sut->Has('description', 'name'));
+        $this->assertTrue($sut->Has('og:title', 'property'));
     }
 
     #endregion Remove
@@ -166,6 +200,7 @@ class MetaCollectionTest extends TestCase
         AccessHelper::CallMethod($sut, 'addDefaults');
 
         $this->assertSame('my description', $items->Get('name')->Get('description'));
+        $this->assertSame('my description', $items->Get('property')->Get('og:description'));
         $this->assertSame('my viewport', $items->Get('name')->Get('viewport'));
         $this->assertSame('my locale', $items->Get('property')->Get('og:locale'));
         $this->assertSame('website', $items->Get('property')->Get('og:type'));
@@ -188,7 +223,8 @@ class MetaCollectionTest extends TestCase
         AccessHelper::SetMockProperty(MetaCollection::class, $sut, 'items', $items);
         AccessHelper::CallMethod($sut, 'addDefaults');
 
-        $this->assertFalse($items->Get('name')->Has('description'));
+        $this->assertFalse($sut->Has('description', 'name'));
+        $this->assertFalse($sut->Has('og:description', 'property'));
         $this->assertSame('my viewport', $items->Get('name')->Get('viewport'));
         $this->assertSame('my locale', $items->Get('property')->Get('og:locale'));
         $this->assertSame('website', $items->Get('property')->Get('og:type'));
@@ -212,7 +248,7 @@ class MetaCollectionTest extends TestCase
         AccessHelper::CallMethod($sut, 'addDefaults');
 
         $this->assertSame('my description', $items->Get('name')->Get('description'));
-        $this->assertFalse($items->Get('name')->Has('viewport'));
+        $this->assertFalse($sut->Has('viewport', 'name'));
         $this->assertSame('my locale', $items->Get('property')->Get('og:locale'));
         $this->assertSame('website', $items->Get('property')->Get('og:type'));
     }
@@ -236,7 +272,7 @@ class MetaCollectionTest extends TestCase
 
         $this->assertSame('my description', $items->Get('name')->Get('description'));
         $this->assertSame('my viewport', $items->Get('name')->Get('viewport'));
-        $this->assertFalse($items->Get('property')->Has('og:locale'));
+        $this->assertFalse($sut->Has('og:locale', 'property'));
         $this->assertSame('website', $items->Get('property')->Get('og:type'));
     }
 
