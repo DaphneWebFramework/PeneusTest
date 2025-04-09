@@ -5,8 +5,10 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 use \Peneus\Systems\PageSystem\Page;
 
 use \Harmonia\Config;
+use \Harmonia\Core\CArray;
 use \Harmonia\Core\CSequentialArray;
 use \Peneus\Systems\PageSystem\LibraryManager;
+use \Peneus\Systems\PageSystem\MetaCollection;
 use \Peneus\Systems\PageSystem\PageManifest;
 use \Peneus\Systems\PageSystem\Renderer;
 use \TestToolkit\AccessHelper;
@@ -17,6 +19,7 @@ class PageTest extends TestCase
     private ?Renderer $renderer = null;
     private ?LibraryManager $libraryManager = null;
     private ?PageManifest $pageManifest = null;
+    private ?MetaCollection $metaCollection = null;
     private ?Config $originalConfig = null;
 
     protected function setUp(): void
@@ -24,6 +27,7 @@ class PageTest extends TestCase
         $this->renderer = $this->createMock(Renderer::class);
         $this->libraryManager = $this->createMock(LibraryManager::class);
         $this->pageManifest = $this->createMock(PageManifest::class);
+        $this->metaCollection = $this->createMock(MetaCollection::class);
         $this->originalConfig =
             Config::ReplaceInstance($this->createMock(Config::class));
     }
@@ -32,6 +36,8 @@ class PageTest extends TestCase
     {
         $this->renderer = null;
         $this->libraryManager = null;
+        $this->pageManifest = null;
+        $this->metaCollection = null;
         Config::ReplaceInstance($this->originalConfig);
     }
 
@@ -42,7 +48,8 @@ class PageTest extends TestCase
                 __DIR__,
                 $this->renderer,
                 $this->libraryManager,
-                $this->pageManifest
+                $this->pageManifest,
+                $this->metaCollection
             ])
             ->onlyMethods($mockedMethods)
             ->getMock();
@@ -342,6 +349,22 @@ class PageTest extends TestCase
 
     #endregion Manifest
 
+    #region MetaItems ----------------------------------------------------------
+
+    function testMetaItems()
+    {
+        $sut = $this->systemUnderTest();
+        $metaItems = $this->createStub(CArray::class);
+
+        $this->metaCollection->expects($this->once())
+            ->method('Items')
+            ->willReturn($metaItems);
+
+        $this->assertSame($metaItems, $sut->MetaItems());
+    }
+
+    #endregion MetaItems
+
     #region Begin --------------------------------------------------------------
 
     function testBegin()
@@ -421,4 +444,48 @@ class PageTest extends TestCase
     }
 
     #endregion RemoveAllLibraries
+
+    #region AddMeta ------------------------------------------------------------
+
+    function testAddMeta()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->metaCollection->expects($this->once())
+            ->method('Add')
+            ->with('description', 'my description', 'name');
+
+        $this->assertSame($sut, $sut->AddMeta('description', 'my description'));
+    }
+
+    #endregion AddMeta
+
+    #region RemoveMeta ---------------------------------------------------------
+
+    function testRemoveMeta()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->metaCollection->expects($this->once())
+            ->method('Remove')
+            ->with('description', 'name');
+
+        $this->assertSame($sut, $sut->RemoveMeta('description', 'name'));
+    }
+
+    #endregion RemoveMeta
+
+    #region RemoveAllMetas -----------------------------------------------------
+
+    function testRemoveAllMetas()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->metaCollection->expects($this->once())
+            ->method('RemoveAll');
+
+        $this->assertSame($sut, $sut->RemoveAllMetas());
+    }
+
+    #endregion RemoveAllMetas
 }

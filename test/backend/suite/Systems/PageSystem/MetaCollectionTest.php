@@ -84,7 +84,7 @@ class MetaCollectionTest extends TestCase
         $this->assertTrue($sut->Items()->IsEmpty());
     }
 
-    function testRemoveDeletesMetaTag()
+    function testRemoveDeletesMeta()
     {
         $sut = $this->systemUnderTest('addDefaults');
 
@@ -95,7 +95,7 @@ class MetaCollectionTest extends TestCase
         $this->assertFalse($sut->Items()->Has('name'));
     }
 
-    function testRemoveDeletesMetaTagButKeepsOtherTypes()
+    function testRemoveDeletesMetaButKeepsOtherTypes()
     {
         $sut = $this->systemUnderTest('addDefaults');
 
@@ -110,16 +110,16 @@ class MetaCollectionTest extends TestCase
 
     #endregion Remove
 
-    #region Clear -------------------------------------------------------------
+    #region RemoveAll ----------------------------------------------------------
 
-    function testClearRemovesAllEntries()
+    function testRemoveAllDeletesAllMetas()
     {
         $sut = $this->systemUnderTest('addDefaults');
 
         $sut->__construct();
         $sut->Add('description', 'my description');
         $sut->Add('og:title', 'title', 'property');
-        $sut->Clear();
+        $sut->RemoveAll();
 
         $this->assertTrue($sut->Items()->IsEmpty());
     }
