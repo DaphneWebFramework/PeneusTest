@@ -361,7 +361,7 @@ class PageTest extends TestCase
             ->with('og:title', 'property')
             ->willReturn(true);
         $this->metaCollection->expects($this->never())
-            ->method('Add');
+            ->method('Set');
         $this->metaCollection->expects($this->once())
             ->method('Items')
             ->willReturn($metas);
@@ -382,7 +382,7 @@ class PageTest extends TestCase
             ->with('og:title', 'property')
             ->willReturn(false);
         $this->metaCollection->expects($this->once())
-            ->method('Add')
+            ->method('Set')
             ->with('og:title','My Title', 'property');
         $this->metaCollection->expects($this->once())
             ->method('Items')
@@ -473,20 +473,31 @@ class PageTest extends TestCase
 
     #endregion RemoveAllLibraries
 
-    #region AddMeta ------------------------------------------------------------
+    #region SetMeta ------------------------------------------------------------
 
-    function testAddMeta()
+    function testSetMetaWithDefaultType()
     {
         $sut = $this->systemUnderTest();
 
         $this->metaCollection->expects($this->once())
-            ->method('Add')
+            ->method('Set')
             ->with('description', 'my description', 'name');
 
-        $this->assertSame($sut, $sut->AddMeta('description', 'my description'));
+        $this->assertSame($sut, $sut->SetMeta('description', 'my description'));
     }
 
-    #endregion AddMeta
+    function testSetMetaWithCustomType()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->metaCollection->expects($this->once())
+            ->method('Set')
+            ->with('og:title', 'my title', 'property');
+
+        $this->assertSame($sut, $sut->SetMeta('og:title', 'my title', 'property'));
+    }
+
+    #endregion SetMeta
 
     #region RemoveMeta ---------------------------------------------------------
 

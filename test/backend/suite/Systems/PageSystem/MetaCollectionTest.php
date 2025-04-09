@@ -33,12 +33,12 @@ class MetaCollectionTest extends TestCase
 
     #region __construct --------------------------------------------------------
 
-    function testConstructorCallsAddDefaults()
+    function testConstructorCallsSetDefaults()
     {
-        $sut = $this->systemUnderTest('addDefaults');
+        $sut = $this->systemUnderTest('setDefaults');
 
         $sut->expects($this->once())
-            ->method('addDefaults');
+            ->method('setDefaults');
 
         $sut->__construct();
     }
@@ -49,11 +49,11 @@ class MetaCollectionTest extends TestCase
 
     function testHasReturnsTrueWhenMetaExists()
     {
-        $sut = $this->systemUnderTest('addDefaults');
+        $sut = $this->systemUnderTest('setDefaults');
 
         $sut->__construct();
-        $sut->Add('description', 'value');
-        $sut->Add('og:title', 'value', 'property');
+        $sut->Set('description', 'value');
+        $sut->Set('og:title', 'value', 'property');
 
         $this->assertTrue($sut->Has('description', 'name'));
         $this->assertTrue($sut->Has('og:title', 'property'));
@@ -61,7 +61,7 @@ class MetaCollectionTest extends TestCase
 
     function testHasReturnsFalseWhenTypeIsMissing()
     {
-        $sut = $this->systemUnderTest('addDefaults');
+        $sut = $this->systemUnderTest('setDefaults');
 
         $sut->__construct();
         $this->assertFalse($sut->Has('og:title', 'property'));
@@ -69,48 +69,48 @@ class MetaCollectionTest extends TestCase
 
     function testHasReturnsFalseWhenNameIsMissingInType()
     {
-        $sut = $this->systemUnderTest('addDefaults');
+        $sut = $this->systemUnderTest('setDefaults');
 
         $sut->__construct();
-        $sut->Add('description', 'value'); // under 'name'
+        $sut->Set('description', 'value'); // under 'name'
         $this->assertFalse($sut->Has('viewport', 'name'));
         $this->assertFalse($sut->Has('description', 'property'));
     }
 
     #endregion Has
 
-    #region Add ---------------------------------------------------------------
+    #region Set ---------------------------------------------------------------
 
-    function testAddStoresMetaUnderCorrectType()
+    function testSetStoresMetaUnderCorrectType()
     {
-        $sut = $this->systemUnderTest('addDefaults');
+        $sut = $this->systemUnderTest('setDefaults');
 
         $sut->__construct();
-        $sut->Add('description', 'my description');
-        $sut->Add('og:title', 'title', 'property');
+        $sut->Set('description', 'my description');
+        $sut->Set('og:title', 'title', 'property');
 
         $this->assertSame('my description', $sut->Items()->Get('name')->Get('description'));
         $this->assertSame('title', $sut->Items()->Get('property')->Get('og:title'));
     }
 
-    function testAddReplacesExistingMetaOfSameType()
+    function testSetReplacesExistingMetaOfSameType()
     {
-        $sut = $this->systemUnderTest('addDefaults');
+        $sut = $this->systemUnderTest('setDefaults');
 
         $sut->__construct();
-        $sut->Add('description', 'original');
-        $sut->Add('description', 'updated');
+        $sut->Set('description', 'original');
+        $sut->Set('description', 'updated');
 
         $this->assertSame('updated', $sut->Items()->Get('name')->Get('description'));
     }
 
-    #endregion Add
+    #endregion Set
 
     #region Remove ------------------------------------------------------------
 
     function testRemoveIgnoresMissingMeta()
     {
-        $sut = $this->systemUnderTest('addDefaults');
+        $sut = $this->systemUnderTest('setDefaults');
 
         $sut->__construct();
         $sut->Remove('does-not-exist', 'name');
@@ -120,10 +120,10 @@ class MetaCollectionTest extends TestCase
 
     function testRemoveDeletesMeta()
     {
-        $sut = $this->systemUnderTest('addDefaults');
+        $sut = $this->systemUnderTest('setDefaults');
 
         $sut->__construct();
-        $sut->Add('description', 'my description');
+        $sut->Set('description', 'my description');
         $sut->Remove('description', 'name');
 
         $this->assertFalse($sut->Has('description', 'name'));
@@ -131,11 +131,11 @@ class MetaCollectionTest extends TestCase
 
     function testRemoveDeletesMetaButKeepsOtherTypes()
     {
-        $sut = $this->systemUnderTest('addDefaults');
+        $sut = $this->systemUnderTest('setDefaults');
 
         $sut->__construct();
-        $sut->Add('description', 'my description');
-        $sut->Add('og:title', 'title', 'property');
+        $sut->Set('description', 'my description');
+        $sut->Set('og:title', 'title', 'property');
         $sut->Remove('description', 'name');
 
         $this->assertFalse($sut->Has('description', 'name'));
@@ -148,11 +148,11 @@ class MetaCollectionTest extends TestCase
 
     function testRemoveAllDeletesAllMetas()
     {
-        $sut = $this->systemUnderTest('addDefaults');
+        $sut = $this->systemUnderTest('setDefaults');
 
         $sut->__construct();
-        $sut->Add('description', 'my description');
-        $sut->Add('og:title', 'title', 'property');
+        $sut->Set('description', 'my description');
+        $sut->Set('og:title', 'title', 'property');
         $sut->RemoveAll();
 
         $this->assertTrue($sut->Items()->IsEmpty());
@@ -164,11 +164,11 @@ class MetaCollectionTest extends TestCase
 
     function testItemsReturnsGroupedStructure()
     {
-        $sut = $this->systemUnderTest('addDefaults');
+        $sut = $this->systemUnderTest('setDefaults');
 
         $sut->__construct();
-        $sut->Add('viewport', 'my viewport');
-        $sut->Add('og:type', 'website', 'property');
+        $sut->Set('viewport', 'my viewport');
+        $sut->Set('og:type', 'website', 'property');
 
         $items = $sut->Items();
         $this->assertInstanceOf(CArray::class, $items);
@@ -180,9 +180,9 @@ class MetaCollectionTest extends TestCase
 
     #endregion Items
 
-    #region addDefaults --------------------------------------------------------
+    #region setDefaults --------------------------------------------------------
 
-    function testAddDefaultsReadsFromConfig()
+    function testSetDefaultsReadsFromConfig()
     {
         $sut = $this->systemUnderTest();
         $config = Config::Instance();
@@ -197,7 +197,7 @@ class MetaCollectionTest extends TestCase
             ]);
 
         AccessHelper::SetMockProperty(MetaCollection::class, $sut, 'items', $items);
-        AccessHelper::CallMethod($sut, 'addDefaults');
+        AccessHelper::CallMethod($sut, 'setDefaults');
 
         $this->assertSame('my description', $items->Get('name')->Get('description'));
         $this->assertSame('my description', $items->Get('property')->Get('og:description'));
@@ -206,7 +206,7 @@ class MetaCollectionTest extends TestCase
         $this->assertSame('website', $items->Get('property')->Get('og:type'));
     }
 
-    function testAddDefaultsSkipsUnsetDescription()
+    function testSetDefaultsSkipsUnsetDescription()
     {
         $sut = $this->systemUnderTest();
         $config = Config::Instance();
@@ -221,7 +221,7 @@ class MetaCollectionTest extends TestCase
             ]);
 
         AccessHelper::SetMockProperty(MetaCollection::class, $sut, 'items', $items);
-        AccessHelper::CallMethod($sut, 'addDefaults');
+        AccessHelper::CallMethod($sut, 'setDefaults');
 
         $this->assertFalse($sut->Has('description', 'name'));
         $this->assertFalse($sut->Has('og:description', 'property'));
@@ -230,7 +230,7 @@ class MetaCollectionTest extends TestCase
         $this->assertSame('website', $items->Get('property')->Get('og:type'));
     }
 
-    function testAddDefaultsSkipsUnsetViewport()
+    function testSetDefaultsSkipsUnsetViewport()
     {
         $sut = $this->systemUnderTest();
         $config = Config::Instance();
@@ -245,7 +245,7 @@ class MetaCollectionTest extends TestCase
             ]);
 
         AccessHelper::SetMockProperty(MetaCollection::class, $sut, 'items', $items);
-        AccessHelper::CallMethod($sut, 'addDefaults');
+        AccessHelper::CallMethod($sut, 'setDefaults');
 
         $this->assertSame('my description', $items->Get('name')->Get('description'));
         $this->assertFalse($sut->Has('viewport', 'name'));
@@ -253,7 +253,7 @@ class MetaCollectionTest extends TestCase
         $this->assertSame('website', $items->Get('property')->Get('og:type'));
     }
 
-    function testAddDefaultsSkipsUnsetLocale()
+    function testSetDefaultsSkipsUnsetLocale()
     {
         $sut = $this->systemUnderTest();
         $config = Config::Instance();
@@ -268,7 +268,7 @@ class MetaCollectionTest extends TestCase
             ]);
 
         AccessHelper::SetMockProperty(MetaCollection::class, $sut, 'items', $items);
-        AccessHelper::CallMethod($sut, 'addDefaults');
+        AccessHelper::CallMethod($sut, 'setDefaults');
 
         $this->assertSame('my description', $items->Get('name')->Get('description'));
         $this->assertSame('my viewport', $items->Get('name')->Get('viewport'));
@@ -276,5 +276,5 @@ class MetaCollectionTest extends TestCase
         $this->assertSame('website', $items->Get('property')->Get('og:type'));
     }
 
-    #endregion addDefaults
+    #endregion setDefaults
 }
