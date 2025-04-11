@@ -6,21 +6,28 @@ use \Peneus\Systems\PageSystem\MetaCollection;
 
 use \Harmonia\Config;
 use \Harmonia\Core\CArray;
+use \Harmonia\Core\CUrl;
+use \Harmonia\Resource;
 use \TestToolkit\AccessHelper;
 
 #[CoversClass(MetaCollection::class)]
 class MetaCollectionTest extends TestCase
 {
     private ?Config $originalConfig = null;
+    private ?Resource $originalResource = null;
 
     protected function setUp(): void
     {
-        $this->originalConfig = Config::ReplaceInstance($this->createMock(Config::class));
+        $this->originalConfig =
+            Config::ReplaceInstance($this->createMock(Config::class));
+        $this->originalResource =
+            Resource::ReplaceInstance($this->createMock(Resource::class));
     }
 
     protected function tearDown(): void
     {
         Config::ReplaceInstance($this->originalConfig);
+        Resource::ReplaceInstance($this->originalResource);
     }
 
     private function systemUnderTest(string ...$mockedMethods): MetaCollection
@@ -186,6 +193,7 @@ class MetaCollectionTest extends TestCase
     {
         $sut = $this->systemUnderTest();
         $config = Config::Instance();
+        $resource = Resource::Instance();
         $items = new CArray();
 
         $config->expects($this->exactly(3))
@@ -195,6 +203,10 @@ class MetaCollectionTest extends TestCase
                 ['Viewport', 'my viewport'],
                 ['Locale', 'my locale']
             ]);
+        $resource->expects($this->once())
+            ->method('AppSubdirectoryUrl')
+            ->with('api')
+            ->willReturn(new CUrl('https://example.com/api/'));
 
         AccessHelper::SetMockProperty(MetaCollection::class, $sut, 'items', $items);
         AccessHelper::CallMethod($sut, 'setDefaults');
@@ -204,6 +216,7 @@ class MetaCollectionTest extends TestCase
         $this->assertSame('my viewport', $items->Get('name')->Get('viewport'));
         $this->assertSame('my locale', $items->Get('property')->Get('og:locale'));
         $this->assertSame('website', $items->Get('property')->Get('og:type'));
+        $this->assertSame('https://example.com/api/', $items->Get('name')->Get('app:api-url'));
     }
 
     function testSetDefaultsSkipsUnsetDescription()
