@@ -55,6 +55,18 @@ class PageTest extends TestCase
             ->getMock();
     }
 
+    #region Id -----------------------------------------------------------------
+
+    function testId()
+    {
+        $sut = $this->systemUnderTest();
+
+        // Note that `$sut` was constructed with `__DIR__` in `systemUnderTest`.
+        $this->assertSame(\basename(__DIR__), $sut->Id());
+    }
+
+    #endregion Id
+
     #region SetTitle -----------------------------------------------------------
 
     function testSetTitle()
@@ -96,39 +108,6 @@ class PageTest extends TestCase
     }
 
     #endregion SetTitleTemplate
-
-    #region SetMasterpage ------------------------------------------------------
-
-    function testSetMasterpage()
-    {
-        $sut = $this->systemUnderTest();
-
-        // Test default value
-        $this->assertSame(
-            '',
-            AccessHelper::GetMockProperty(Page::class, $sut, 'masterpage')
-        );
-
-        $this->assertSame($sut, $sut->SetMasterpage('basic'));
-        $this->assertSame(
-            'basic',
-            AccessHelper::GetMockProperty(Page::class, $sut, 'masterpage')
-        );
-    }
-
-    #endregion SetMasterpage
-
-    #region Id -----------------------------------------------------------------
-
-    function testId()
-    {
-        $sut = $this->systemUnderTest();
-
-        // Note that `$sut` was constructed with `__DIR__` in `systemUnderTest`.
-        $this->assertSame(\basename(__DIR__), $sut->Id());
-    }
-
-    #endregion Id
 
     #region Title --------------------------------------------------------------
 
@@ -286,6 +265,27 @@ class PageTest extends TestCase
 
     #endregion Title
 
+    #region SetMasterpage ------------------------------------------------------
+
+    function testSetMasterpage()
+    {
+        $sut = $this->systemUnderTest();
+
+        // Test default value
+        $this->assertSame(
+            '',
+            AccessHelper::GetMockProperty(Page::class, $sut, 'masterpage')
+        );
+
+        $this->assertSame($sut, $sut->SetMasterpage('basic'));
+        $this->assertSame(
+            'basic',
+            AccessHelper::GetMockProperty(Page::class, $sut, 'masterpage')
+        );
+    }
+
+    #endregion SetMasterpage
+
     #region Masterpage ---------------------------------------------------------
 
     function testMasterpage()
@@ -321,77 +321,6 @@ class PageTest extends TestCase
     }
 
     #endregion Content
-
-    #region IncludedLibraries --------------------------------------------------
-
-    function testIncludedLibraries()
-    {
-        $sut = $this->systemUnderTest();
-        $included = $this->createStub(CSequentialArray::class);
-
-        $this->libraryManager->expects($this->once())
-            ->method('Included')
-            ->willReturn($included);
-
-        $this->assertSame($included, $sut->IncludedLibraries());
-    }
-
-    #endregion IncludedLibraries
-
-    #region Manifest -----------------------------------------------------------
-
-    function testManifest()
-    {
-        $sut = $this->systemUnderTest();
-
-        $this->assertSame($this->pageManifest, $sut->Manifest());
-    }
-
-    #endregion Manifest
-
-    #region MetaItems ----------------------------------------------------------
-
-    function testMetaItemsDoesNotInjectOgTitleIfAlreadyPresent()
-    {
-        $sut = $this->systemUnderTest();
-        $metas = $this->createStub(CArray::class);
-
-        $this->metaCollection->expects($this->once())
-            ->method('Has')
-            ->with('og:title', 'property')
-            ->willReturn(true);
-        $this->metaCollection->expects($this->never())
-            ->method('Set');
-        $this->metaCollection->expects($this->once())
-            ->method('Items')
-            ->willReturn($metas);
-
-        $this->assertSame($metas, $sut->MetaItems());
-    }
-
-    function testMetaItemsInjectsOgTitleIfMissing()
-    {
-        $sut = $this->systemUnderTest('Title');
-        $metas = $this->createStub(CArray::class);
-
-        $sut->expects($this->once())
-            ->method('Title')
-            ->willReturn('My Title');
-        $this->metaCollection->expects($this->once())
-            ->method('Has')
-            ->with('og:title', 'property')
-            ->willReturn(false);
-        $this->metaCollection->expects($this->once())
-            ->method('Set')
-            ->with('og:title','My Title', 'property');
-        $this->metaCollection->expects($this->once())
-            ->method('Items')
-            ->willReturn($metas);
-
-        $this->assertSame($metas, $sut->MetaItems());
-    }
-
-    #endregion MetaItems
 
     #region Begin --------------------------------------------------------------
 
@@ -473,6 +402,33 @@ class PageTest extends TestCase
 
     #endregion RemoveAllLibraries
 
+    #region IncludedLibraries --------------------------------------------------
+
+    function testIncludedLibraries()
+    {
+        $sut = $this->systemUnderTest();
+        $included = $this->createStub(CSequentialArray::class);
+
+        $this->libraryManager->expects($this->once())
+            ->method('Included')
+            ->willReturn($included);
+
+        $this->assertSame($included, $sut->IncludedLibraries());
+    }
+
+    #endregion IncludedLibraries
+
+    #region Manifest -----------------------------------------------------------
+
+    function testManifest()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->assertSame($this->pageManifest, $sut->Manifest());
+    }
+
+    #endregion Manifest
+
     #region SetMeta ------------------------------------------------------------
 
     function testSetMetaWithDefaultType()
@@ -527,4 +483,48 @@ class PageTest extends TestCase
     }
 
     #endregion RemoveAllMetas
+
+    #region MetaItems ----------------------------------------------------------
+
+    function testMetaItemsDoesNotInjectOgTitleIfAlreadyPresent()
+    {
+        $sut = $this->systemUnderTest();
+        $metas = $this->createStub(CArray::class);
+
+        $this->metaCollection->expects($this->once())
+            ->method('Has')
+            ->with('og:title', 'property')
+            ->willReturn(true);
+        $this->metaCollection->expects($this->never())
+            ->method('Set');
+        $this->metaCollection->expects($this->once())
+            ->method('Items')
+            ->willReturn($metas);
+
+        $this->assertSame($metas, $sut->MetaItems());
+    }
+
+    function testMetaItemsInjectsOgTitleIfMissing()
+    {
+        $sut = $this->systemUnderTest('Title');
+        $metas = $this->createStub(CArray::class);
+
+        $sut->expects($this->once())
+            ->method('Title')
+            ->willReturn('My Title');
+        $this->metaCollection->expects($this->once())
+            ->method('Has')
+            ->with('og:title', 'property')
+            ->willReturn(false);
+        $this->metaCollection->expects($this->once())
+            ->method('Set')
+            ->with('og:title','My Title', 'property');
+        $this->metaCollection->expects($this->once())
+            ->method('Items')
+            ->willReturn($metas);
+
+        $this->assertSame($metas, $sut->MetaItems());
+    }
+
+    #endregion MetaItems
 }
