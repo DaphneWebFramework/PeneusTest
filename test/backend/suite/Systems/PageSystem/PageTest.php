@@ -7,6 +7,10 @@ use \Peneus\Systems\PageSystem\Page;
 use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Core\CSequentialArray;
+use \Harmonia\Services\CookieService;
+use \Harmonia\Services\Security\CsrfToken;
+use \Harmonia\Services\SecurityService;
+use \Peneus\Api\Guards\FormTokenGuard;
 use \Peneus\Systems\PageSystem\LibraryManager;
 use \Peneus\Systems\PageSystem\MetaCollection;
 use \Peneus\Systems\PageSystem\PageManifest;
@@ -21,6 +25,8 @@ class PageTest extends TestCase
     private ?PageManifest $pageManifest = null;
     private ?MetaCollection $metaCollection = null;
     private ?Config $originalConfig = null;
+    private ?SecurityService $originalSecurityService = null;
+    private ?CookieService $originalCookieService = null;
 
     protected function setUp(): void
     {
@@ -30,6 +36,10 @@ class PageTest extends TestCase
         $this->metaCollection = $this->createMock(MetaCollection::class);
         $this->originalConfig =
             Config::ReplaceInstance($this->createMock(Config::class));
+        $this->originalSecurityService =
+            SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
+        $this->originalCookieService =
+            CookieService::ReplaceInstance($this->createMock(CookieService::class));
     }
 
     protected function tearDown(): void
@@ -39,6 +49,8 @@ class PageTest extends TestCase
         $this->pageManifest = null;
         $this->metaCollection = null;
         Config::ReplaceInstance($this->originalConfig);
+        SecurityService::ReplaceInstance($this->originalSecurityService);
+        CookieService::ReplaceInstance($this->originalCookieService);
     }
 
     private function systemUnderTest(string ...$mockedMethods): Page
@@ -527,4 +539,42 @@ class PageTest extends TestCase
     }
 
     #endregion MetaItems
+
+    #region CsrfTokenName ------------------------------------------------------
+
+    function testCsrfTokenName()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->assertSame(FormTokenGuard::TOKEN_FIELD, $sut->CsrfTokenName());
+    }
+
+    #endregion CsrfTokenName
+
+    #region CsrfTokenValue -----------------------------------------------------
+
+    function testCsrfTokenValue()
+    {
+        $sut = $this->systemUnderTest();
+        $securityService = SecurityService::Instance();
+        $cookieService = CookieService::Instance();
+        $csrfToken = $this->createMock(CsrfToken::class);
+
+        $securityService->expects($this->once())
+            ->method('GenerateCsrfToken')
+            ->willReturn($csrfToken);
+        $csrfToken->expects($this->once())
+            ->method('CookieValue')
+            ->willReturn('cookie-value');
+        $cookieService->expects($this->once())
+            ->method('SetCsrfCookie')
+            ->with('cookie-value');
+        $csrfToken->expects($this->once())
+            ->method('Token')
+            ->willReturn('token-value');
+
+        $this->assertSame('token-value', $sut->CsrfTokenValue());
+    }
+
+    #endregion CsrfTokenValue
 }
