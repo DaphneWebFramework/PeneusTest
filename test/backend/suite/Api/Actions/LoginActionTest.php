@@ -108,7 +108,7 @@ class LoginActionTest extends TestCase
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfUsernameIsMissing()
+    function testOnExecuteThrowsIfEmailIsMissing()
     {
         $loginAction = $this->systemUnderTest();
         $request = Request::Instance();
@@ -120,11 +120,33 @@ class LoginActionTest extends TestCase
         $formParams->expects($this->once())
             ->method('ToArray')
             ->willReturn([
-                'password' => 'pass123'
+                'password' => 'pass1234'
             ]);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Required field 'username' is missing.");
+        $this->expectExceptionMessage("Required field 'email' is missing.");
+        AccessHelper::CallMethod($loginAction, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfEmailIsInvalid()
+    {
+        $loginAction = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'email' => 'invalid-email',
+                'password' => 'pass1234'
+            ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(
+            "Field 'email' must be a valid email address.");
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
 
@@ -140,11 +162,55 @@ class LoginActionTest extends TestCase
         $formParams->expects($this->once())
             ->method('ToArray')
             ->willReturn([
-                'username' => 'john'
+                'email' => 'john@example.com'
             ]);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Required field 'password' is missing.");
+        AccessHelper::CallMethod($loginAction, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfPasswordLengthIsLessThanMinimum()
+    {
+        $loginAction = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'email' => 'john@example.com',
+                'password' => '1234567'
+            ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(
+            "Field 'password' must have a minimum length of 8 characters.");
+        AccessHelper::CallMethod($loginAction, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfPasswordLengthIsGreaterThanMaximum()
+    {
+        $loginAction = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'email' => 'john@example.com',
+                'password' => \str_repeat('a', 73)
+            ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(
+            "Field 'password' must have a maximum length of 72 characters.");
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
 
@@ -161,20 +227,20 @@ class LoginActionTest extends TestCase
         $formParams->expects($this->once())
             ->method('ToArray')
             ->willReturn([
-                'username' => 'john',
-                'password' => 'pass123'
+                'email' => 'john@example.com',
+                'password' => 'pass1234'
             ]);
         $loginAction->expects($this->once())
             ->method('findAccount')
-            ->with('john')
+            ->with('john@example.com')
             ->willReturn(null);
         $translation->expects($this->once())
             ->method('Get')
-            ->with('error_incorrect_username_or_password')
-            ->willReturn('Incorrect username or password.');
+            ->with('error_incorrect_email_or_password')
+            ->willReturn('Incorrect email address or password.');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Incorrect username or password.');
+        $this->expectExceptionMessage('Incorrect email address or password.');
         $this->expectExceptionCode(401);
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
@@ -193,24 +259,24 @@ class LoginActionTest extends TestCase
         $formParams->expects($this->once())
             ->method('ToArray')
             ->willReturn([
-                'username' => 'john',
-                'password' => 'pass123'
+                'email' => 'john@example.com',
+                'password' => 'pass1234'
             ]);
         $loginAction->expects($this->once())
             ->method('findAccount')
-            ->with('john')
+            ->with('john@example.com')
             ->willReturn($account);
         $loginAction->expects($this->once())
             ->method('verifyPassword')
-            ->with($account, 'pass123')
+            ->with($account, 'pass1234')
             ->willReturn(false);
         $translation->expects($this->once())
             ->method('Get')
-            ->with('error_incorrect_username_or_password')
-            ->willReturn('Incorrect username or password.');
+            ->with('error_incorrect_email_or_password')
+            ->willReturn('Incorrect email address or password.');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Incorrect username or password.');
+        $this->expectExceptionMessage('Incorrect email address or password.');
         $this->expectExceptionCode(401);
         AccessHelper::CallMethod($loginAction, 'onExecute');
     }
@@ -232,16 +298,16 @@ class LoginActionTest extends TestCase
         $formParams->expects($this->once())
             ->method('ToArray')
             ->willReturn([
-                'username' => 'john',
-                'password' => 'pass123'
+                'email' => 'john@example.com',
+                'password' => 'pass1234'
             ]);
         $loginAction->expects($this->once())
             ->method('findAccount')
-            ->with('john')
+            ->with('john@example.com')
             ->willReturn($account);
         $loginAction->expects($this->once())
             ->method('verifyPassword')
-            ->with($account, 'pass123')
+            ->with($account, 'pass1234')
             ->willReturn(true);
         $loginAction->expects($this->once())
             ->method('updateLastLoginTime')
@@ -292,16 +358,16 @@ class LoginActionTest extends TestCase
         $formParams->expects($this->once())
             ->method('ToArray')
             ->willReturn([
-                'username' => 'john',
-                'password' => 'pass123'
+                'email' => 'john@example.com',
+                'password' => 'pass1234'
             ]);
         $loginAction->expects($this->once())
             ->method('findAccount')
-            ->with('john')
+            ->with('john@example.com')
             ->willReturn($account);
         $loginAction->expects($this->once())
             ->method('verifyPassword')
-            ->with($account, 'pass123')
+            ->with($account, 'pass1234')
             ->willReturn(true);
         $loginAction->expects($this->once())
             ->method('updateLastLoginTime')
@@ -357,16 +423,16 @@ class LoginActionTest extends TestCase
         $formParams->expects($this->once())
             ->method('ToArray')
             ->willReturn([
-                'username' => 'john',
-                'password' => 'pass123'
+                'email' => 'john@example.com',
+                'password' => 'pass1234'
             ]);
         $loginAction->expects($this->once())
             ->method('findAccount')
-            ->with('john')
+            ->with('john@example.com')
             ->willReturn($account);
         $loginAction->expects($this->once())
             ->method('verifyPassword')
-            ->with($account, 'pass123')
+            ->with($account, 'pass1234')
             ->willReturn(true);
         $loginAction->expects($this->once())
             ->method('updateLastLoginTime')
@@ -421,16 +487,16 @@ class LoginActionTest extends TestCase
         $formParams->expects($this->once())
             ->method('ToArray')
             ->willReturn([
-                'username' => 'john',
-                'password' => 'pass123'
+                'email' => 'john@example.com',
+                'password' => 'pass1234'
             ]);
         $loginAction->expects($this->once())
             ->method('findAccount')
-            ->with('john')
+            ->with('john@example.com')
             ->willReturn($account);
         $loginAction->expects($this->once())
             ->method('verifyPassword')
-            ->with($account, 'pass123')
+            ->with($account, 'pass1234')
             ->willReturn(true);
         $loginAction->expects($this->once())
             ->method('updateLastLoginTime')
@@ -477,7 +543,7 @@ class LoginActionTest extends TestCase
         $account = AccessHelper::CallMethod(
             $loginAction,
             'findAccount',
-            ['john']
+            ['john@example.com']
         );
         $this->assertNull($account);
     }
@@ -494,10 +560,10 @@ class LoginActionTest extends TestCase
                 $this->assertInstanceOf(SelectQuery::class, $query);
                 $this->assertSame('account', AccessHelper::GetProperty($query, 'table'));
                 $this->assertSame('*', AccessHelper::GetProperty($query, 'columns'));
-                $this->assertSame('username = :username', AccessHelper::GetProperty($query, 'condition'));
+                $this->assertSame('email = :email', AccessHelper::GetProperty($query, 'condition'));
                 $this->assertNull(AccessHelper::GetProperty($query, 'orderBy'));
                 $this->assertSame('1', AccessHelper::GetProperty($query, 'limit'));
-                $this->assertSame(['username' => 'john'], $query->Bindings());
+                $this->assertSame(['email' => 'john@example.com'], $query->Bindings());
                 return true;
             }))
             ->willReturn($resultSet);
@@ -506,8 +572,8 @@ class LoginActionTest extends TestCase
             ->willReturn([
                 'id' => 23,
                 'email' => 'john@example.com',
-                'username' => 'john',
                 'passwordHash' => 'password-hash',
+                'displayName' => 'John',
                 'timeActivated' => '2024-01-01 00:00:00',
                 'timeLastLogin' => '2025-01-01 00:00:00'
             ]);
@@ -515,13 +581,13 @@ class LoginActionTest extends TestCase
         $account = AccessHelper::CallMethod(
             $loginAction,
             'findAccount',
-            ['john']
+            ['john@example.com']
         );
         $this->assertInstanceOf(Account::class, $account);
         $this->assertSame(23, $account->id);
         $this->assertSame('john@example.com', $account->email);
-        $this->assertSame('john', $account->username);
         $this->assertSame('password-hash', $account->passwordHash);
+        $this->assertSame('John', $account->displayName);
         $this->assertSame('2024-01-01 00:00:00', $account->timeActivated->format('Y-m-d H:i:s'));
         $this->assertSame('2025-01-01 00:00:00', $account->timeLastLogin->format('Y-m-d H:i:s'));
     }
