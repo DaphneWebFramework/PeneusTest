@@ -8,13 +8,16 @@ use \Harmonia\Core\CFileSystem;
 use \Harmonia\Core\CPath;
 use \Harmonia\Core\CUrl;
 use \Harmonia\Resource as _BaseResource;
+use \Harmonia\Server;
 use \TestToolkit\AccessHelper;
+use \Harmonia\Core\CString;
 
 #[CoversClass(Resource::class)]
 class ResourceTest extends TestCase
 {
     private ?_BaseResource $originalBaseResource = null;
     private ?CFileSystem $originalFileSystem = null;
+    private ?Server $originalServer = null;
 
     protected function setUp(): void
     {
@@ -22,11 +25,15 @@ class ResourceTest extends TestCase
             _BaseResource::ReplaceInstance($this->createMock(_BaseResource::class));
         $this->originalFileSystem =
             CFileSystem::ReplaceInstance($this->createMock(CFileSystem::class));
+        $this->originalServer =
+            Server::ReplaceInstance($this->createMock(Server::class));
     }
 
     protected function tearDown(): void
     {
         _BaseResource::ReplaceInstance($this->originalBaseResource);
+        CFileSystem::ReplaceInstance($this->originalFileSystem);
+        Server::ReplaceInstance($this->originalServer);
     }
 
     private function systemUnderTest(string ...$mockedMethods): Resource
@@ -180,9 +187,9 @@ class ResourceTest extends TestCase
 
     #endregion FrontendLibraryFileUrl
 
-    #region PageDirectoryPath --------------------------------------------------
+    #region PagePath -----------------------------------------------------------
 
-    function testPageDirectoryPath()
+    function testPagePath()
     {
         $sut = $this->systemUnderTest();
         $baseResource = _BaseResource::Instance();
@@ -194,15 +201,15 @@ class ResourceTest extends TestCase
 
         $this->assertEquals(
             'path/to/pages' . \DIRECTORY_SEPARATOR . 'mypage',
-            $sut->PageDirectoryPath('mypage')
+            $sut->PagePath('mypage')
         );
     }
 
-    #endregion PageDirectoryPath
+    #endregion PagePath
 
-    #region PageDirectoryUrl ---------------------------------------------------
+    #region PageUrl ------------------------------------------------------------
 
-    function testPageDirectoryUrl()
+    function testPageUrl()
     {
         $sut = $this->systemUnderTest();
         $baseResource = _BaseResource::Instance();
@@ -214,28 +221,73 @@ class ResourceTest extends TestCase
 
         $this->assertEquals(
             'https://example.com/pages/mypage/',
-            $sut->PageDirectoryUrl('mypage')
+            $sut->PageUrl('mypage')
         );
     }
 
-    #endregion PageDirectoryUrl
+    #endregion PageUrl
+
+    #region LoginPageUrl -------------------------------------------------------
+
+    function testLoginPageUrlAppendsRedirectParameter()
+    {
+        $sut = $this->systemUnderTest('PageUrl');
+        $server = Server::Instance();
+        $loginPageUrl = new CUrl('https://example.com/pages/login/');
+        $requestUri = new CString('/pages/home/');
+
+        $sut->expects($this->once())
+            ->method('PageUrl')
+            ->with('login')
+            ->willReturn($loginPageUrl);
+        $server->expects($this->once())
+            ->method('RequestUri')
+            ->willReturn($requestUri);
+
+        $this->assertEquals(
+            'https://example.com/pages/login/?redirect=%2Fpages%2Fhome%2F',
+            $sut->LoginPageUrl()
+        );
+    }
+
+    function testLoginPageUrlDoesNotAppendRedirectParameter()
+    {
+        $sut = $this->systemUnderTest('PageUrl');
+        $server = Server::Instance();
+        $loginPageUrl = new CUrl('https://example.com/pages/login/');
+
+        $sut->expects($this->once())
+            ->method('PageUrl')
+            ->with('login')
+            ->willReturn($loginPageUrl);
+        $server->expects($this->once())
+            ->method('RequestUri')
+            ->willReturn(null);
+
+        $this->assertEquals(
+            'https://example.com/pages/login/',
+            $sut->LoginPageUrl()
+        );
+    }
+
+    #endregion LoginPageUrl
 
     #region PageFilePath -------------------------------------------------------
 
     function testPageFilePath()
     {
-        $sut = $this->systemUnderTest('PageDirectoryPath');
+        $sut = $this->systemUnderTest('PagePath');
         $pageId = 'mypage';
         $relativePath = 'script.js';
-        $pageDirectoryPath = 'path/to/pages' . \DIRECTORY_SEPARATOR . $pageId;
+        $pagePath = 'path/to/pages' . \DIRECTORY_SEPARATOR . $pageId;
 
         $sut->expects($this->once())
-            ->method('PageDirectoryPath')
+            ->method('PagePath')
             ->with($pageId)
-            ->willReturn(new CPath($pageDirectoryPath));
+            ->willReturn(new CPath($pagePath));
 
         $this->assertEquals(
-            $pageDirectoryPath . \DIRECTORY_SEPARATOR . $relativePath,
+            $pagePath . \DIRECTORY_SEPARATOR . $relativePath,
             $sut->PageFilePath($pageId, $relativePath)
         );
     }
@@ -246,7 +298,7 @@ class ResourceTest extends TestCase
 
     function testPageFileUrlAppendsCacheBuster()
     {
-        $sut = $this->systemUnderTest('PageDirectoryUrl', 'PageFilePath');
+        $sut = $this->systemUnderTest('PageUrl', 'PageFilePath');
         $baseResource = _BaseResource::Instance();
         $fileSystem = CFileSystem::Instance();
         $pageId = 'mypage';
@@ -256,12 +308,12 @@ class ResourceTest extends TestCase
             . $pageId
             . \DIRECTORY_SEPARATOR
             . $relativePath;
-        $pageDirectoryUrl = "https://example.com/pages/{$pageId}/";
+        $pageUrl = "https://example.com/pages/{$pageId}/";
 
         $sut->expects($this->once())
-            ->method('PageDirectoryUrl')
+            ->method('PageUrl')
             ->with($pageId)
-            ->willReturn(new CUrl($pageDirectoryUrl));
+            ->willReturn(new CUrl($pageUrl));
         $sut->expects($this->once())
             ->method('PageFilePath')
             ->with($pageId, $relativePath)
@@ -272,14 +324,14 @@ class ResourceTest extends TestCase
             ->willReturn(1712345678);
 
         $this->assertEquals(
-            "{$pageDirectoryUrl}{$relativePath}?1712345678",
+            "{$pageUrl}{$relativePath}?1712345678",
             $sut->PageFileUrl($pageId, $relativePath)
         );
     }
 
     function testPageFileUrlWithoutCacheBusterIfFileMissing()
     {
-        $sut = $this->systemUnderTest('PageDirectoryUrl', 'PageFilePath');
+        $sut = $this->systemUnderTest('PageUrl', 'PageFilePath');
         $baseResource = _BaseResource::Instance();
         $fileSystem = CFileSystem::Instance();
         $pageId = 'mypage';
@@ -289,12 +341,12 @@ class ResourceTest extends TestCase
             . $pageId
             . \DIRECTORY_SEPARATOR
             . $relativePath;
-        $pageDirectoryUrl = "https://example.com/pages/{$pageId}/";
+        $pageUrl = "https://example.com/pages/{$pageId}/";
 
         $sut->expects($this->once())
-            ->method('PageDirectoryUrl')
+            ->method('PageUrl')
             ->with($pageId)
-            ->willReturn(new CUrl($pageDirectoryUrl));
+            ->willReturn(new CUrl($pageUrl));
         $sut->expects($this->once())
             ->method('PageFilePath')
             ->with($pageId, $relativePath)
@@ -305,7 +357,7 @@ class ResourceTest extends TestCase
             ->willReturn(0); // simulates missing or unreadable file
 
         $this->assertEquals(
-            "{$pageDirectoryUrl}{$relativePath}",
+            "{$pageUrl}{$relativePath}",
             $sut->PageFileUrl($pageId, $relativePath)
         );
     }
