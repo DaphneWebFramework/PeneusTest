@@ -18,6 +18,7 @@ use \Harmonia\Services\SecurityService;
 use \Harmonia\Session;
 use \Peneus\Api\Actions\LogoutAction;
 use \Peneus\Model\Account;
+use \Peneus\Model\Role;
 use \Peneus\Services\AccountService;
 use \Peneus\Translation;
 use \TestToolkit\AccessHelper;
@@ -90,7 +91,7 @@ class LoginActionTest extends TestCase
 
     function testOnExecuteThrowsIfAlreadyLoggedIn()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
         $translation = Translation::Instance();
 
@@ -105,12 +106,12 @@ class LoginActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('You are already logged in.');
         $this->expectExceptionCode(409);
-        AccessHelper::CallMethod($loginAction, 'onExecute');
+        AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfEmailIsMissing()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
 
@@ -125,12 +126,12 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Required field 'email' is missing.");
-        AccessHelper::CallMethod($loginAction, 'onExecute');
+        AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfEmailIsInvalid()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
 
@@ -147,12 +148,12 @@ class LoginActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             "Field 'email' must be a valid email address.");
-        AccessHelper::CallMethod($loginAction, 'onExecute');
+        AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfPasswordIsMissing()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
 
@@ -167,12 +168,12 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Required field 'password' is missing.");
-        AccessHelper::CallMethod($loginAction, 'onExecute');
+        AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfPasswordLengthIsLessThanMinimum()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
 
@@ -189,12 +190,12 @@ class LoginActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             "Field 'password' must have a minimum length of 8 characters.");
-        AccessHelper::CallMethod($loginAction, 'onExecute');
+        AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfPasswordLengthIsGreaterThanMaximum()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
 
@@ -211,12 +212,12 @@ class LoginActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             "Field 'password' must have a maximum length of 72 characters.");
-        AccessHelper::CallMethod($loginAction, 'onExecute');
+        AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfAccountNotFound()
     {
-        $loginAction = $this->systemUnderTest('findAccount');
+        $sut = $this->systemUnderTest('findAccount');
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $translation = Translation::Instance();
@@ -230,7 +231,7 @@ class LoginActionTest extends TestCase
                 'email' => 'john@example.com',
                 'password' => 'pass1234'
             ]);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('findAccount')
             ->with('john@example.com')
             ->willReturn(null);
@@ -242,12 +243,12 @@ class LoginActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Incorrect email address or password.');
         $this->expectExceptionCode(401);
-        AccessHelper::CallMethod($loginAction, 'onExecute');
+        AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfPasswordVerificationFails()
     {
-        $loginAction = $this->systemUnderTest('findAccount', 'verifyPassword');
+        $sut = $this->systemUnderTest('findAccount', 'verifyPassword');
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $account = $this->createStub(Account::class);
@@ -262,11 +263,11 @@ class LoginActionTest extends TestCase
                 'email' => 'john@example.com',
                 'password' => 'pass1234'
             ]);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('findAccount')
             ->with('john@example.com')
             ->willReturn($account);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('verifyPassword')
             ->with($account, 'pass1234')
             ->willReturn(false);
@@ -278,12 +279,12 @@ class LoginActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Incorrect email address or password.');
         $this->expectExceptionCode(401);
-        AccessHelper::CallMethod($loginAction, 'onExecute');
+        AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteLogsOutAndThrowsIfUpdateLastLoginTimeFails()
     {
-        $loginAction = $this->systemUnderTest('findAccount', 'verifyPassword',
+        $sut = $this->systemUnderTest('findAccount', 'verifyPassword',
             'updateLastLoginTime', 'createLogoutAction');
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -301,15 +302,15 @@ class LoginActionTest extends TestCase
                 'email' => 'john@example.com',
                 'password' => 'pass1234'
             ]);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('findAccount')
             ->with('john@example.com')
             ->willReturn($account);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('verifyPassword')
             ->with($account, 'pass1234')
             ->willReturn(true);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('updateLastLoginTime')
             ->with($account)
             ->willReturn(false);
@@ -324,7 +325,7 @@ class LoginActionTest extends TestCase
                     return false;
                 }
             });
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('createLogoutAction')
             ->willReturn($logoutAction);
         $logoutAction->expects($this->once())
@@ -337,12 +338,12 @@ class LoginActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Login failed.');
         $this->expectExceptionCode(500);
-        AccessHelper::CallMethod($loginAction, 'onExecute');
+        AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteLogsOutAndThrowsIfEstablishSessionIntegrityFails()
     {
-        $loginAction = $this->systemUnderTest('findAccount', 'verifyPassword',
+        $sut = $this->systemUnderTest('findAccount', 'verifyPassword',
             'updateLastLoginTime', 'establishSessionIntegrity',
             'createLogoutAction');
         $request = Request::Instance();
@@ -361,19 +362,19 @@ class LoginActionTest extends TestCase
                 'email' => 'john@example.com',
                 'password' => 'pass1234'
             ]);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('findAccount')
             ->with('john@example.com')
             ->willReturn($account);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('verifyPassword')
             ->with($account, 'pass1234')
             ->willReturn(true);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('updateLastLoginTime')
             ->with($account)
             ->willReturn(true);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('establishSessionIntegrity')
             ->with($account)
             ->willReturn(false);
@@ -388,7 +389,7 @@ class LoginActionTest extends TestCase
                     return false;
                 }
             });
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('createLogoutAction')
             ->willReturn($logoutAction);
         $logoutAction->expects($this->once())
@@ -401,12 +402,12 @@ class LoginActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Login failed.');
         $this->expectExceptionCode(500);
-        AccessHelper::CallMethod($loginAction, 'onExecute');
+        AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteLogsOutAndThrowsIfDeleteCsrfCookieFails()
     {
-        $loginAction = $this->systemUnderTest('findAccount', 'verifyPassword',
+        $sut = $this->systemUnderTest('findAccount', 'verifyPassword',
             'updateLastLoginTime', 'establishSessionIntegrity',
             'createLogoutAction');
         $request = Request::Instance();
@@ -426,19 +427,19 @@ class LoginActionTest extends TestCase
                 'email' => 'john@example.com',
                 'password' => 'pass1234'
             ]);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('findAccount')
             ->with('john@example.com')
             ->willReturn($account);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('verifyPassword')
             ->with($account, 'pass1234')
             ->willReturn(true);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('updateLastLoginTime')
             ->with($account)
             ->willReturn(true);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('establishSessionIntegrity')
             ->with($account)
             ->willReturn(true);
@@ -454,7 +455,7 @@ class LoginActionTest extends TestCase
                     return false;
                 }
             });
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('createLogoutAction')
             ->willReturn($logoutAction);
         $logoutAction->expects($this->once())
@@ -467,12 +468,12 @@ class LoginActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Login failed.');
         $this->expectExceptionCode(500);
-        AccessHelper::CallMethod($loginAction, 'onExecute');
+        AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceedsIfDatabaseTransactionSucceeds()
     {
-        $loginAction = $this->systemUnderTest('findAccount', 'verifyPassword',
+        $sut = $this->systemUnderTest('findAccount', 'verifyPassword',
             'updateLastLoginTime', 'establishSessionIntegrity',
             'createLogoutAction');
         $request = Request::Instance();
@@ -490,19 +491,19 @@ class LoginActionTest extends TestCase
                 'email' => 'john@example.com',
                 'password' => 'pass1234'
             ]);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('findAccount')
             ->with('john@example.com')
             ->willReturn($account);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('verifyPassword')
             ->with($account, 'pass1234')
             ->willReturn(true);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('updateLastLoginTime')
             ->with($account)
             ->willReturn(true);
-        $loginAction->expects($this->once())
+        $sut->expects($this->once())
             ->method('establishSessionIntegrity')
             ->with($account)
             ->willReturn(true);
@@ -517,10 +518,10 @@ class LoginActionTest extends TestCase
                     return false;
                 }
             });
-        $loginAction->expects($this->never())
+        $sut->expects($this->never())
             ->method('createLogoutAction');
 
-        $this->assertNull(AccessHelper::CallMethod($loginAction, 'onExecute'));
+        $this->assertNull(AccessHelper::CallMethod($sut, 'onExecute'));
     }
 
     #endregion onExecute
@@ -529,7 +530,7 @@ class LoginActionTest extends TestCase
 
     function testFindAccountReturnsNullWhenNotFound()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $database = Database::Instance();
         $resultSet = $this->createMock(ResultSet::class);
 
@@ -541,7 +542,7 @@ class LoginActionTest extends TestCase
             ->willReturn(null);
 
         $account = AccessHelper::CallMethod(
-            $loginAction,
+            $sut,
             'findAccount',
             ['john@example.com']
         );
@@ -550,7 +551,7 @@ class LoginActionTest extends TestCase
 
     function testFindAccountReturnsAccountWhenFound()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $database = Database::Instance();
         $resultSet = $this->createMock(ResultSet::class);
 
@@ -579,7 +580,7 @@ class LoginActionTest extends TestCase
             ]);
 
         $account = AccessHelper::CallMethod(
-            $loginAction,
+            $sut,
             'findAccount',
             ['john@example.com']
         );
@@ -594,12 +595,106 @@ class LoginActionTest extends TestCase
 
     #endregion findAccount
 
+    #region findAccountRole ----------------------------------------------------
+
+    function testFindAccountRoleReturnsNullWhenNotFound()
+    {
+        $sut = $this->systemUnderTest();
+        $database = Database::Instance();
+        $resultSet = $this->createMock(ResultSet::class);
+
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn($resultSet);
+        $resultSet->expects($this->once())
+            ->method('Row')
+            ->willReturn(null);
+
+        $role = AccessHelper::CallMethod(
+            $sut,
+            'findAccountRole',
+            [42]
+        );
+        $this->assertNull($role);
+    }
+
+    function testFindAccountRoleReturnsNullForInvalidEnumValue()
+    {
+        $sut = $this->systemUnderTest();
+        $database = Database::Instance();
+        $resultSet = $this->createMock(ResultSet::class);
+
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame('accountrole', AccessHelper::GetProperty($query, 'table'));
+                $this->assertSame('*', AccessHelper::GetProperty($query, 'columns'));
+                $this->assertSame('accountId = :accountId', AccessHelper::GetProperty($query, 'condition'));
+                $this->assertNull(AccessHelper::GetProperty($query, 'orderBy'));
+                $this->assertSame('1', AccessHelper::GetProperty($query, 'limit'));
+                $this->assertSame(['accountId' => 42], $query->Bindings());
+                return true;
+            }))
+            ->willReturn($resultSet);
+        $resultSet->expects($this->once())
+            ->method('Row')
+            ->willReturn([
+                'accountId' => 42,
+                'role' => 999 // invalid enum value
+            ]);
+
+        $role = AccessHelper::CallMethod(
+            $sut,
+            'findAccountRole',
+            [42]
+        );
+        $this->assertNull($role);
+    }
+
+    function testFindAccountRoleReturnsRoleWhenFound()
+    {
+        $sut = $this->systemUnderTest();
+        $database = Database::Instance();
+        $resultSet = $this->createMock(ResultSet::class);
+
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame('accountrole', AccessHelper::GetProperty($query, 'table'));
+                $this->assertSame('*', AccessHelper::GetProperty($query, 'columns'));
+                $this->assertSame('accountId = :accountId', AccessHelper::GetProperty($query, 'condition'));
+                $this->assertNull(AccessHelper::GetProperty($query, 'orderBy'));
+                $this->assertSame('1', AccessHelper::GetProperty($query, 'limit'));
+                $this->assertSame(['accountId' => 42], $query->Bindings());
+                return true;
+            }))
+            ->willReturn($resultSet);
+        $resultSet->expects($this->once())
+            ->method('Row')
+            ->willReturn([
+                'accountId' => 42,
+                'role' => Role::Editor->value
+            ]);
+
+        $role = AccessHelper::CallMethod(
+            $sut,
+            'findAccountRole',
+            [42]
+        );
+        $this->assertInstanceOf(Role::class, $role);
+        $this->assertSame(Role::Editor, $role);
+    }
+
+    #endregion findAccountRole
+
     #region verifyPassword -----------------------------------------------------
 
     #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
     function testVerifyPassword($returnValue)
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $account = new Account(['passwordHash' => 'password-hash']);
         $securityService = SecurityService::Instance();
 
@@ -611,7 +706,7 @@ class LoginActionTest extends TestCase
         $this->assertSame(
             $returnValue,
             AccessHelper::CallMethod(
-                $loginAction,
+                $sut,
                 'verifyPassword',
                 [$account, 'plain-password']
             )
@@ -625,7 +720,7 @@ class LoginActionTest extends TestCase
     #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
     function testUpdateLastLoginTime($returnValue)
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);
 
         $account->expects($this->once())
@@ -635,7 +730,7 @@ class LoginActionTest extends TestCase
         $this->assertSame(
             $returnValue,
             AccessHelper::CallMethod(
-                $loginAction,
+                $sut,
                 'updateLastLoginTime',
                 [$account]
             )
@@ -651,7 +746,7 @@ class LoginActionTest extends TestCase
 
     function testEstablishSessionIntegrityFailsIfSessionStartThrows()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $securityService = SecurityService::Instance();
         $session = Session::Instance();
 
@@ -662,7 +757,7 @@ class LoginActionTest extends TestCase
             ->willThrowException(new \RuntimeException);
 
         $this->assertFalse(AccessHelper::CallMethod(
-            $loginAction,
+            $sut,
             'establishSessionIntegrity',
             [new Account]
         ));
@@ -670,7 +765,7 @@ class LoginActionTest extends TestCase
 
     function testEstablishSessionIntegrityFailsIfSessionClearThrows()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $securityService = SecurityService::Instance();
         $session = Session::Instance();
 
@@ -684,7 +779,7 @@ class LoginActionTest extends TestCase
             ->willThrowException(new \RuntimeException);
 
         $this->assertFalse(AccessHelper::CallMethod(
-            $loginAction,
+            $sut,
             'establishSessionIntegrity',
             [new Account]
         ));
@@ -692,7 +787,7 @@ class LoginActionTest extends TestCase
 
     function testEstablishSessionIntegrityFailsIfSessionCloseThrows()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $securityService = SecurityService::Instance();
         $session = Session::Instance();
 
@@ -712,7 +807,7 @@ class LoginActionTest extends TestCase
             ->willThrowException(new \RuntimeException);
 
         $this->assertFalse(AccessHelper::CallMethod(
-            $loginAction,
+            $sut,
             'establishSessionIntegrity',
             [new Account]
         ));
@@ -720,7 +815,7 @@ class LoginActionTest extends TestCase
 
     function testEstablishSessionIntegrityFailsIfSetCookieThrows()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
         $securityService = SecurityService::Instance();
         $session = Session::Instance();
         $cookieService = CookieService::Instance();
@@ -743,15 +838,15 @@ class LoginActionTest extends TestCase
             ->willThrowException(new \RuntimeException);
 
         $this->assertFalse(AccessHelper::CallMethod(
-            $loginAction,
+            $sut,
             'establishSessionIntegrity',
             [new Account]
         ));
     }
 
-    function testEstablishSessionIntegritySucceeds()
+    function testEstablishSessionIntegritySucceedsWithoutAccountRole()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest('findAccountRole');
         $account = new Account(['id' => 23]);
         $securityService = SecurityService::Instance();
         $csrfToken = $this->createMock(CsrfToken::class);
@@ -771,6 +866,10 @@ class LoginActionTest extends TestCase
         $csrfToken->expects($this->once())
             ->method('Token')
             ->willReturn('integrity-token');
+        $sut->expects($this->once())
+            ->method('findAccountRole')
+            ->with(23)
+            ->willReturn(null); // no role explicitly set in the database
         $session->expects($this->exactly(2))
             ->method('Set')
             ->with($this->callback(function(...$args) {
@@ -797,7 +896,67 @@ class LoginActionTest extends TestCase
             ->with('integrity-cookie-name', 'integrity-cookie-value');
 
         $this->assertTrue(AccessHelper::CallMethod(
-            $loginAction,
+            $sut,
+            'establishSessionIntegrity',
+            [$account]
+        ));
+    }
+
+    function testEstablishSessionIntegritySucceedsWithAccountRole()
+    {
+        $sut = $this->systemUnderTest('findAccountRole');
+        $account = new Account(['id' => 23]);
+        $securityService = SecurityService::Instance();
+        $csrfToken = $this->createMock(CsrfToken::class);
+        $session = Session::Instance();
+        $accountService = AccountService::Instance();
+        $cookieService = CookieService::Instance();
+
+        $securityService->expects($this->once())
+            ->method('GenerateCsrfToken')
+            ->willReturn($csrfToken);
+        $session->expects($this->once())
+            ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Clear')
+            ->willReturn($session);
+        $csrfToken->expects($this->once())
+            ->method('Token')
+            ->willReturn('integrity-token');
+        $sut->expects($this->once())
+            ->method('findAccountRole')
+            ->with(23)
+            ->willReturn(Role::Editor);
+        $session->expects($this->exactly(3))
+            ->method('Set')
+            ->with($this->callback(function(...$args) {
+                [$key, $value] = $args;
+                return match ($key) {
+                    AccountService::INTEGRITY_TOKEN_SESSION_KEY =>
+                        $value === 'integrity-token',
+                    AccountService::ACCOUNT_ID_SESSION_KEY =>
+                        $value === 23,
+                    AccountService::ACCOUNT_ROLE_SESSION_KEY =>
+                        $value === Role::Editor->value,
+                    default => false
+                };
+            }))
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Close');
+        $accountService->expects($this->once())
+            ->method('IntegrityCookieName')
+            ->willReturn('integrity-cookie-name');
+        $csrfToken->expects($this->once())
+            ->method('CookieValue')
+            ->willReturn('integrity-cookie-value');
+        $cookieService->expects($this->once())
+            ->method('SetCookie')
+            ->with('integrity-cookie-name', 'integrity-cookie-value');
+
+        $this->assertTrue(AccessHelper::CallMethod(
+            $sut,
             'establishSessionIntegrity',
             [$account]
         ));
@@ -809,11 +968,11 @@ class LoginActionTest extends TestCase
 
     function testCreateLogoutAction()
     {
-        $loginAction = $this->systemUnderTest();
+        $sut = $this->systemUnderTest();
 
         $this->assertInstanceOf(
             LogoutAction::class,
-            AccessHelper::CallMethod($loginAction, 'createLogoutAction')
+            AccessHelper::CallMethod($sut, 'createLogoutAction')
         );
     }
 

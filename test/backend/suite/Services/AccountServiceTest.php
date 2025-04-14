@@ -13,13 +13,13 @@ use \Harmonia\Services\Security\CsrfToken;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Session;
 use \Peneus\Model\Account;
+use \Peneus\Model\Role;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
 #[CoversClass(AccountService::class)]
 class AccountServiceTest extends TestCase
 {
-    private ?AccountService $originalAccountService = null;
     private ?CookieService $originalCookieService = null;
     private ?Session $originalSession = null;
     private ?Request $originalRequest = null;
@@ -27,39 +27,45 @@ class AccountServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->originalAccountService = AccountService::ReplaceInstance(null);
-        $this->originalCookieService = CookieService::ReplaceInstance(
-            $this->createMock(CookieService::class));
-        $this->originalSession = Session::ReplaceInstance(
-            $this->createMock(Session::class));
-        $this->originalRequest = Request::ReplaceInstance(
-            $this->createMock(Request::class));
-        $this->originalSecurityService = SecurityService::ReplaceInstance(
-            $this->createMock(SecurityService::class));
+        $this->originalCookieService =
+            CookieService::ReplaceInstance($this->createMock(CookieService::class));
+        $this->originalSession =
+            Session::ReplaceInstance($this->createMock(Session::class));
+        $this->originalRequest =
+            Request::ReplaceInstance($this->createMock(Request::class));
+        $this->originalSecurityService =
+            SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
     }
 
     protected function tearDown(): void
     {
-        AccountService::ReplaceInstance($this->originalAccountService);
         CookieService::ReplaceInstance($this->originalCookieService);
         Session::ReplaceInstance($this->originalSession);
         Request::ReplaceInstance($this->originalRequest);
         SecurityService::ReplaceInstance($this->originalSecurityService);
     }
 
+    private function systemUnderTest(string ...$mockedMethods): AccountService
+    {
+        return $this->getMockBuilder(AccountService::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods($mockedMethods)
+            ->getMock();
+    }
+
     #region IntegrityCookieName ------------------------------------------------
 
     function testIntegrityCookieNameCallsAppSpecificCookieName()
     {
+        $sut = $this->systemUnderTest();
         $cookieService = CookieService::Instance();
-        $accountService = AccountService::Instance();
 
         $cookieService->expects($this->once())
             ->method('AppSpecificCookieName')
             ->with('INTEGRITY')
             ->willReturn('MYAPP_INTEGRITY');
 
-        $this->assertSame('MYAPP_INTEGRITY', $accountService->IntegrityCookieName());
+        $this->assertSame('MYAPP_INTEGRITY', $sut->IntegrityCookieName());
     }
 
     #endregion IntegrityCookieName
@@ -68,91 +74,186 @@ class AccountServiceTest extends TestCase
 
     function testAuthenticatedAccountThrowsIfSessionStartThrows()
     {
+        $sut = $this->systemUnderTest(
+            'verifySessionIntegrity',
+            'retrieveAuthenticatedAccount'
+        );
         $session = Session::Instance();
-        $accountService = AccountService::Instance();
 
         $session->expects($this->once())
             ->method('Start')
             ->willThrowException(new \RuntimeException());
+        $sut->expects($this->never())
+            ->method('verifySessionIntegrity');
+        $sut->expects($this->never())
+            ->method('retrieveAuthenticatedAccount');
+        $session->expects($this->never())
+            ->method('Destroy');
+        $session->expects($this->never())
+            ->method('Close');
 
         $this->expectException(\RuntimeException::class);
-        $accountService->AuthenticatedAccount();
+        $sut->AuthenticatedAccount();
     }
 
     function testAuthenticatedAccountReturnsNullIfVerifySessionIntegrityReturnsFalse()
     {
+        $sut = $this->systemUnderTest(
+            'verifySessionIntegrity',
+            'retrieveAuthenticatedAccount'
+        );
         $session = Session::Instance();
-        $accountService = $this->getMockBuilder(AccountService::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['verifySessionIntegrity', 'retrieveAuthenticatedAccount'])
-            ->getMock();
 
         $session->expects($this->once())
             ->method('Start')
             ->willReturn($session);
-        $accountService->expects($this->once())
+        $sut->expects($this->once())
             ->method('verifySessionIntegrity')
             ->willReturn(false);
-        $accountService->expects($this->never())
+        $sut->expects($this->never())
             ->method('retrieveAuthenticatedAccount');
         $session->expects($this->once())
             ->method('Destroy');
+        $session->expects($this->never())
+            ->method('Close');
 
-        $this->assertNull($accountService->AuthenticatedAccount());
+        $this->assertNull($sut->AuthenticatedAccount());
     }
 
     function testAuthenticatedAccountReturnsNullIfRetrieveAuthenticatedAccountReturnsNull()
     {
+        $sut = $this->systemUnderTest(
+            'verifySessionIntegrity',
+            'retrieveAuthenticatedAccount'
+        );
         $session = Session::Instance();
-        $accountService = $this->getMockBuilder(AccountService::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['verifySessionIntegrity', 'retrieveAuthenticatedAccount'])
-            ->getMock();
 
         $session->expects($this->once())
             ->method('Start')
             ->willReturn($session);
-        $accountService->expects($this->once())
+        $sut->expects($this->once())
             ->method('verifySessionIntegrity')
             ->willReturn(true);
-        $accountService->expects($this->once())
+        $sut->expects($this->once())
             ->method('retrieveAuthenticatedAccount')
             ->willReturn(null);
         $session->expects($this->once())
             ->method('Destroy');
+        $session->expects($this->never())
+            ->method('Close');
 
-        $this->assertNull($accountService->AuthenticatedAccount());
+        $this->assertNull($sut->AuthenticatedAccount());
     }
 
     function testAuthenticatedAccountReturnsAccountIfRetrieveAuthenticatedAccountReturnsAccount()
     {
+        $sut = $this->systemUnderTest(
+            'verifySessionIntegrity',
+            'retrieveAuthenticatedAccount'
+        );
         $session = Session::Instance();
-        $accountService = $this->getMockBuilder(AccountService::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['verifySessionIntegrity', 'retrieveAuthenticatedAccount'])
-            ->getMock();
-        $account = $this->createMock(Account::class);
+        $account = $this->createStub(Account::class);
 
         $session->expects($this->once())
-            ->method('Start');
-        $accountService->expects($this->once())
+            ->method('Start')
+            ->willReturn($session);
+        $sut->expects($this->once())
             ->method('verifySessionIntegrity')
             ->willReturn(true);
-        $accountService->expects($this->once())
+        $sut->expects($this->once())
             ->method('retrieveAuthenticatedAccount')
             ->willReturn($account);
+        $session->expects($this->once())
+            ->method('Close');
 
-        $this->assertSame($account, $accountService->AuthenticatedAccount());
+        $this->assertSame($account, $sut->AuthenticatedAccount());
     }
 
     #endregion AuthenticatedAccount
+
+    #region RoleOfAuthenticatedAccount -----------------------------------------
+
+    function testRoleOfAuthenticatedAccountThrowsIfSessionStartThrows()
+    {
+        $sut = $this->systemUnderTest();
+        $session = Session::Instance();
+
+        $session->expects($this->once())
+            ->method('Start')
+            ->willThrowException(new \RuntimeException());
+        $session->expects($this->never())
+            ->method('Get');
+        $session->expects($this->never())
+            ->method('Close');
+
+        $this->expectException(\RuntimeException::class);
+        $sut->RoleOfAuthenticatedAccount();
+    }
+
+    function testRoleOfAuthenticatedAccountThrowsIfSessionCloseThrows()
+    {
+        $sut = $this->systemUnderTest();
+        $session = Session::Instance();
+
+        $session->expects($this->once())
+            ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Get')
+            ->with(AccountService::ACCOUNT_ROLE_SESSION_KEY)
+            ->willReturn(20); // Role::Admin
+        $session->expects($this->once())
+            ->method('Close')
+            ->willThrowException(new \RuntimeException());
+
+        $this->expectException(\RuntimeException::class);
+        $sut->RoleOfAuthenticatedAccount();
+    }
+
+    function testRoleOfAuthenticatedAccountReturnsNullIfNotSetInSession()
+    {
+        $sut = $this->systemUnderTest();
+        $session = Session::Instance();
+
+        $session->expects($this->once())
+            ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Get')
+            ->with(AccountService::ACCOUNT_ROLE_SESSION_KEY)
+            ->willReturn(null);
+        $session->expects($this->once())
+            ->method('Close');
+
+        $this->assertNull($sut->RoleOfAuthenticatedAccount());
+    }
+
+    function testRoleOfAuthenticatedAccountReturnsRoleIfSetInSession()
+    {
+        $sut = $this->systemUnderTest();
+        $session = Session::Instance();
+
+        $session->expects($this->once())
+            ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Get')
+            ->with(AccountService::ACCOUNT_ROLE_SESSION_KEY)
+            ->willReturn(20); // Role::Admin
+        $session->expects($this->once())
+            ->method('Close');
+
+        $this->assertSame(Role::Admin, $sut->RoleOfAuthenticatedAccount());
+    }
+
+    #endregion RoleOfAuthenticatedAccount
 
     #region verifySessionIntegrity ---------------------------------------------
 
     function testVerifySessionIntegrityReturnsFalseIfIntegrityTokenIsMissing()
     {
+        $sut = $this->systemUnderTest();
         $session = Session::Instance();
-        $accountService = AccountService::Instance();
 
         $session->expects($this->once())
             ->method('Get')
@@ -160,18 +261,15 @@ class AccountServiceTest extends TestCase
             ->willReturn(null);
 
         $this->assertFalse(AccessHelper::CallMethod(
-            $accountService,
+            $sut,
             'verifySessionIntegrity'
         ));
     }
 
     function testVerifySessionIntegrityReturnsFalseIfIntegrityCookieIsMissing()
     {
+        $sut = $this->systemUnderTest('IntegrityCookieName');
         $session = Session::Instance();
-        $accountService = $this->getMockBuilder(AccountService::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['IntegrityCookieName'])
-            ->getMock();
         $requestCookies = $this->createMock(CArray::class);
         $request = Request::Instance();
 
@@ -179,7 +277,7 @@ class AccountServiceTest extends TestCase
             ->method('Get')
             ->with(AccountService::INTEGRITY_TOKEN_SESSION_KEY)
             ->willReturn('integrity-token-value');
-        $accountService->expects($this->once())
+        $sut->expects($this->once())
             ->method('IntegrityCookieName')
             ->willReturn('MYAPP_INTEGRITY');
         $request->expects($this->once())
@@ -191,7 +289,7 @@ class AccountServiceTest extends TestCase
             ->willReturn(null);
 
         $this->assertFalse(AccessHelper::CallMethod(
-            $accountService,
+            $sut,
             'verifySessionIntegrity'
         ));
     }
@@ -199,11 +297,8 @@ class AccountServiceTest extends TestCase
     #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
     function testVerifySessionIntegrityReturnsWhateverVerifyCsrfTokenReturns($returnValue)
     {
+        $sut = $this->systemUnderTest('IntegrityCookieName');
         $session = Session::Instance();
-        $accountService = $this->getMockBuilder(AccountService::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['IntegrityCookieName'])
-            ->getMock();
         $requestCookies = $this->createMock(CArray::class);
         $request = Request::Instance();
         $securityService = SecurityService::Instance();
@@ -212,7 +307,7 @@ class AccountServiceTest extends TestCase
             ->method('Get')
             ->with(AccountService::INTEGRITY_TOKEN_SESSION_KEY)
             ->willReturn('integrity-token-value');
-        $accountService->expects($this->once())
+        $sut->expects($this->once())
             ->method('IntegrityCookieName')
             ->willReturn('MYAPP_INTEGRITY');
         $request->expects($this->once())
@@ -231,7 +326,7 @@ class AccountServiceTest extends TestCase
             ->willReturn($returnValue);
 
         $this->assertSame($returnValue, AccessHelper::CallMethod(
-            $accountService,
+            $sut,
             'verifySessionIntegrity'
         ));
     }
@@ -242,8 +337,8 @@ class AccountServiceTest extends TestCase
 
     function testRetrieveAuthenticatedAccountReturnsNullIfAccountIdIsMissing()
     {
+        $sut = $this->systemUnderTest();
         $session = Session::Instance();
-        $accountService = AccountService::Instance();
 
         $session->expects($this->once())
             ->method('Get')
@@ -251,7 +346,7 @@ class AccountServiceTest extends TestCase
             ->willReturn(null);
 
         $this->assertNull(AccessHelper::CallMethod(
-            $accountService,
+            $sut,
             'retrieveAuthenticatedAccount'
         ));
     }
@@ -259,23 +354,20 @@ class AccountServiceTest extends TestCase
     #[DataProvider('nullOrAccountDataProvider')]
     function testRetrieveAuthenticatedAccountReturnsWhateverFindAccountByIdReturns($returnValue)
     {
+        $sut = $this->systemUnderTest('findAccountById');
         $session = Session::Instance();
-        $accountService = $this->getMockBuilder(AccountService::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['findAccountById'])
-            ->getMock();
 
         $session->expects($this->once())
             ->method('Get')
             ->with(AccountService::ACCOUNT_ID_SESSION_KEY)
             ->willReturn(123);
-        $accountService->expects($this->once())
+        $sut->expects($this->once())
             ->method('findAccountById')
             ->with(123)
             ->willReturn($returnValue);
 
         $this->assertSame($returnValue, AccessHelper::CallMethod(
-            $accountService,
+            $sut,
             'retrieveAuthenticatedAccount'
         ));
     }
