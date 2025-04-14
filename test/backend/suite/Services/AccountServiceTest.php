@@ -64,9 +64,9 @@ class AccountServiceTest extends TestCase
 
     #endregion IntegrityCookieName
 
-    #region GetAuthenticatedAccount --------------------------------------------
+    #region AuthenticatedAccount -----------------------------------------------
 
-    function testGetAuthenticatedAccountThrowsIfSessionStartThrows()
+    function testAuthenticatedAccountThrowsIfSessionStartThrows()
     {
         $session = Session::Instance();
         $accountService = AccountService::Instance();
@@ -76,10 +76,10 @@ class AccountServiceTest extends TestCase
             ->willThrowException(new \RuntimeException());
 
         $this->expectException(\RuntimeException::class);
-        $accountService->GetAuthenticatedAccount();
+        $accountService->AuthenticatedAccount();
     }
 
-    function testGetAuthenticatedAccountReturnsNullIfVerifySessionIntegrityReturnsFalse()
+    function testAuthenticatedAccountReturnsNullIfVerifySessionIntegrityReturnsFalse()
     {
         $session = Session::Instance();
         $accountService = $this->getMockBuilder(AccountService::class)
@@ -98,10 +98,10 @@ class AccountServiceTest extends TestCase
         $session->expects($this->once())
             ->method('Destroy');
 
-        $this->assertNull($accountService->GetAuthenticatedAccount());
+        $this->assertNull($accountService->AuthenticatedAccount());
     }
 
-    function testGetAuthenticatedAccountReturnsNullIfRetrieveAuthenticatedAccountReturnsNull()
+    function testAuthenticatedAccountReturnsNullIfRetrieveAuthenticatedAccountReturnsNull()
     {
         $session = Session::Instance();
         $accountService = $this->getMockBuilder(AccountService::class)
@@ -121,10 +121,10 @@ class AccountServiceTest extends TestCase
         $session->expects($this->once())
             ->method('Destroy');
 
-        $this->assertNull($accountService->GetAuthenticatedAccount());
+        $this->assertNull($accountService->AuthenticatedAccount());
     }
 
-    function testGetAuthenticatedAccountReturnsAccountIfRetrieveAuthenticatedAccountReturnsAccount()
+    function testAuthenticatedAccountReturnsAccountIfRetrieveAuthenticatedAccountReturnsAccount()
     {
         $session = Session::Instance();
         $accountService = $this->getMockBuilder(AccountService::class)
@@ -142,10 +142,10 @@ class AccountServiceTest extends TestCase
             ->method('retrieveAuthenticatedAccount')
             ->willReturn($account);
 
-        $this->assertSame($account, $accountService->GetAuthenticatedAccount());
+        $this->assertSame($account, $accountService->AuthenticatedAccount());
     }
 
-    #endregion GetAuthenticatedAccount
+    #endregion AuthenticatedAccount
 
     #region verifySessionIntegrity ---------------------------------------------
 

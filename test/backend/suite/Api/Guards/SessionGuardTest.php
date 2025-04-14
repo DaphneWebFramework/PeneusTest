@@ -31,7 +31,7 @@ class SessionGuardTest extends TestCase
         $sessionGuard = new SessionGuard;
 
         $accountService->expects($this->once())
-            ->method('GetAuthenticatedAccount')
+            ->method('AuthenticatedAccount')
             ->willReturn($this->createStub(Account::class));
 
         $this->assertTrue($sessionGuard->Verify());
@@ -43,7 +43,7 @@ class SessionGuardTest extends TestCase
         $sessionGuard = new SessionGuard;
 
         $accountService->expects($this->once())
-            ->method('GetAuthenticatedAccount')
+            ->method('AuthenticatedAccount')
             ->willReturn(null);
 
         $this->assertFalse($sessionGuard->Verify());
