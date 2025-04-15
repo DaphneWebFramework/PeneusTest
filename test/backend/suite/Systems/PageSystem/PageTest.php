@@ -11,6 +11,7 @@ use \Harmonia\Services\CookieService;
 use \Harmonia\Services\Security\CsrfToken;
 use \Harmonia\Services\SecurityService;
 use \Peneus\Api\Guards\FormTokenGuard;
+use \Peneus\Systems\PageSystem\AccessPolicies\IAccessPolicy;
 use \Peneus\Systems\PageSystem\LibraryManager;
 use \Peneus\Systems\PageSystem\MetaCollection;
 use \Peneus\Systems\PageSystem\PageManifest;
@@ -58,6 +59,7 @@ class PageTest extends TestCase
         return $this->getMockBuilder(Page::class)
             ->setConstructorArgs([
                 __DIR__,
+                $this->createStub(IAccessPolicy::class),
                 $this->renderer,
                 $this->libraryManager,
                 $this->pageManifest,
@@ -66,6 +68,25 @@ class PageTest extends TestCase
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
+
+    #region __construct --------------------------------------------------------
+
+    function testConstructorCallsEnforceOnGivenAccessPolicy()
+    {
+        $accessPolicy = $this->createMock(IAccessPolicy::class);
+        $accessPolicy->expects($this->once())
+            ->method('Enforce');
+        new Page(
+            __DIR__,
+            $accessPolicy,
+            $this->renderer,
+            $this->libraryManager,
+            $this->pageManifest,
+            $this->metaCollection
+        );
+    }
+
+    #endregion __construct
 
     #region Id -----------------------------------------------------------------
 
