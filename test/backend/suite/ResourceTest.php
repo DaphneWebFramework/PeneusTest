@@ -6,11 +6,12 @@ use \Peneus\Resource;
 
 use \Harmonia\Core\CFileSystem;
 use \Harmonia\Core\CPath;
+use \Harmonia\Core\CString;
 use \Harmonia\Core\CUrl;
+use \Harmonia\Http\StatusCode;
 use \Harmonia\Resource as _BaseResource;
 use \Harmonia\Server;
 use \TestToolkit\AccessHelper;
-use \Harmonia\Core\CString;
 
 #[CoversClass(Resource::class)]
 class ResourceTest extends TestCase
@@ -233,16 +234,14 @@ class ResourceTest extends TestCase
     {
         $sut = $this->systemUnderTest('PageUrl');
         $server = Server::Instance();
-        $loginPageUrl = new CUrl('https://example.com/pages/login/');
-        $requestUri = new CString('/pages/home/');
 
         $sut->expects($this->once())
             ->method('PageUrl')
             ->with('login')
-            ->willReturn($loginPageUrl);
+            ->willReturn(new CUrl('https://example.com/pages/login/'));
         $server->expects($this->once())
             ->method('RequestUri')
-            ->willReturn($requestUri);
+            ->willReturn(new CString('/pages/home/'));
 
         $this->assertEquals(
             'https://example.com/pages/login/?redirect=%2Fpages%2Fhome%2F',
@@ -254,12 +253,11 @@ class ResourceTest extends TestCase
     {
         $sut = $this->systemUnderTest('PageUrl');
         $server = Server::Instance();
-        $loginPageUrl = new CUrl('https://example.com/pages/login/');
 
         $sut->expects($this->once())
             ->method('PageUrl')
             ->with('login')
-            ->willReturn($loginPageUrl);
+            ->willReturn(new CUrl('https://example.com/pages/login/'));
         $server->expects($this->once())
             ->method('RequestUri')
             ->willReturn(null);
@@ -271,6 +269,25 @@ class ResourceTest extends TestCase
     }
 
     #endregion LoginPageUrl
+
+    #region ErrorPageUrl ------------------------------------------------------
+
+    function testErrorPageUrl()
+    {
+        $sut = $this->systemUnderTest('PageUrl');
+
+        $sut->expects($this->once())
+            ->method('PageUrl')
+            ->with('error')
+            ->willReturn(new CUrl('https://example.com/pages/error/'));
+
+        $this->assertEquals(
+            'https://example.com/pages/error/404',
+            $sut->ErrorPageUrl(StatusCode::NotFound)
+        );
+    }
+
+    #endregion ErrorPageUrl
 
     #region PageFilePath -------------------------------------------------------
 
