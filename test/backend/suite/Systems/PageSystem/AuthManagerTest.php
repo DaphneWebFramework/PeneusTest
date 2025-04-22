@@ -2,7 +2,7 @@
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 
-use \Peneus\Systems\PageSystem\AccessPolicies\MembersPolicy;
+use \Peneus\Systems\PageSystem\AuthManager;
 
 use \Harmonia\Core\CUrl;
 use \Harmonia\Http\StatusCode;
@@ -11,8 +11,8 @@ use \Peneus\Model\Role;
 use \Peneus\Resource;
 use \Peneus\Services\AccountService;
 
-#[CoversClass(MembersPolicy::class)]
-class MembersPolicyTest extends TestCase
+#[CoversClass(AuthManager::class)]
+class AuthManagerTest extends TestCase
 {
     private ?AccountService $originalAccountService = null;
     private ?Resource $originalResource = null;
@@ -31,16 +31,77 @@ class MembersPolicyTest extends TestCase
         Resource::ReplaceInstance($this->originalResource);
     }
 
-    private function systemUnderTest(string ...$mockedMethods): MembersPolicy
+    private function systemUnderTest(string ...$mockedMethods): AuthManager
     {
-        return $this->getMockBuilder(MembersPolicy::class)
+        return $this->getMockBuilder(AuthManager::class)
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
 
-    #region Enforce ------------------------------------------------------------
+    #region LoggedInAccount ----------------------------------------------------
 
-    function testEnforceRedirectsToLoginPageWhenLoggedInAccountReturnsNull()
+    function testLoggedInAccountReturnsNullWhenNotLoggedIn()
+    {
+        $sut = new AuthManager();
+        $accountService = AccountService::Instance();
+
+        $accountService->expects($this->once())
+            ->method('LoggedInAccount')
+            ->willReturn(null);
+
+        $this->assertNull($sut->LoggedInAccount());
+        $this->assertNull($sut->LoggedInAccount()); // from cache
+    }
+
+    function testLoggedInAccountReturnsCachedValue()
+    {
+        $sut = new AuthManager();
+        $accountService = AccountService::Instance();
+        $account = $this->createStub(Account::class);
+
+        $accountService->expects($this->once())
+            ->method('LoggedInAccount')
+            ->willReturn($account);
+
+        $this->assertSame($account, $sut->LoggedInAccount());
+        $this->assertSame($account, $sut->LoggedInAccount()); // from cache
+    }
+
+    #endregion LoggedInAccount
+
+    #region LoggedInAccountRole ------------------------------------------------
+
+    function testLoggedInAccountRoleReturnsCachedOrFallback()
+    {
+        $sut = new AuthManager();
+        $accountService = AccountService::Instance();
+
+        $accountService->expects($this->once())
+            ->method('RoleOfLoggedInAccount')
+            ->willReturn(null); // Simulate no role stored
+
+        $this->assertSame(Role::None, $sut->LoggedInAccountRole());
+        $this->assertSame(Role::None, $sut->LoggedInAccountRole()); // from cache
+    }
+
+    function testLoggedInAccountRoleReturnsSetRole()
+    {
+        $sut = new AuthManager();
+        $accountService = AccountService::Instance();
+
+        $accountService->expects($this->once())
+            ->method('RoleOfLoggedInAccount')
+            ->willReturn(Role::Editor); // Simulate stored role
+
+        $this->assertSame(Role::Editor, $sut->LoggedInAccountRole());
+        $this->assertSame(Role::Editor, $sut->LoggedInAccountRole()); // from cache
+    }
+
+    #endregion LoggedInAccountRole
+
+    #region RequireLogin -------------------------------------------------------
+
+    function testRequireLoginRedirectsToLoginPageWhenNotLoggedIn()
     {
         $sut = $this->systemUnderTest('redirect');
         $accountService = AccountService::Instance();
@@ -56,15 +117,13 @@ class MembersPolicyTest extends TestCase
         $sut->expects($this->once())
             ->method('redirect')
             ->with($loginPageUrl);
-        // Note: Response::Redirect() typically halts script execution,
-        // so subsequent code in Enforce() would not run beyond this point.
 
-        $sut->Enforce();
+        $sut->RequireLogin();
     }
 
-    function testEnforceWhenRoleOfLoggedInAccountReturnsNullAndMinimumRoleIsNone()
+    function testRequireLoginPassesWhenRoleIsNullAndMinimumIsNone()
     {
-        $sut = $this->systemUnderTest();
+        $sut = new AuthManager();
         $accountService = AccountService::Instance();
         $resource = Resource::Instance();
 
@@ -79,32 +138,30 @@ class MembersPolicyTest extends TestCase
         $resource->expects($this->never())
             ->method('ErrorPageUrl');
 
-        $sut->__construct(Role::None);
-        $sut->Enforce();
+        $sut->RequireLogin(Role::None);
     }
 
-    function testEnforceWhenRoleOfLoggedInAccountReturnsNoneAndMinimumRoleIsNone()
+    function testRequireLoginPassesWhenRoleIsNoneAndMinimumIsNone()
     {
-        $sut = $this->systemUnderTest();
+        $sut = new AuthManager();
         $accountService = AccountService::Instance();
         $resource = Resource::Instance();
 
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
-        $resource->expects($this->never())
-            ->method('LoginPageUrl');
         $accountService->expects($this->once())
             ->method('RoleOfLoggedInAccount')
             ->willReturn(Role::None);
         $resource->expects($this->never())
+            ->method('LoginPageUrl');
+        $resource->expects($this->never())
             ->method('ErrorPageUrl');
 
-        $sut->__construct(Role::None);
-        $sut->Enforce();
+        $sut->RequireLogin(Role::None);
     }
 
-    function testEnforceRedirectsToErrorPageWhenRoleOfLoggedInAccountIsLessThanMinimumRole()
+    function testRequireLoginRedirectsToErrorPageWhenRoleIsInsufficient()
     {
         $sut = $this->systemUnderTest('redirect');
         $accountService = AccountService::Instance();
@@ -116,7 +173,7 @@ class MembersPolicyTest extends TestCase
             ->willReturn($this->createStub(Account::class));
         $accountService->expects($this->once())
             ->method('RoleOfLoggedInAccount')
-            ->willReturn(Role::Editor); // less than minimum role (Admin)
+            ->willReturn(Role::Editor); // less than Admin
         $resource->expects($this->once())
             ->method('ErrorPageUrl')
             ->with(StatusCode::Unauthorized)
@@ -125,51 +182,48 @@ class MembersPolicyTest extends TestCase
             ->method('redirect')
             ->with($errorPageUrl);
 
-        $sut->__construct(Role::Admin);
-        $sut->Enforce();
+        $sut->RequireLogin(Role::Admin);
     }
 
-    function testEnforceWhenRoleOfLoggedInAccountIsEqualToMinimumRole()
+    function testRequireLoginPassesWhenRoleIsEqualToMinimum()
     {
-        $sut = $this->systemUnderTest();
+        $sut = new AuthManager();
         $accountService = AccountService::Instance();
         $resource = Resource::Instance();
 
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
-        $resource->expects($this->never())
-            ->method('LoginPageUrl');
         $accountService->expects($this->once())
             ->method('RoleOfLoggedInAccount')
-            ->willReturn(Role::Admin); // equal to minimum role
+            ->willReturn(Role::Admin);
+        $resource->expects($this->never())
+            ->method('LoginPageUrl');
         $resource->expects($this->never())
             ->method('ErrorPageUrl');
 
-        $sut->__construct(Role::Admin);
-        $sut->Enforce();
+        $sut->RequireLogin(Role::Admin);
     }
 
-    function testEnforceWhenRoleOfLoggedInAccountIsGreaterThanMinimumRole()
+    function testRequireLoginPassesWhenRoleIsGreaterThanMinimum()
     {
-        $sut = $this->systemUnderTest();
+        $sut = new AuthManager();
         $accountService = AccountService::Instance();
         $resource = Resource::Instance();
 
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
-        $resource->expects($this->never())
-            ->method('LoginPageUrl');
         $accountService->expects($this->once())
             ->method('RoleOfLoggedInAccount')
-            ->willReturn(Role::Admin); // greater than minimum role (Editor)
+            ->willReturn(Role::Admin); // greater than Editor
+        $resource->expects($this->never())
+            ->method('LoginPageUrl');
         $resource->expects($this->never())
             ->method('ErrorPageUrl');
 
-        $sut->__construct(Role::Editor);
-        $sut->Enforce();
+        $sut->RequireLogin(Role::Editor);
     }
 
-    #endregion Enforce
+    #endregion RequireLogin
 }

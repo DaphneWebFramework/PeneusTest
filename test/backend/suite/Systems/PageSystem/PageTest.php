@@ -11,7 +11,9 @@ use \Harmonia\Services\CookieService;
 use \Harmonia\Services\Security\CsrfToken;
 use \Harmonia\Services\SecurityService;
 use \Peneus\Api\Guards\FormTokenGuard;
-use \Peneus\Systems\PageSystem\AccessPolicies\IAccessPolicy;
+use \Peneus\Model\Account;
+use \Peneus\Model\Role;
+use \Peneus\Systems\PageSystem\AuthManager;
 use \Peneus\Systems\PageSystem\LibraryManager;
 use \Peneus\Systems\PageSystem\MetaCollection;
 use \Peneus\Systems\PageSystem\PageManifest;
@@ -25,6 +27,7 @@ class PageTest extends TestCase
     private ?LibraryManager $libraryManager = null;
     private ?PageManifest $pageManifest = null;
     private ?MetaCollection $metaCollection = null;
+    private ?AuthManager $authManager = null;
     private ?Config $originalConfig = null;
     private ?SecurityService $originalSecurityService = null;
     private ?CookieService $originalCookieService = null;
@@ -35,6 +38,7 @@ class PageTest extends TestCase
         $this->libraryManager = $this->createMock(LibraryManager::class);
         $this->pageManifest = $this->createMock(PageManifest::class);
         $this->metaCollection = $this->createMock(MetaCollection::class);
+        $this->authManager = $this->createMock(AuthManager::class);
         $this->originalConfig =
             Config::ReplaceInstance($this->createMock(Config::class));
         $this->originalSecurityService =
@@ -49,6 +53,7 @@ class PageTest extends TestCase
         $this->libraryManager = null;
         $this->pageManifest = null;
         $this->metaCollection = null;
+        $this->authManager = null;
         Config::ReplaceInstance($this->originalConfig);
         SecurityService::ReplaceInstance($this->originalSecurityService);
         CookieService::ReplaceInstance($this->originalCookieService);
@@ -59,34 +64,15 @@ class PageTest extends TestCase
         return $this->getMockBuilder(Page::class)
             ->setConstructorArgs([
                 __DIR__,
-                $this->createStub(IAccessPolicy::class),
                 $this->renderer,
                 $this->libraryManager,
                 $this->pageManifest,
-                $this->metaCollection
+                $this->metaCollection,
+                $this->authManager
             ])
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
-
-    #region __construct --------------------------------------------------------
-
-    function testConstructorCallsEnforceOnGivenAccessPolicy()
-    {
-        $accessPolicy = $this->createMock(IAccessPolicy::class);
-        $accessPolicy->expects($this->once())
-            ->method('Enforce');
-        new Page(
-            __DIR__,
-            $accessPolicy,
-            $this->renderer,
-            $this->libraryManager,
-            $this->pageManifest,
-            $this->metaCollection
-        );
-    }
-
-    #endregion __construct
 
     #region Id -----------------------------------------------------------------
 
@@ -560,6 +546,52 @@ class PageTest extends TestCase
     }
 
     #endregion MetaItems
+
+    #region LoggedInAccount ----------------------------------------------------
+
+    function testLoggedInAccountDelegatesToAuthManager()
+    {
+        $sut = $this->systemUnderTest();
+        $account = $this->createStub(Account::class);
+
+        $this->authManager->expects($this->once())
+            ->method('LoggedInAccount')
+            ->willReturn($account);
+
+        $this->assertSame($account, $sut->LoggedInAccount());
+    }
+
+    #endregion LoggedInAccount
+
+    #region LoggedInAccountRole ------------------------------------------------
+
+    function testLoggedInAccountRoleDelegatesToAuthManager()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->authManager->expects($this->once())
+            ->method('LoggedInAccountRole')
+            ->willReturn(Role::Editor);
+
+        $this->assertSame(Role::Editor, $sut->LoggedInAccountRole());
+    }
+
+    #endregion LoggedInAccountRole
+
+    #region RequireLogin -------------------------------------------------------
+
+    function testRequireLoginDelegatesToAuthManager()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->authManager->expects($this->once())
+            ->method('RequireLogin')
+            ->with(Role::Admin);
+
+        $this->assertSame($sut, $sut->RequireLogin(Role::Admin));
+    }
+
+    #endregion RequireLogin
 
     #region CsrfTokenName ------------------------------------------------------
 
