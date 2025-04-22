@@ -109,6 +109,7 @@ class AccountServiceTest extends TestCase
             ->willReturn($session);
         $sut->expects($this->once())
             ->method('verifySessionIntegrity')
+            ->with($session)
             ->willReturn(false);
         $sut->expects($this->never())
             ->method('retrieveLoggedInAccount');
@@ -133,9 +134,11 @@ class AccountServiceTest extends TestCase
             ->willReturn($session);
         $sut->expects($this->once())
             ->method('verifySessionIntegrity')
+            ->with($session)
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('retrieveLoggedInAccount')
+            ->with($session)
             ->willReturn(null);
         $session->expects($this->once())
             ->method('Destroy');
@@ -159,9 +162,11 @@ class AccountServiceTest extends TestCase
             ->willReturn($session);
         $sut->expects($this->once())
             ->method('verifySessionIntegrity')
+            ->with($session)
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('retrieveLoggedInAccount')
+            ->with($session)
             ->willReturn($account);
         $session->expects($this->once())
             ->method('Close');
@@ -262,7 +267,8 @@ class AccountServiceTest extends TestCase
 
         $this->assertFalse(AccessHelper::CallMethod(
             $sut,
-            'verifySessionIntegrity'
+            'verifySessionIntegrity',
+            [$session]
         ));
     }
 
@@ -290,7 +296,8 @@ class AccountServiceTest extends TestCase
 
         $this->assertFalse(AccessHelper::CallMethod(
             $sut,
-            'verifySessionIntegrity'
+            'verifySessionIntegrity',
+            [$session]
         ));
     }
 
@@ -327,7 +334,8 @@ class AccountServiceTest extends TestCase
 
         $this->assertSame($returnValue, AccessHelper::CallMethod(
             $sut,
-            'verifySessionIntegrity'
+            'verifySessionIntegrity',
+            [$session]
         ));
     }
 
@@ -347,7 +355,8 @@ class AccountServiceTest extends TestCase
 
         $this->assertNull(AccessHelper::CallMethod(
             $sut,
-            'retrieveLoggedInAccount'
+            'retrieveLoggedInAccount',
+            [$session]
         ));
     }
 
@@ -368,7 +377,8 @@ class AccountServiceTest extends TestCase
 
         $this->assertSame($returnValue, AccessHelper::CallMethod(
             $sut,
-            'retrieveLoggedInAccount'
+            'retrieveLoggedInAccount',
+            [$session]
         ));
     }
 
