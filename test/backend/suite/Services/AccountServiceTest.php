@@ -70,13 +70,13 @@ class AccountServiceTest extends TestCase
 
     #endregion IntegrityCookieName
 
-    #region AuthenticatedAccount -----------------------------------------------
+    #region LoggedInAccount ----------------------------------------------------
 
-    function testAuthenticatedAccountThrowsIfSessionStartThrows()
+    function testLoggedInAccountThrowsIfSessionStartThrows()
     {
         $sut = $this->systemUnderTest(
             'verifySessionIntegrity',
-            'retrieveAuthenticatedAccount'
+            'retrieveLoggedInAccount'
         );
         $session = Session::Instance();
 
@@ -86,21 +86,21 @@ class AccountServiceTest extends TestCase
         $sut->expects($this->never())
             ->method('verifySessionIntegrity');
         $sut->expects($this->never())
-            ->method('retrieveAuthenticatedAccount');
+            ->method('retrieveLoggedInAccount');
         $session->expects($this->never())
             ->method('Destroy');
         $session->expects($this->never())
             ->method('Close');
 
         $this->expectException(\RuntimeException::class);
-        $sut->AuthenticatedAccount();
+        $sut->LoggedInAccount();
     }
 
-    function testAuthenticatedAccountReturnsNullIfVerifySessionIntegrityReturnsFalse()
+    function testLoggedInAccountReturnsNullIfVerifySessionIntegrityReturnsFalse()
     {
         $sut = $this->systemUnderTest(
             'verifySessionIntegrity',
-            'retrieveAuthenticatedAccount'
+            'retrieveLoggedInAccount'
         );
         $session = Session::Instance();
 
@@ -111,20 +111,20 @@ class AccountServiceTest extends TestCase
             ->method('verifySessionIntegrity')
             ->willReturn(false);
         $sut->expects($this->never())
-            ->method('retrieveAuthenticatedAccount');
+            ->method('retrieveLoggedInAccount');
         $session->expects($this->once())
             ->method('Destroy');
         $session->expects($this->never())
             ->method('Close');
 
-        $this->assertNull($sut->AuthenticatedAccount());
+        $this->assertNull($sut->LoggedInAccount());
     }
 
-    function testAuthenticatedAccountReturnsNullIfRetrieveAuthenticatedAccountReturnsNull()
+    function testLoggedInAccountReturnsNullIfRetrieveLoggedInAccountReturnsNull()
     {
         $sut = $this->systemUnderTest(
             'verifySessionIntegrity',
-            'retrieveAuthenticatedAccount'
+            'retrieveLoggedInAccount'
         );
         $session = Session::Instance();
 
@@ -135,21 +135,21 @@ class AccountServiceTest extends TestCase
             ->method('verifySessionIntegrity')
             ->willReturn(true);
         $sut->expects($this->once())
-            ->method('retrieveAuthenticatedAccount')
+            ->method('retrieveLoggedInAccount')
             ->willReturn(null);
         $session->expects($this->once())
             ->method('Destroy');
         $session->expects($this->never())
             ->method('Close');
 
-        $this->assertNull($sut->AuthenticatedAccount());
+        $this->assertNull($sut->LoggedInAccount());
     }
 
-    function testAuthenticatedAccountReturnsAccountIfRetrieveAuthenticatedAccountReturnsAccount()
+    function testLoggedInAccountReturnsAccountIfRetrieveLoggedInAccountReturnsAccount()
     {
         $sut = $this->systemUnderTest(
             'verifySessionIntegrity',
-            'retrieveAuthenticatedAccount'
+            'retrieveLoggedInAccount'
         );
         $session = Session::Instance();
         $account = $this->createStub(Account::class);
@@ -161,19 +161,19 @@ class AccountServiceTest extends TestCase
             ->method('verifySessionIntegrity')
             ->willReturn(true);
         $sut->expects($this->once())
-            ->method('retrieveAuthenticatedAccount')
+            ->method('retrieveLoggedInAccount')
             ->willReturn($account);
         $session->expects($this->once())
             ->method('Close');
 
-        $this->assertSame($account, $sut->AuthenticatedAccount());
+        $this->assertSame($account, $sut->LoggedInAccount());
     }
 
-    #endregion AuthenticatedAccount
+    #endregion LoggedInAccount
 
-    #region RoleOfAuthenticatedAccount -----------------------------------------
+    #region RoleOfLoggedInAccount ----------------------------------------------
 
-    function testRoleOfAuthenticatedAccountThrowsIfSessionStartThrows()
+    function testRoleOfLoggedInAccountThrowsIfSessionStartThrows()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
@@ -187,10 +187,10 @@ class AccountServiceTest extends TestCase
             ->method('Close');
 
         $this->expectException(\RuntimeException::class);
-        $sut->RoleOfAuthenticatedAccount();
+        $sut->RoleOfLoggedInAccount();
     }
 
-    function testRoleOfAuthenticatedAccountThrowsIfSessionCloseThrows()
+    function testRoleOfLoggedInAccountThrowsIfSessionCloseThrows()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
@@ -207,10 +207,10 @@ class AccountServiceTest extends TestCase
             ->willThrowException(new \RuntimeException());
 
         $this->expectException(\RuntimeException::class);
-        $sut->RoleOfAuthenticatedAccount();
+        $sut->RoleOfLoggedInAccount();
     }
 
-    function testRoleOfAuthenticatedAccountReturnsNullIfNotSetInSession()
+    function testRoleOfLoggedInAccountReturnsNullIfNotSetInSession()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
@@ -225,10 +225,10 @@ class AccountServiceTest extends TestCase
         $session->expects($this->once())
             ->method('Close');
 
-        $this->assertNull($sut->RoleOfAuthenticatedAccount());
+        $this->assertNull($sut->RoleOfLoggedInAccount());
     }
 
-    function testRoleOfAuthenticatedAccountReturnsRoleIfSetInSession()
+    function testRoleOfLoggedInAccountReturnsRoleIfSetInSession()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
@@ -243,10 +243,10 @@ class AccountServiceTest extends TestCase
         $session->expects($this->once())
             ->method('Close');
 
-        $this->assertSame(Role::Admin, $sut->RoleOfAuthenticatedAccount());
+        $this->assertSame(Role::Admin, $sut->RoleOfLoggedInAccount());
     }
 
-    #endregion RoleOfAuthenticatedAccount
+    #endregion RoleOfLoggedInAccount
 
     #region verifySessionIntegrity ---------------------------------------------
 
@@ -333,9 +333,9 @@ class AccountServiceTest extends TestCase
 
     #endregion verifySessionIntegrity
 
-    #region retrieveAuthenticatedAccount ---------------------------------------
+    #region retrieveLoggedInAccount --------------------------------------------
 
-    function testRetrieveAuthenticatedAccountReturnsNullIfAccountIdIsMissing()
+    function testRetrieveLoggedInAccountReturnsNullIfAccountIdIsMissing()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
@@ -347,12 +347,12 @@ class AccountServiceTest extends TestCase
 
         $this->assertNull(AccessHelper::CallMethod(
             $sut,
-            'retrieveAuthenticatedAccount'
+            'retrieveLoggedInAccount'
         ));
     }
 
     #[DataProvider('nullOrAccountDataProvider')]
-    function testRetrieveAuthenticatedAccountReturnsWhateverFindAccountByIdReturns($returnValue)
+    function testRetrieveLoggedInAccountReturnsWhateverFindAccountByIdReturns($returnValue)
     {
         $sut = $this->systemUnderTest('findAccountById');
         $session = Session::Instance();
@@ -368,11 +368,11 @@ class AccountServiceTest extends TestCase
 
         $this->assertSame($returnValue, AccessHelper::CallMethod(
             $sut,
-            'retrieveAuthenticatedAccount'
+            'retrieveLoggedInAccount'
         ));
     }
 
-    #endregion retrieveAuthenticatedAccount
+    #endregion retrieveLoggedInAccount
 
     #region Data Providers -----------------------------------------------------
 

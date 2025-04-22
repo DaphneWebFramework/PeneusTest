@@ -25,25 +25,25 @@ class SessionGuardTest extends TestCase
 
     #region Verify -------------------------------------------------------------
 
-    function testVerifyWithAuthenticatedAccount()
+    function testVerifyWithLoggedInAccount()
     {
         $accountService = AccountService::Instance();
         $sessionGuard = new SessionGuard;
 
         $accountService->expects($this->once())
-            ->method('AuthenticatedAccount')
+            ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
 
         $this->assertTrue($sessionGuard->Verify());
     }
 
-    function testVerifyWithUnauthenticatedAccount()
+    function testVerifyWithNotLoggedInAccount()
     {
         $accountService = AccountService::Instance();
         $sessionGuard = new SessionGuard;
 
         $accountService->expects($this->once())
-            ->method('AuthenticatedAccount')
+            ->method('LoggedInAccount')
             ->willReturn(null);
 
         $this->assertFalse($sessionGuard->Verify());

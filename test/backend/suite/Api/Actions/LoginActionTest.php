@@ -96,7 +96,7 @@ class LoginActionTest extends TestCase
         $translation = Translation::Instance();
 
         $accountService->expects($this->once())
-            ->method('AuthenticatedAccount')
+            ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
         $translation->expects($this->once())
             ->method('Get')

@@ -40,7 +40,7 @@ class MembersPolicyTest extends TestCase
 
     #region Enforce ------------------------------------------------------------
 
-    function testEnforceRedirectsToLoginPageWhenAuthenticatedAccountReturnsNull()
+    function testEnforceRedirectsToLoginPageWhenLoggedInAccountReturnsNull()
     {
         $sut = $this->systemUnderTest('redirect');
         $accountService = AccountService::Instance();
@@ -48,7 +48,7 @@ class MembersPolicyTest extends TestCase
         $loginPageUrl = new CUrl('login-page-url');
 
         $accountService->expects($this->once())
-            ->method('AuthenticatedAccount')
+            ->method('LoggedInAccount')
             ->willReturn(null);
         $resource->expects($this->once())
             ->method('LoginPageUrl')
@@ -62,19 +62,19 @@ class MembersPolicyTest extends TestCase
         $sut->Enforce();
     }
 
-    function testEnforceWhenRoleOfAuthenticatedAccountReturnsNullAndMinimumRoleIsNone()
+    function testEnforceWhenRoleOfLoggedInAccountReturnsNullAndMinimumRoleIsNone()
     {
         $sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
         $resource = Resource::Instance();
 
         $accountService->expects($this->once())
-            ->method('AuthenticatedAccount')
+            ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
         $resource->expects($this->never())
             ->method('LoginPageUrl');
         $accountService->expects($this->once())
-            ->method('RoleOfAuthenticatedAccount')
+            ->method('RoleOfLoggedInAccount')
             ->willReturn(null);
         $resource->expects($this->never())
             ->method('ErrorPageUrl');
@@ -83,19 +83,19 @@ class MembersPolicyTest extends TestCase
         $sut->Enforce();
     }
 
-    function testEnforceWhenRoleOfAuthenticatedAccountReturnsNoneAndMinimumRoleIsNone()
+    function testEnforceWhenRoleOfLoggedInAccountReturnsNoneAndMinimumRoleIsNone()
     {
         $sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
         $resource = Resource::Instance();
 
         $accountService->expects($this->once())
-            ->method('AuthenticatedAccount')
+            ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
         $resource->expects($this->never())
             ->method('LoginPageUrl');
         $accountService->expects($this->once())
-            ->method('RoleOfAuthenticatedAccount')
+            ->method('RoleOfLoggedInAccount')
             ->willReturn(Role::None);
         $resource->expects($this->never())
             ->method('ErrorPageUrl');
@@ -104,7 +104,7 @@ class MembersPolicyTest extends TestCase
         $sut->Enforce();
     }
 
-    function testEnforceRedirectsToErrorPageWhenRoleOfAuthenticatedAccountIsLessThanMinimumRole()
+    function testEnforceRedirectsToErrorPageWhenRoleOfLoggedInAccountIsLessThanMinimumRole()
     {
         $sut = $this->systemUnderTest('redirect');
         $accountService = AccountService::Instance();
@@ -112,10 +112,10 @@ class MembersPolicyTest extends TestCase
         $errorPageUrl = new CUrl('error-page-url');
 
         $accountService->expects($this->once())
-            ->method('AuthenticatedAccount')
+            ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
         $accountService->expects($this->once())
-            ->method('RoleOfAuthenticatedAccount')
+            ->method('RoleOfLoggedInAccount')
             ->willReturn(Role::Editor); // less than minimum role (Admin)
         $resource->expects($this->once())
             ->method('ErrorPageUrl')
@@ -129,19 +129,19 @@ class MembersPolicyTest extends TestCase
         $sut->Enforce();
     }
 
-    function testEnforceWhenRoleOfAuthenticatedAccountIsEqualToMinimumRole()
+    function testEnforceWhenRoleOfLoggedInAccountIsEqualToMinimumRole()
     {
         $sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
         $resource = Resource::Instance();
 
         $accountService->expects($this->once())
-            ->method('AuthenticatedAccount')
+            ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
         $resource->expects($this->never())
             ->method('LoginPageUrl');
         $accountService->expects($this->once())
-            ->method('RoleOfAuthenticatedAccount')
+            ->method('RoleOfLoggedInAccount')
             ->willReturn(Role::Admin); // equal to minimum role
         $resource->expects($this->never())
             ->method('ErrorPageUrl');
@@ -150,19 +150,19 @@ class MembersPolicyTest extends TestCase
         $sut->Enforce();
     }
 
-    function testEnforceWhenRoleOfAuthenticatedAccountIsGreaterThanMinimumRole()
+    function testEnforceWhenRoleOfLoggedInAccountIsGreaterThanMinimumRole()
     {
         $sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
         $resource = Resource::Instance();
 
         $accountService->expects($this->once())
-            ->method('AuthenticatedAccount')
+            ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
         $resource->expects($this->never())
             ->method('LoginPageUrl');
         $accountService->expects($this->once())
-            ->method('RoleOfAuthenticatedAccount')
+            ->method('RoleOfLoggedInAccount')
             ->willReturn(Role::Admin); // greater than minimum role (Editor)
         $resource->expects($this->never())
             ->method('ErrorPageUrl');
