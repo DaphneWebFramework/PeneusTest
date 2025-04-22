@@ -171,9 +171,9 @@ class AccountServiceTest extends TestCase
 
     #endregion LoggedInAccount
 
-    #region RoleOfLoggedInAccount ----------------------------------------------
+    #region LoggedInAccountRole ------------------------------------------------
 
-    function testRoleOfLoggedInAccountThrowsIfSessionStartThrows()
+    function testLoggedInAccountRoleThrowsIfSessionStartThrows()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
@@ -187,10 +187,10 @@ class AccountServiceTest extends TestCase
             ->method('Close');
 
         $this->expectException(\RuntimeException::class);
-        $sut->RoleOfLoggedInAccount();
+        $sut->LoggedInAccountRole();
     }
 
-    function testRoleOfLoggedInAccountThrowsIfSessionCloseThrows()
+    function testLoggedInAccountRoleThrowsIfSessionCloseThrows()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
@@ -207,10 +207,10 @@ class AccountServiceTest extends TestCase
             ->willThrowException(new \RuntimeException());
 
         $this->expectException(\RuntimeException::class);
-        $sut->RoleOfLoggedInAccount();
+        $sut->LoggedInAccountRole();
     }
 
-    function testRoleOfLoggedInAccountReturnsNullIfNotSetInSession()
+    function testLoggedInAccountRoleReturnsNullIfNotSetInSession()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
@@ -225,10 +225,10 @@ class AccountServiceTest extends TestCase
         $session->expects($this->once())
             ->method('Close');
 
-        $this->assertNull($sut->RoleOfLoggedInAccount());
+        $this->assertNull($sut->LoggedInAccountRole());
     }
 
-    function testRoleOfLoggedInAccountReturnsRoleIfSetInSession()
+    function testLoggedInAccountRoleReturnsRoleIfSetInSession()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
@@ -243,10 +243,10 @@ class AccountServiceTest extends TestCase
         $session->expects($this->once())
             ->method('Close');
 
-        $this->assertSame(Role::Admin, $sut->RoleOfLoggedInAccount());
+        $this->assertSame(Role::Admin, $sut->LoggedInAccountRole());
     }
 
-    #endregion RoleOfLoggedInAccount
+    #endregion LoggedInAccountRole
 
     #region verifySessionIntegrity ---------------------------------------------
 

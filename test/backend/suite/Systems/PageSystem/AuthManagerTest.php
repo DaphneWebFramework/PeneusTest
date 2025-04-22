@@ -77,7 +77,7 @@ class AuthManagerTest extends TestCase
         $accountService = AccountService::Instance();
 
         $accountService->expects($this->once())
-            ->method('RoleOfLoggedInAccount')
+            ->method('LoggedInAccountRole')
             ->willReturn(null); // Simulate no role stored
 
         $this->assertSame(Role::None, $sut->LoggedInAccountRole());
@@ -90,7 +90,7 @@ class AuthManagerTest extends TestCase
         $accountService = AccountService::Instance();
 
         $accountService->expects($this->once())
-            ->method('RoleOfLoggedInAccount')
+            ->method('LoggedInAccountRole')
             ->willReturn(Role::Editor); // Simulate stored role
 
         $this->assertSame(Role::Editor, $sut->LoggedInAccountRole());
@@ -133,7 +133,7 @@ class AuthManagerTest extends TestCase
         $resource->expects($this->never())
             ->method('LoginPageUrl');
         $accountService->expects($this->once())
-            ->method('RoleOfLoggedInAccount')
+            ->method('LoggedInAccountRole')
             ->willReturn(null);
         $resource->expects($this->never())
             ->method('ErrorPageUrl');
@@ -151,7 +151,7 @@ class AuthManagerTest extends TestCase
             ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
         $accountService->expects($this->once())
-            ->method('RoleOfLoggedInAccount')
+            ->method('LoggedInAccountRole')
             ->willReturn(Role::None);
         $resource->expects($this->never())
             ->method('LoginPageUrl');
@@ -172,7 +172,7 @@ class AuthManagerTest extends TestCase
             ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
         $accountService->expects($this->once())
-            ->method('RoleOfLoggedInAccount')
+            ->method('LoggedInAccountRole')
             ->willReturn(Role::Editor); // less than Admin
         $resource->expects($this->once())
             ->method('ErrorPageUrl')
@@ -195,7 +195,7 @@ class AuthManagerTest extends TestCase
             ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
         $accountService->expects($this->once())
-            ->method('RoleOfLoggedInAccount')
+            ->method('LoggedInAccountRole')
             ->willReturn(Role::Admin);
         $resource->expects($this->never())
             ->method('LoginPageUrl');
@@ -215,7 +215,7 @@ class AuthManagerTest extends TestCase
             ->method('LoggedInAccount')
             ->willReturn($this->createStub(Account::class));
         $accountService->expects($this->once())
-            ->method('RoleOfLoggedInAccount')
+            ->method('LoggedInAccountRole')
             ->willReturn(Role::Admin); // greater than Editor
         $resource->expects($this->never())
             ->method('LoginPageUrl');
