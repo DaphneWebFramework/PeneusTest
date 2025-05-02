@@ -854,6 +854,118 @@ class EntityTest extends TestCase
 
     #endregion Find
 
+    #region Count --------------------------------------------------------------
+
+    function testCountReturnsZeroIfExecuteFails()
+    {
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn(null);
+        $count = TestEntity::Count();
+        $this->assertSame(0, $count);
+    }
+
+    function testCountReturnsZeroIfRowIsNull()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->expects($this->once())
+            ->method('Row')
+            ->with(ResultSet::ROW_MODE_NUMERIC)
+            ->willReturn(null);
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn($resultSet);
+        $count = TestEntity::Count();
+        $this->assertSame(0, $count);
+    }
+
+    function testCountReturnsZeroIfRowHasNoIndexZero()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->expects($this->once())
+            ->method('Row')
+            ->with(ResultSet::ROW_MODE_NUMERIC)
+            ->willReturn([]);
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->willReturn($resultSet);
+        $count = TestEntity::Count();
+        $this->assertSame(0, $count);
+    }
+
+    function testCountReturnsExpectedRowCount()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->expects($this->once())
+            ->method('Row')
+            ->with(ResultSet::ROW_MODE_NUMERIC)
+            ->willReturn([123]);
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame(
+                    'testentity',
+                    AccessHelper::GetProperty($query, 'table')
+                );
+                $this->assertSame(
+                    'COUNT(*)',
+                    AccessHelper::GetProperty($query, 'columns')
+                );
+                $this->assertNull(
+                    AccessHelper::GetProperty($query, 'condition')
+                );
+                $this->assertSame(
+                    [],
+                    $query->Bindings()
+                );
+                return true;
+            }))
+            ->willReturn($resultSet);
+        $count = TestEntity::Count();
+        $this->assertSame(123, $count);
+    }
+
+    function testCountAcceptsConditionAndBindings()
+    {
+        $resultSet = $this->createMock(ResultSet::class);
+        $resultSet->expects($this->once())
+            ->method('Row')
+            ->with(ResultSet::ROW_MODE_NUMERIC)
+            ->willReturn([7]);
+        $database = Database::Instance();
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame(
+                    'testentity',
+                    AccessHelper::GetProperty($query, 'table')
+                );
+                $this->assertSame(
+                    'COUNT(*)',
+                    AccessHelper::GetProperty($query, 'columns')
+                );
+                $this->assertSame(
+                    'age > :age',
+                    AccessHelper::GetProperty($query, 'condition')
+                );
+                $this->assertSame(
+                    ['age' => 30],
+                    $query->Bindings()
+                );
+                return true;
+            }))
+            ->willReturn($resultSet);
+        $count = TestEntity::Count('age > :age', ['age' => 30]);
+        $this->assertSame(7, $count);
+    }
+    #endregion Count
+
     #region tableName ----------------------------------------------------------
 
     function testTableNameCanBeOverridden()
