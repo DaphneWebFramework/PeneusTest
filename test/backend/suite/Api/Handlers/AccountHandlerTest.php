@@ -6,6 +6,7 @@ use \Peneus\Api\Handlers\AccountHandler;
 
 use \Peneus\Api\Actions\LoginAction;
 use \Peneus\Api\Actions\LogoutAction;
+use \Peneus\Api\Actions\RegisterAccountAction;
 use \Peneus\Api\Guards\FormTokenGuard;
 use \Peneus\Api\Guards\SessionGuard;
 use \TestToolkit\AccessHelper;
@@ -14,6 +15,16 @@ use \TestToolkit\AccessHelper;
 class AccountHandlerTest extends TestCase
 {
     #region createAction -------------------------------------------------------
+
+    function testCreateActionWithRegisterAccount()
+    {
+        $handler = new AccountHandler;
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['register-account']);
+        $this->assertInstanceOf(RegisterAccountAction::class, $action);
+        $guards = AccessHelper::GetProperty($action, 'guards');
+        $this->assertCount(1, $guards);
+        $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);
+    }
 
     function testCreateActionWithLogin()
     {

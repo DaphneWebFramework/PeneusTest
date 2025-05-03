@@ -11,6 +11,7 @@ use \Harmonia\Database\Database;
 use \Harmonia\Database\Queries\SelectQuery;
 use \Harmonia\Database\ResultSet;
 use \Harmonia\Http\Request;
+use \Harmonia\Http\StatusCode;
 use \Harmonia\Logger;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\Security\CsrfToken;
@@ -105,7 +106,7 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('You are already logged in.');
-        $this->expectExceptionCode(409);
+        $this->expectExceptionCode(StatusCode::Conflict->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -242,7 +243,7 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Incorrect email address or password.');
-        $this->expectExceptionCode(401);
+        $this->expectExceptionCode(StatusCode::Unauthorized->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -278,7 +279,7 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Incorrect email address or password.');
-        $this->expectExceptionCode(401);
+        $this->expectExceptionCode(StatusCode::Unauthorized->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -337,7 +338,7 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Login failed.');
-        $this->expectExceptionCode(500);
+        $this->expectExceptionCode(StatusCode::InternalServerError->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -401,7 +402,7 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Login failed.');
-        $this->expectExceptionCode(500);
+        $this->expectExceptionCode(StatusCode::InternalServerError->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -467,7 +468,7 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Login failed.');
-        $this->expectExceptionCode(500);
+        $this->expectExceptionCode(StatusCode::InternalServerError->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -512,11 +513,7 @@ class LoginActionTest extends TestCase
         $database->expects($this->once())
             ->method('WithTransaction')
             ->willReturnCallback(function($callback) {
-                try {
-                    return $callback();
-                } catch (\Throwable $e) {
-                    return false;
-                }
+                return $callback();
             });
         $sut->expects($this->never())
             ->method('createLogoutAction');

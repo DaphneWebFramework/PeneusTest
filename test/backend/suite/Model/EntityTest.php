@@ -964,6 +964,7 @@ class EntityTest extends TestCase
         $count = TestEntity::Count('age > :age', ['age' => 30]);
         $this->assertSame(7, $count);
     }
+
     #endregion Count
 
     #region tableName ----------------------------------------------------------

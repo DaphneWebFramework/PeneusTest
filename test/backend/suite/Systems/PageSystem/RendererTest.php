@@ -21,24 +21,24 @@ use \TestToolkit\AccessHelper;
 #[CoversClass(Renderer::class)]
 class RendererTest extends TestCase
 {
-    private ?Resource $originalResource = null;
     private ?Config $originalConfig = null;
+    private ?Resource $originalResource = null;
     private ?Logger $originalLogger = null;
 
     protected function setUp(): void
     {
-        $this->originalResource =
-            Resource::ReplaceInstance($this->createMock(Resource::class));
         $this->originalConfig =
             Config::ReplaceInstance($this->createMock(Config::class));
+        $this->originalResource =
+            Resource::ReplaceInstance($this->createMock(Resource::class));
         $this->originalLogger =
             Logger::ReplaceInstance($this->createStub(Logger::class));
     }
 
     protected function tearDown(): void
     {
-        Resource::ReplaceInstance($this->originalResource);
         Config::ReplaceInstance($this->originalConfig);
+        Resource::ReplaceInstance($this->originalResource);
         Logger::ReplaceInstance($this->originalLogger);
     }
 
@@ -489,7 +489,7 @@ class RendererTest extends TestCase
             ->willReturn($this->pageManifest());
         $sut->expects($this->any())
             ->method('isRemoteAsset')
-            ->willReturnCallback(function ($path) {
+            ->willReturnCallback(function($path) {
                 return \str_starts_with($path, 'http');
             });
         $sut->expects($this->once())
@@ -566,7 +566,7 @@ class RendererTest extends TestCase
             ->willReturn($this->pageManifest());
         $sut->expects($this->any())
             ->method('isRemoteAsset')
-            ->willReturnCallback(function ($path) {
+            ->willReturnCallback(function($path) {
                 return \str_starts_with($path, 'http');
             });
         $sut->expects($this->once())
