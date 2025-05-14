@@ -16,10 +16,10 @@ class AccountHandlerTest extends TestCase
 {
     #region createAction -------------------------------------------------------
 
-    function testCreateActionWithRegisterAccount()
+    function testCreateActionWithRegister()
     {
         $handler = new AccountHandler;
-        $action = AccessHelper::CallMethod($handler, 'createAction', ['register-account']);
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['register']);
         $this->assertInstanceOf(RegisterAccountAction::class, $action);
         $guards = AccessHelper::GetProperty($action, 'guards');
         $this->assertCount(1, $guards);
