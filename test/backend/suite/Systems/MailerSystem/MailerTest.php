@@ -47,13 +47,13 @@ class MailerTest extends TestCase
 
     #region __construct --------------------------------------------------------
 
-    function testConstructorInstantiatesFakeMailerImplWhenDeveloperModeIsEnabled()
+    function testConstructorInstantiatesFakeMailerImplWhenDebugModeIsEnabled()
     {
         $config = Config::Instance();
 
         $config->expects($this->once())
             ->method('Option')
-            ->with('MailerDeveloperMode')
+            ->with('IsDebug')
             ->willReturn(true);
 
         $sut = new Mailer();
@@ -61,14 +61,14 @@ class MailerTest extends TestCase
         $this->assertInstanceOf(FakeMailerImpl::class, $impl);
     }
 
-    function testConstructorInstantiatesMailerImplWhenDeveloperModeIsDisabled()
+    function testConstructorInstantiatesMailerImplWhenDebugModeIsDisabled()
     {
         $config = Config::Instance();
         $server = Server::Instance();
 
         $config->expects($this->once())
             ->method('Option')
-            ->with('MailerDeveloperMode')
+            ->with('IsDebug')
             ->willReturn(false);
         $server->expects($this->once())
             ->method('IsSecure')
