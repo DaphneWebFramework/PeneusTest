@@ -756,7 +756,6 @@ class RegisterAccountActionTest extends TestCase
                 <!DOCTYPE html>
                 <html lang="{{Language}}">
                 <head><title>{{Title}}</title></head>
-                <body style="background: {{EmailPrimaryColor}}">
                 <h1>{{MastheadText}}</h1>
                 <h2>{{GreetingText}}</h2>
                 <p>{{IntroText}}</p>
@@ -774,10 +773,9 @@ class RegisterAccountActionTest extends TestCase
         $config->expects($this->any())
             ->method('OptionOrDefault')
             ->willReturnMap([
-                ['Language'         , 'en'     , 'tr'],
-                ['AppName'          , ''       , 'Çiçek Sepeti'],
-                ['SupportEmail'     , ''       , 'destek@ciceksepeti.com'],
-                ['EmailPrimaryColor', '#3b82f6', '#22c55e']
+                ['Language'     , 'en' , 'tr'],
+                ['AppName'      , ''   , 'Çiçek Sepeti'],
+                ['SupportEmail' , ''   , 'destek@ciceksepeti.com']
             ]);
             $translation->method('Get')
                 ->willReturnCallback(function ($key, ...$args) {
@@ -820,7 +818,6 @@ class RegisterAccountActionTest extends TestCase
                 <!DOCTYPE html>
                 <html lang="tr">
                 <head><title>Hoş geldiniz!</title></head>
-                <body style="background: #22c55e">
                 <h1>Hoş geldiniz!</h1>
                 <h2>Merhaba John Doe,</h2>
                 <p>Hesabınızı etkinleştirmek için aşağıdaki butona tıklayın.</p>
