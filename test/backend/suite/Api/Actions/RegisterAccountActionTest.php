@@ -231,8 +231,9 @@ class RegisterAccountActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
-            "Field 'displayName' must match the required pattern:"
-          . " /^[\p{L}\p{N}][\p{L}\p{N} .\-']{1,49}$/u");
+            'Display name is invalid. It must start with a letter or number'
+          . ' and may only contain letters, numbers, spaces, dots, hyphens,'
+          . ' and apostrophes.');
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
