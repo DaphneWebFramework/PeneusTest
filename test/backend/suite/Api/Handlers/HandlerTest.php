@@ -4,23 +4,30 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\Handlers\Handler;
 
+use \Harmonia\Config;
 use \Peneus\Api\Actions\Action;
-use \Peneus\Translation;
 
 #[CoversClass(Handler::class)]
 class HandlerTest extends TestCase
 {
-    private ?Translation $originalTranslation = null;
+    private ?Config $originalConfig = null;
 
     protected function setUp(): void
     {
-        $this->originalTranslation = Translation::ReplaceInstance(
-            $this->createMock(Translation::class));
+        $this->originalConfig =
+            Config::ReplaceInstance($this->config());
     }
 
     protected function tearDown(): void
     {
-        Translation::ReplaceInstance($this->originalTranslation);
+        Config::ReplaceInstance($this->originalConfig);
+    }
+
+    private function config()
+    {
+        $mock = $this->createMock(Config::class);
+        $mock->method('Option')->with('Language')->willReturn('en');
+        return $mock;
     }
 
     private function systemUnderTest(): Handler
@@ -35,12 +42,7 @@ class HandlerTest extends TestCase
     function testHandleActionWhenActionIsUnknown()
     {
         $sut = $this->systemUnderTest();
-        $translation = Translation::Instance();
 
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('error_action_not_found', 'action1')
-            ->willReturn('Action not found: action1');
         $sut->expects($this->once())
             ->method('createAction')
             ->willReturn(null);

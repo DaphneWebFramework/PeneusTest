@@ -21,7 +21,6 @@ use \Harmonia\Services\CookieService;
 use \Harmonia\Services\SecurityService;
 use \Peneus\Resource;
 use \Peneus\Systems\MailerSystem\Mailer;
-use \Peneus\Translation;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
@@ -35,7 +34,6 @@ class RegisterAccountActionTest extends TestCase
     private ?Config $originalConfig = null;
     private ?Resource $originalResource = null;
     private ?Logger $originalLogger = null;
-    private ?Translation $originalTranslation = null;
 
     protected function setUp(): void
     {
@@ -53,8 +51,6 @@ class RegisterAccountActionTest extends TestCase
             Resource::ReplaceInstance($this->createMock(Resource::class));
         $this->originalLogger =
             Logger::ReplaceInstance($this->createMock(Logger::class));
-        $this->originalTranslation =
-            Translation::ReplaceInstance($this->createMock(Translation::class));
     }
 
     protected function tearDown(): void
@@ -66,7 +62,6 @@ class RegisterAccountActionTest extends TestCase
         Config::ReplaceInstance($this->originalConfig);
         Resource::ReplaceInstance($this->originalResource);
         Logger::ReplaceInstance($this->originalLogger);
-        Translation::ReplaceInstance($this->originalTranslation);
     }
 
     private function config()
@@ -246,7 +241,6 @@ class RegisterAccountActionTest extends TestCase
         $sut = $this->systemUnderTest('isEmailAlreadyRegistered');
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
-        $translation = Translation::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -262,10 +256,6 @@ class RegisterAccountActionTest extends TestCase
             ->method('isEmailAlreadyRegistered')
             ->with('john@example.com')
             ->willReturn(true);
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('error_email_already_registered')
-            ->willReturn('This email address is already registered.');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('This email address is already registered.');
@@ -281,7 +271,6 @@ class RegisterAccountActionTest extends TestCase
         );
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
-        $translation = Translation::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -301,10 +290,6 @@ class RegisterAccountActionTest extends TestCase
             ->method('isEmailAlreadyPending')
             ->with('john@example.com')
             ->willReturn(true);
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('error_email_already_pending')
-            ->willReturn('This email address is already awaiting activation.');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('This email address is already awaiting activation.');
@@ -324,7 +309,6 @@ class RegisterAccountActionTest extends TestCase
         $formParams = $this->createMock(CArray::class);
         $securityService = SecurityService::Instance();
         $database = Database::Instance();
-        $translation = Translation::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -363,10 +347,6 @@ class RegisterAccountActionTest extends TestCase
                     return false;
                 }
             });
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('error_register_account_failed')
-            ->willReturn('Account registration failed.');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Account registration failed.');
@@ -386,7 +366,6 @@ class RegisterAccountActionTest extends TestCase
         $formParams = $this->createMock(CArray::class);
         $securityService = SecurityService::Instance();
         $database = Database::Instance();
-        $translation = Translation::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -427,10 +406,6 @@ class RegisterAccountActionTest extends TestCase
                     return false;
                 }
             });
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('error_register_account_failed')
-            ->willReturn('Account registration failed.');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Account registration failed.');
@@ -451,7 +426,6 @@ class RegisterAccountActionTest extends TestCase
         $securityService = SecurityService::Instance();
         $cookieService = CookieService::Instance();
         $database = Database::Instance();
-        $translation = Translation::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -494,10 +468,6 @@ class RegisterAccountActionTest extends TestCase
                     return false;
                 }
             });
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('error_register_account_failed')
-            ->willReturn('Account registration failed.');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Account registration failed.');
@@ -518,7 +488,6 @@ class RegisterAccountActionTest extends TestCase
         $securityService = SecurityService::Instance();
         $cookieService = CookieService::Instance();
         $database = Database::Instance();
-        $translation = Translation::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -556,10 +525,6 @@ class RegisterAccountActionTest extends TestCase
             ->willReturnCallback(function($callback) {
                 return $callback();
             });
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('success_account_activation_link_sent')
-            ->willReturn('An account activation link has been sent to your email address.');
 
         $result = AccessHelper::CallMethod($sut, 'onExecute');
 
@@ -890,13 +855,12 @@ class RegisterAccountActionTest extends TestCase
     #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
     function testSendActivationEmailReturns($returnValue)
     {
-        $sut = $this->systemUnderTest('openFile', 'newMailer');
+        $sut = $this->systemUnderTest('openFile', 'newMailer', 'currentYear');
         $resource = Resource::Instance();
         $logger = Logger::Instance();
         $path = new CPath('path/to/email.html');
         $file = $this->createMock(CFile::class);
         $config = Config::Instance();
-        $translation = Translation::Instance();
         $mailer = $this->createMock(Mailer::class);
 
         $resource->expects($this->once())
@@ -930,34 +894,17 @@ class RegisterAccountActionTest extends TestCase
         $config->expects($this->any())
             ->method('OptionOrDefault')
             ->willReturnMap([
-                ['Language'     , 'en' , 'tr'],
-                ['AppName'      , ''   , 'Çiçek Sepeti'],
-                ['SupportEmail' , ''   , 'destek@ciceksepeti.com']
+                ['Language'     , 'en' , 'en'],
+                ['AppName'      , ''   , 'Example'],
+                ['SupportEmail' , ''   , 'support@example.com']
             ]);
-            $translation->method('Get')
-                ->willReturnCallback(function ($key, ...$args) {
-                    return match ($key) {
-                        'email_activate_account_masthead'
-                            => 'Hoş geldiniz!',
-                        'email_common_greeting'
-                            => sprintf('Merhaba %s,', $args[0]),
-                        'email_activate_account_intro'
-                            => 'Hesabınızı etkinleştirmek için aşağıdaki butona tıklayın.',
-                        'email_activate_account_button_text'
-                            => 'Hesabımı Etkinleştir',
-                        'email_activate_account_security_notice'
-                            => sprintf('E-posta adresiniz %s üzerinde bir kayıt işleminde kullanıldı.', $args[0]),
-                        'email_common_contact_us'
-                            => 'Yardım gerekirse bize ulaşın:',
-                        'email_common_copyright'
-                            => sprintf('© %d %s. Tüm hakları saklıdır.', '2025'/*$args[0]*/, $args[1]),
-                        default => '',
-                    };
-                });
         $resource->expects($this->once())
             ->method('PageUrl')
             ->with('activate-account')
             ->willReturn(new CUrl('url/to/activate-account/'));
+        $sut->expects($this->once())
+            ->method('currentYear')
+            ->willReturn('1974');
         $sut->expects($this->once())
             ->method('newMailer')
             ->willReturn($mailer);
@@ -967,22 +914,22 @@ class RegisterAccountActionTest extends TestCase
             ->willReturnSelf();
         $mailer->expects($this->once())
             ->method('SetSubject')
-            ->with('Hoş geldiniz!')
+            ->with('Welcome!')
             ->willReturnSelf();
         $mailer->expects($this->once())
             ->method('SetBody')
             ->with(<<<HTML
                 <!DOCTYPE html>
-                <html lang="tr">
-                <head><title>Hoş geldiniz!</title></head>
-                <h1>Hoş geldiniz!</h1>
-                <h2>Merhaba John Doe,</h2>
-                <p>Hesabınızı etkinleştirmek için aşağıdaki butona tıklayın.</p>
-                <a href="url/to/activate-account/activation-code-123">Hesabımı Etkinleştir</a>
-                <p>E-posta adresiniz Çiçek Sepeti üzerinde bir kayıt işleminde kullanıldı.</p>
+                <html lang="en">
+                <head><title>Welcome!</title></head>
+                <h1>Welcome!</h1>
+                <h2>Hi John Doe,</h2>
+                <p>You're almost there! Just click the button below to activate your account.</p>
+                <a href="url/to/activate-account/activation-code-123">Activate My Account</a>
+                <p>You received this email because your email address was used to register on Example. If this wasn't you, you can safely ignore this email.</p>
                 <footer>
-                <p>Yardım gerekirse bize ulaşın: <a href="mailto:destek@ciceksepeti.com">destek@ciceksepeti.com</a></p>
-                <p>© 2025 Çiçek Sepeti. Tüm hakları saklıdır.</p>
+                <p>Need help? Contact us at <a href="mailto:support@example.com">support@example.com</a></p>
+                <p>© 1974 Example. All rights reserved.</p>
                 </footer>
                 </body>
                 </html>

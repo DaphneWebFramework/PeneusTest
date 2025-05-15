@@ -4,8 +4,8 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\Actions\Action;
 
+use \Harmonia\Config;
 use \Peneus\Api\Guards\IGuard;
-use \Peneus\Translation;
 
 class DummyAction extends Action {
     protected function onExecute(): mixed { return 42; }
@@ -14,59 +14,60 @@ class DummyAction extends Action {
 #[CoversClass(Action::class)]
 class ActionTest extends TestCase
 {
-    private ?Translation $originalTranslation = null;
+    private ?Config $originalConfig = null;
 
     protected function setUp(): void
     {
-        $this->originalTranslation =
-            Translation::ReplaceInstance($this->createMock(Translation::class));
+        $this->originalConfig =
+            Config::ReplaceInstance($this->config());
     }
 
     protected function tearDown(): void
     {
-        Translation::ReplaceInstance($this->originalTranslation);
+        Config::ReplaceInstance($this->originalConfig);
+    }
+
+    private function config()
+    {
+        $mock = $this->createMock(Config::class);
+        $mock->method('Option')->with('Language')->willReturn('en');
+        return $mock;
     }
 
     #region Execute ------------------------------------------------------------
 
     function testExecuteWithoutGuards()
     {
-        $action = new DummyAction();
-        $this->assertSame(42, $action->Execute());
+        $sut = new DummyAction();
+        $this->assertSame(42, $sut->Execute());
     }
 
     function testExecuteWithGuardsWhenFirstGuardDoesNotVerify()
     {
-        $action = new DummyAction();
+        $sut = new DummyAction();
         $guard1 = $this->createMock(IGuard::class);
         $guard2 = $this->createMock(IGuard::class);
-        $translation = Translation::Instance();
 
         $guard1->expects($this->once())
             ->method('Verify')
             ->willReturn(false);
         $guard2->expects($this->never())
             ->method('Verify');
-        $action->AddGuard($guard1)
-               ->AddGuard($guard2);
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('error_no_permission_for_action')
-            ->willReturn('You do not have permission to perform this action.');
+        $sut->AddGuard($guard1)
+            ->AddGuard($guard2);
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage(
             'You do not have permission to perform this action.');
         $this->expectExceptionCode(401);
-        $action->Execute();
+        $sut->Execute();
     }
 
     function testExecuteWithGuardsWhenSecondGuardDoesNotVerify()
     {
         $guard1 = $this->createMock(IGuard::class);
         $guard2 = $this->createMock(IGuard::class);
-        $action = new DummyAction();
-        $translation = Translation::Instance();
+        $sut = new DummyAction();
 
         $guard1->expects($this->once())
             ->method('Verify')
@@ -74,25 +75,21 @@ class ActionTest extends TestCase
         $guard2->expects($this->once())
             ->method('Verify')
             ->willReturn(false);
-        $action->AddGuard($guard1)
-               ->AddGuard($guard2);
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('error_no_permission_for_action')
-            ->willReturn('You do not have permission to perform this action.');
+        $sut->AddGuard($guard1)
+            ->AddGuard($guard2);
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage(
             'You do not have permission to perform this action.');
         $this->expectExceptionCode(401);
-        $action->Execute();
+        $sut->Execute();
     }
 
     function testExecuteWithGuardsWhenAllGuardsVerify()
     {
         $guard1 = $this->createMock(IGuard::class);
         $guard2 = $this->createMock(IGuard::class);
-        $action = new DummyAction();
+        $sut = new DummyAction();
 
         $guard1->expects($this->once())
             ->method('Verify')
@@ -100,10 +97,10 @@ class ActionTest extends TestCase
         $guard2->expects($this->once())
             ->method('Verify')
             ->willReturn(true);
-        $action->AddGuard($guard1)
-               ->AddGuard($guard2);
+        $sut->AddGuard($guard1)
+            ->AddGuard($guard2);
 
-        $this->assertSame(42, $action->Execute());
+        $this->assertSame(42, $sut->Execute());
     }
 
     #endregion Execute

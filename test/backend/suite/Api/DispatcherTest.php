@@ -12,7 +12,6 @@ use \Harmonia\Http\StatusCode;
 use \Harmonia\Shutdown\ShutdownHandler;
 use \Peneus\Api\HandlerRegistry;
 use \Peneus\Api\Handlers\Handler;
-use \Peneus\Translation;
 use \TestToolkit\AccessHelper;
 
 #[CoversClass(Dispatcher::class)]
@@ -22,7 +21,6 @@ class DispatcherTest extends TestCase
     private ?Request $originalRequest = null;
     private ?HandlerRegistry $originalHandlerRegistry = null;
     private ?Config $originalConfig = null;
-    private ?Translation $originalTranslation = null;
 
     protected function setUp(): void
     {
@@ -33,9 +31,7 @@ class DispatcherTest extends TestCase
         $this->originalHandlerRegistry =
             HandlerRegistry::ReplaceInstance($this->createMock(HandlerRegistry::class));
         $this->originalConfig =
-            Config::ReplaceInstance($this->createMock(Config::class));
-        $this->originalTranslation =
-            Translation::ReplaceInstance($this->createMock(Translation::class));
+            Config::ReplaceInstance($this->config());
     }
 
     protected function tearDown(): void
@@ -44,23 +40,27 @@ class DispatcherTest extends TestCase
         Request::ReplaceInstance($this->originalRequest);
         HandlerRegistry::ReplaceInstance($this->originalHandlerRegistry);
         Config::ReplaceInstance($this->originalConfig);
-        Translation::ReplaceInstance($this->originalTranslation);
+    }
+
+    private function config($language = 'en', $isDebug = true): Config
+    {
+        $config = $this->createMock(Config::class);
+        $config->method('Option')->willReturnMap([
+            ['Language', $language],
+            ['IsDebug', $isDebug]
+        ]);
+        return $config;
     }
 
     #region DispatchRequest ----------------------------------------------------
 
     function testDispatchRequestWithMissingHandlerQueryParameter()
     {
-        $translation = Translation::Instance();
+        $sut = new Dispatcher();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
 
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('error_handler_not_specified')
-            ->willReturn('Handler not specified.');
         $request->expects($this->once())
             ->method('QueryParams')
             ->willReturn($queryParams);
@@ -76,22 +76,17 @@ class DispatcherTest extends TestCase
             ->method('SetBody')
             ->with('{"error":"Handler not specified."}');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
-        $dispatcher->DispatchRequest();
+        AccessHelper::SetProperty($sut, 'response', $response); // Inject
+        $sut->DispatchRequest();
     }
 
     function testDispatchRequestWithMissingActionQueryParameter()
     {
-        $translation = Translation::Instance();
+        $sut = new Dispatcher();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
 
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('error_action_not_specified')
-            ->willReturn('Action not specified.');
         $request->expects($this->once())
             ->method('QueryParams')
             ->willReturn($queryParams);
@@ -111,23 +106,18 @@ class DispatcherTest extends TestCase
             ->method('SetBody')
             ->with('{"error":"Action not specified."}');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
-        $dispatcher->DispatchRequest();
+        AccessHelper::SetProperty($sut, 'response', $response); // Inject
+        $sut->DispatchRequest();
     }
 
     function testDispatchRequestWithHandlerNotFound()
     {
-        $translation = Translation::Instance();
+        $sut = new Dispatcher();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
 
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('error_handler_not_found', 'handler1')
-            ->willReturn('Handler not found: handler1');
         $request->expects($this->once())
             ->method('QueryParams')
             ->willReturn($queryParams);
@@ -151,18 +141,18 @@ class DispatcherTest extends TestCase
             ->method('SetBody')
             ->with('{"error":"Handler not found: handler1"}');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
-        $dispatcher->DispatchRequest();
+        AccessHelper::SetProperty($sut, 'response', $response); // Inject
+        $sut->DispatchRequest();
     }
 
     function testDispatchRequestWithHandleActionReturnsNull()
     {
+        $sut = new Dispatcher();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $handler = $this->createMock(Handler::class);
         $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -187,18 +177,18 @@ class DispatcherTest extends TestCase
             ->method('SetStatusCode')
             ->with(StatusCode::NoContent);
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
-        $dispatcher->DispatchRequest();
+        AccessHelper::SetProperty($sut, 'response', $response); // Inject
+        $sut->DispatchRequest();
     }
 
     function testDispatchRequestWithHandleActionReturnsResponseObject()
     {
+        $sut = new Dispatcher();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $handler = $this->createMock(Handler::class);
         $resultResponse = $this->createStub(Response::class);
-        $dispatcher = new Dispatcher();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -220,22 +210,22 @@ class DispatcherTest extends TestCase
             ->with('action1')
             ->willReturn($resultResponse);
 
-        $dispatcher->DispatchRequest();
+        $sut->DispatchRequest();
 
         $this->assertSame(
             $resultResponse,
-            AccessHelper::GetProperty($dispatcher, 'response')
+            AccessHelper::GetProperty($sut, 'response')
         );
     }
 
     function testDispatchRequestWithHandleActionReturnsOtherResult()
     {
+        $sut = new Dispatcher();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $handler = $this->createMock(Handler::class);
         $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -267,18 +257,18 @@ class DispatcherTest extends TestCase
             ->method('SetBody')
             ->with('{"question":"What is the meaning of life?","answer":42}');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
-        $dispatcher->DispatchRequest();
+        AccessHelper::SetProperty($sut, 'response', $response); // Inject
+        $sut->DispatchRequest();
     }
 
     function testDispatchRequestWithHandleActionThrowsWhenExceptionCodeNotSet()
     {
+        $sut = new Dispatcher();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $handler = $this->createMock(Handler::class);
         $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -311,18 +301,18 @@ class DispatcherTest extends TestCase
             ->method('SetBody')
             ->with('{"error":"Sample error message."}');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
-        $dispatcher->DispatchRequest();
+        AccessHelper::SetProperty($sut, 'response', $response); // Inject
+        $sut->DispatchRequest();
     }
 
     function testDispatchRequestWithHandleActionThrowsWhenExceptionCodeSet()
     {
+        $sut = new Dispatcher();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $handlerRegistry = HandlerRegistry::Instance();
         $handler = $this->createMock(Handler::class);
         $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -355,8 +345,8 @@ class DispatcherTest extends TestCase
             ->method('SetBody')
             ->with('{"error":"File is too large."}');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
-        $dispatcher->DispatchRequest();
+        AccessHelper::SetProperty($sut, 'response', $response); // Inject
+        $sut->DispatchRequest();
     }
 
     #endregion DispatchRequest
@@ -365,26 +355,21 @@ class DispatcherTest extends TestCase
 
     function testOnShutdownWithNoError()
     {
+        $sut = new Dispatcher();
         $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
 
         $response->expects($this->once())
             ->method('Send');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
-        $dispatcher->OnShutdown(null);
+        AccessHelper::SetProperty($sut, 'response', $response); // Inject
+        $sut->OnShutdown(null);
     }
 
     function testOnShutdownWithErrorInDebugMode()
     {
-        $config = Config::Instance();
+        $sut = new Dispatcher();
         $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
 
-        $config->expects($this->once())
-            ->method('Option')
-            ->with('IsDebug')
-            ->willReturn(true);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::InternalServerError)
@@ -400,25 +385,16 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('Send');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
-        $dispatcher->OnShutdown("E_NOTICE: Something went wrong in 'file.php' on line 123.");
+        AccessHelper::SetProperty($sut, 'response', $response); // Inject
+        $sut->OnShutdown("E_NOTICE: Something went wrong in 'file.php' on line 123.");
     }
 
     function testOnShutdownWithErrorInLiveMode()
     {
-        $config = Config::Instance();
-        $translation = Translation::Instance();
+        $sut = new Dispatcher();
         $response = $this->createMock(Response::class);
-        $dispatcher = new Dispatcher();
+        Config::ReplaceInstance($this->config('en', false)); // Set live mode
 
-        $config->expects($this->once())
-            ->method('Option')
-            ->with('IsDebug')
-            ->willReturn(false);
-        $translation->expects($this->once())
-            ->method('Get')
-            ->with('error_unexpected')
-            ->willReturn('An unexpected error occurred.');
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::InternalServerError)
@@ -434,8 +410,8 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('Send');
 
-        AccessHelper::SetProperty($dispatcher, 'response', $response); // Inject
-        $dispatcher->OnShutdown("E_NOTICE: Something went wrong in 'file.php' on line 123.");
+        AccessHelper::SetProperty($sut, 'response', $response); // Inject
+        $sut->OnShutdown("E_NOTICE: Something went wrong in 'file.php' on line 123.");
     }
 
     #endregion OnShutdown
