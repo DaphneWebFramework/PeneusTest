@@ -273,10 +273,50 @@ class RegisterAccountActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
+    function testOnExecuteThrowsIfEmailAlreadyPending()
+    {
+        $sut = $this->systemUnderTest(
+            'isEmailAlreadyRegistered',
+            'isEmailAlreadyPending'
+        );
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $translation = Translation::Instance();
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'email' => 'john@example.com',
+                'password' => 'pass1234',
+                'displayName' => 'John Doe'
+            ]);
+        $sut->expects($this->once())
+            ->method('isEmailAlreadyRegistered')
+            ->with('john@example.com')
+            ->willReturn(false);
+        $sut->expects($this->once())
+            ->method('isEmailAlreadyPending')
+            ->with('john@example.com')
+            ->willReturn(true);
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('error_email_already_pending')
+            ->willReturn('This email address is already awaiting activation.');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('This email address is already awaiting activation.');
+        $this->expectExceptionCode(StatusCode::Conflict->value);
+        AccessHelper::CallMethod($sut, 'onExecute');
+    }
+
     function testOnExecuteThrowsIfCreatePendingAccountFails()
     {
         $sut = $this->systemUnderTest(
             'isEmailAlreadyRegistered',
+            'isEmailAlreadyPending',
             'createPendingAccount',
             'sendActivationEmail'
         );
@@ -298,6 +338,10 @@ class RegisterAccountActionTest extends TestCase
             ]);
         $sut->expects($this->once())
             ->method('isEmailAlreadyRegistered')
+            ->with('john@example.com')
+            ->willReturn(false);
+        $sut->expects($this->once())
+            ->method('isEmailAlreadyPending')
             ->with('john@example.com')
             ->willReturn(false);
         $securityService->expects($this->once())
@@ -334,6 +378,7 @@ class RegisterAccountActionTest extends TestCase
     {
         $sut = $this->systemUnderTest(
             'isEmailAlreadyRegistered',
+            'isEmailAlreadyPending',
             'createPendingAccount',
             'sendActivationEmail'
         );
@@ -355,6 +400,10 @@ class RegisterAccountActionTest extends TestCase
             ]);
         $sut->expects($this->once())
             ->method('isEmailAlreadyRegistered')
+            ->with('john@example.com')
+            ->willReturn(false);
+        $sut->expects($this->once())
+            ->method('isEmailAlreadyPending')
             ->with('john@example.com')
             ->willReturn(false);
         $securityService->expects($this->once())
@@ -393,6 +442,7 @@ class RegisterAccountActionTest extends TestCase
     {
         $sut = $this->systemUnderTest(
             'isEmailAlreadyRegistered',
+            'isEmailAlreadyPending',
             'createPendingAccount',
             'sendActivationEmail'
         );
@@ -415,6 +465,10 @@ class RegisterAccountActionTest extends TestCase
             ]);
         $sut->expects($this->once())
             ->method('isEmailAlreadyRegistered')
+            ->with('john@example.com')
+            ->willReturn(false);
+        $sut->expects($this->once())
+            ->method('isEmailAlreadyPending')
             ->with('john@example.com')
             ->willReturn(false);
         $securityService->expects($this->once())
@@ -455,6 +509,7 @@ class RegisterAccountActionTest extends TestCase
     {
         $sut = $this->systemUnderTest(
             'isEmailAlreadyRegistered',
+            'isEmailAlreadyPending',
             'createPendingAccount',
             'sendActivationEmail'
         );
@@ -477,6 +532,10 @@ class RegisterAccountActionTest extends TestCase
             ]);
         $sut->expects($this->once())
             ->method('isEmailAlreadyRegistered')
+            ->with('john@example.com')
+            ->willReturn(false);
+        $sut->expects($this->once())
+            ->method('isEmailAlreadyPending')
             ->with('john@example.com')
             ->willReturn(false);
         $securityService->expects($this->once())
@@ -599,6 +658,92 @@ class RegisterAccountActionTest extends TestCase
     }
 
     #endregion isEmailAlreadyRegistered
+
+    #region isEmailAlreadyPending ----------------------------------------------
+
+    function testIsEmailAlreadyPendingReturnsTrue()
+    {
+        $sut = $this->systemUnderTest();
+        $database = Database::Instance();
+        $resultSet = $this->createMock(ResultSet::class);
+
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame(
+                    'pendingaccount',
+                    AccessHelper::GetProperty($query, 'table')
+                );
+                $this->assertSame(
+                    'COUNT(*)',
+                    AccessHelper::GetProperty($query, 'columns')
+                );
+                $this->assertSame(
+                    'email = :email',
+                    AccessHelper::GetProperty($query, 'condition')
+                );
+                $this->assertSame(
+                    ['email' => 'test@example.com'],
+                    $query->Bindings()
+                );
+                return true;
+            }))
+            ->willReturn($resultSet);
+        $resultSet->expects($this->once())
+            ->method('Row')
+            ->with(ResultSet::ROW_MODE_NUMERIC)
+            ->willReturn([1]);
+
+        $this->assertTrue(AccessHelper::CallMethod(
+            $sut,
+            'isEmailAlreadyPending',
+            ['test@example.com']
+        ));
+    }
+
+    function testIsEmailAlreadyPendingReturnsFalse()
+    {
+        $sut = $this->systemUnderTest();
+        $database = Database::Instance();
+        $resultSet = $this->createMock(ResultSet::class);
+
+        $database->expects($this->once())
+            ->method('Execute')
+            ->with($this->callback(function($query) {
+                $this->assertInstanceOf(SelectQuery::class, $query);
+                $this->assertSame(
+                    'pendingaccount',
+                    AccessHelper::GetProperty($query, 'table')
+                );
+                $this->assertSame(
+                    'COUNT(*)',
+                    AccessHelper::GetProperty($query, 'columns')
+                );
+                $this->assertSame(
+                    'email = :email',
+                    AccessHelper::GetProperty($query, 'condition')
+                );
+                $this->assertSame(
+                    ['email' => 'test@example.com'],
+                    $query->Bindings()
+                );
+                return true;
+            }))
+            ->willReturn($resultSet);
+        $resultSet->expects($this->once())
+            ->method('Row')
+            ->with(ResultSet::ROW_MODE_NUMERIC)
+            ->willReturn([0]);
+
+        $this->assertFalse(AccessHelper::CallMethod(
+            $sut,
+            'isEmailAlreadyPending',
+            ['test@example.com']
+        ));
+    }
+
+    #endregion isEmailAlreadyPending
 
     #region createPendingAccount -----------------------------------------------
 
