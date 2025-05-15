@@ -463,6 +463,7 @@ class RegisterAccountActionTest extends TestCase
         $securityService = SecurityService::Instance();
         $cookieService = CookieService::Instance();
         $database = Database::Instance();
+        $translation = Translation::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -496,8 +497,19 @@ class RegisterAccountActionTest extends TestCase
             ->willReturnCallback(function($callback) {
                 return $callback();
             });
+        $translation->expects($this->once())
+            ->method('Get')
+            ->with('success_account_activation_link_sent')
+            ->willReturn('An account activation link has been sent to your email address.');
 
-        $this->assertNull(AccessHelper::CallMethod($sut, 'onExecute'));
+        $result = AccessHelper::CallMethod($sut, 'onExecute');
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('message', $result);
+        $this->assertSame(
+            'An account activation link has been sent to your email address.',
+            $result['message']
+        );
     }
 
     #endregion onExecute
