@@ -74,7 +74,7 @@ class DispatcherTest extends TestCase
             ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
-            ->with('{"error":"Handler not specified."}');
+            ->with('{"message":"Handler not specified."}');
 
         AccessHelper::SetProperty($sut, 'response', $response); // Inject
         $sut->DispatchRequest();
@@ -104,7 +104,7 @@ class DispatcherTest extends TestCase
             ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
-            ->with('{"error":"Action not specified."}');
+            ->with('{"message":"Action not specified."}');
 
         AccessHelper::SetProperty($sut, 'response', $response); // Inject
         $sut->DispatchRequest();
@@ -139,7 +139,7 @@ class DispatcherTest extends TestCase
             ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
-            ->with('{"error":"Handler not found: handler1"}');
+            ->with('{"message":"Handler not found: handler1"}');
 
         AccessHelper::SetProperty($sut, 'response', $response); // Inject
         $sut->DispatchRequest();
@@ -299,7 +299,7 @@ class DispatcherTest extends TestCase
             ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
-            ->with('{"error":"Sample error message."}');
+            ->with('{"message":"Sample error message."}');
 
         AccessHelper::SetProperty($sut, 'response', $response); // Inject
         $sut->DispatchRequest();
@@ -343,7 +343,7 @@ class DispatcherTest extends TestCase
             ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
-            ->with('{"error":"File is too large."}');
+            ->with('{"message":"File is too large."}');
 
         AccessHelper::SetProperty($sut, 'response', $response); // Inject
         $sut->DispatchRequest();
@@ -380,7 +380,7 @@ class DispatcherTest extends TestCase
             ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
-            ->with('{"error":"E_NOTICE: Something went wrong in \'file.php\' on line 123."}')
+            ->with('{"message":"E_NOTICE: Something went wrong in \'file.php\' on line 123."}')
             ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('Send');
@@ -393,7 +393,7 @@ class DispatcherTest extends TestCase
     {
         $sut = new Dispatcher();
         $response = $this->createMock(Response::class);
-        Config::ReplaceInstance($this->config('en', false)); // Set live mode
+        Config::ReplaceInstance($this->config(isDebug: false)); // Set live mode
 
         $response->expects($this->once())
             ->method('SetStatusCode')
@@ -405,7 +405,7 @@ class DispatcherTest extends TestCase
             ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('SetBody')
-            ->with('{"error":"An unexpected error occurred."}')
+            ->with('{"message":"An unexpected error occurred."}')
             ->willReturn($response); // Chain
         $response->expects($this->once())
             ->method('Send');
