@@ -9,7 +9,7 @@ use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\Response;
 use \Harmonia\Http\StatusCode;
-use \Harmonia\Shutdown\ShutdownHandler;
+use \Harmonia\Systems\ShutdownSystem\ShutdownHandler;
 use \Peneus\Api\HandlerRegistry;
 use \Peneus\Api\Handlers\Handler;
 use \TestToolkit\AccessHelper;
@@ -44,12 +44,12 @@ class DispatcherTest extends TestCase
 
     private function config($language = 'en', $isDebug = true): Config
     {
-        $config = $this->createMock(Config::class);
-        $config->method('Option')->willReturnMap([
+        $mock = $this->createMock(Config::class);
+        $mock->method('Option')->willReturnMap([
             ['Language', $language],
             ['IsDebug', $isDebug]
         ]);
-        return $config;
+        return $mock;
     }
 
     #region DispatchRequest ----------------------------------------------------
