@@ -339,7 +339,8 @@ class ActivateAccountActionTest extends TestCase
         $sut = $this->systemUnderTest(
             'findPendingAccount',
             'isEmailAlreadyRegistered',
-            'createAccountFromPendingAccount'
+            'createAccountFromPendingAccount',
+            'redirectUrl'
         );
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -349,6 +350,7 @@ class ActivateAccountActionTest extends TestCase
         $account = $this->createMock(Account::class);
         $database = Database::Instance();
         $cookieService = CookieService::Instance();
+        $redirectUrl = '/redirect/target';
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -383,8 +385,15 @@ class ActivateAccountActionTest extends TestCase
             ->willReturnCallback(function($callback) {
                 return $callback();
             });
+        $sut->expects($this->once())
+            ->method('redirectUrl')
+            ->willReturn($redirectUrl);
 
-        $this->assertNull(AccessHelper::CallMethod($sut, 'onExecute'));
+        $result = AccessHelper::CallMethod($sut, 'onExecute');
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('redirectUrl', $result);
+        $this->assertSame($redirectUrl, $result['redirectUrl']);
     }
 
     #endregion onExecute
