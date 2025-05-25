@@ -4,6 +4,7 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\Handlers\AccountHandler;
 
+use \Peneus\Api\Actions\ActivateAccountAction;
 use \Peneus\Api\Actions\LoginAction;
 use \Peneus\Api\Actions\LogoutAction;
 use \Peneus\Api\Actions\RegisterAccountAction;
@@ -21,6 +22,16 @@ class AccountHandlerTest extends TestCase
         $handler = new AccountHandler;
         $action = AccessHelper::CallMethod($handler, 'createAction', ['register']);
         $this->assertInstanceOf(RegisterAccountAction::class, $action);
+        $guards = AccessHelper::GetProperty($action, 'guards');
+        $this->assertCount(1, $guards);
+        $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);
+    }
+
+    function testCreateActionWithActivate()
+    {
+        $handler = new AccountHandler;
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['activate']);
+        $this->assertInstanceOf(ActivateAccountAction::class, $action);
         $guards = AccessHelper::GetProperty($action, 'guards');
         $this->assertCount(1, $guards);
         $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);

@@ -122,6 +122,14 @@ class EntityWithNonBindableProperties extends Entity {
     public string $aString; // Only this property will be bound
 }
 
+class EntityWithNonNullableDateTime extends Entity {
+    public \DateTime $timeRegistered;
+}
+
+class EntityWithNullableDateTime extends Entity {
+    public ?\DateTime $timeLastLogin;
+}
+
 class TestEntity extends Entity {
     public string $name;
     public int $age;
@@ -406,6 +414,31 @@ class EntityTest extends TestCase
         $this->assertSame('', $entity->name);
         $this->assertSame(0, $entity->age);
         $this->assertInstanceOf(\DateTime::class, $entity->createdAt);
+    }
+
+    function testConstructDoesNotThrowOnInvalidDateTimeString()
+    {
+        $entity = new EntityWithNonNullableDateTime([
+            'timeRegistered' => 'not-a-date'
+        ]);
+
+        $this->assertInstanceOf(\DateTime::class, $entity->timeRegistered);
+    }
+
+    function testConstructSkipsAssigningNullToNonNullableDateTime()
+    {
+        $entity = new EntityWithNonNullableDateTime([
+            'timeRegistered' => null
+        ]);
+        $this->assertNotNull($entity->timeRegistered);
+    }
+
+    function testConstructAssignsNullToNullableDateTime()
+    {
+        $entity = new EntityWithNullableDateTime([
+            'timeLastLogin' => null
+        ]);
+        $this->assertNull($entity->timeLastLogin);
     }
 
     #endregion __construct
