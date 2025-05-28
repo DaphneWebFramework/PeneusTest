@@ -8,6 +8,7 @@ use \Peneus\Api\Actions\ActivateAccountAction;
 use \Peneus\Api\Actions\LoginAction;
 use \Peneus\Api\Actions\LogoutAction;
 use \Peneus\Api\Actions\RegisterAccountAction;
+use \Peneus\Api\Actions\SendPasswordResetAction;
 use \Peneus\Api\Guards\FormTokenGuard;
 use \Peneus\Api\Guards\SessionGuard;
 use \TestToolkit\AccessHelper;
@@ -55,6 +56,16 @@ class AccountHandlerTest extends TestCase
         $guards = AccessHelper::GetProperty($action, 'guards');
         $this->assertCount(1, $guards);
         $this->assertInstanceOf(SessionGuard::class, $guards[0]);
+    }
+
+    function testCreateActionWithSendPasswordReset()
+    {
+        $handler = new AccountHandler;
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['send-password-reset']);
+        $this->assertInstanceOf(SendPasswordResetAction::class, $action);
+        $guards = AccessHelper::GetProperty($action, 'guards');
+        $this->assertCount(1, $guards);
+        $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);
     }
 
     public function testCreateActionWithUnknownAction()
