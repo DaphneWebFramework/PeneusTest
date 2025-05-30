@@ -1,18 +1,22 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\SendPasswordResetAction;
 
 use \Harmonia\Config;
 use \Harmonia\Core\CArray;
+use \Harmonia\Core\CUrl;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Peneus\Model\Account;
+use \Peneus\Resource;
 use \TestToolkit\AccessHelper;
+use \TestToolkit\DataHelper;
 
 #[CoversClass(SendPasswordResetAction::class)]
 class SendPasswordResetActionTest extends TestCase
@@ -22,6 +26,7 @@ class SendPasswordResetActionTest extends TestCase
     private ?SecurityService $originalSecurityService = null;
     private ?CookieService $originalCookieService = null;
     private ?Config $originalConfig = null;
+    private ?Resource $originalResource = null;
 
     protected function setUp(): void
     {
@@ -35,6 +40,8 @@ class SendPasswordResetActionTest extends TestCase
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
         $this->originalConfig =
             Config::ReplaceInstance($this->config());
+        $this->originalResource =
+            Resource::ReplaceInstance($this->createMock(Resource::class));
     }
 
     protected function tearDown(): void
@@ -44,6 +51,7 @@ class SendPasswordResetActionTest extends TestCase
         SecurityService::ReplaceInstance($this->originalSecurityService);
         CookieService::ReplaceInstance($this->originalCookieService);
         Config::ReplaceInstance($this->originalConfig);
+        Resource::ReplaceInstance($this->originalResource);
     }
 
     private function config()
@@ -361,4 +369,40 @@ class SendPasswordResetActionTest extends TestCase
     }
 
     #endregion onExecute
+
+    #region sendPasswordResetEmail ---------------------------------------------
+
+    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
+    function testSendActivationEmailDelegatesToTrait($returnValue)
+    {
+        $sut = $this->systemUnderTest('sendTransactionalEmail');
+        $resource = Resource::Instance();
+
+        $resource->expects($this->once())
+            ->method('PageUrl')
+            ->with('reset-password')
+            ->willReturn(new CUrl('url/to/page/'));
+        $sut->expects($this->once())
+            ->method('sendTransactionalEmail')
+            ->with(
+                'john@example.com',
+                'John Doe',
+                'url/to/page/reset-code-abc',
+                [
+                    'masthead' => 'email_reset_password_masthead',
+                    'intro' => 'email_reset_password_intro',
+                    'buttonText' => 'email_reset_password_button_text',
+                    'securityNotice' => 'email_reset_password_security_notice'
+                ]
+            )
+            ->willReturn($returnValue);
+
+        $this->assertSame($returnValue, AccessHelper::CallMethod(
+            $sut,
+            'sendPasswordResetEmail',
+            ['john@example.com', 'John Doe', 'reset-code-abc']
+        ));
+    }
+
+    #endregion sendPasswordResetEmail
 }

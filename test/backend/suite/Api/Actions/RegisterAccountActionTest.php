@@ -7,12 +7,9 @@ use \Peneus\Api\Actions\RegisterAccountAction;
 
 use \Harmonia\Config;
 use \Harmonia\Core\CArray;
-use \Harmonia\Core\CFile;
-use \Harmonia\Core\CPath;
 use \Harmonia\Core\CUrl;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
-use \Harmonia\Logger;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
@@ -20,7 +17,6 @@ use \Harmonia\Systems\DatabaseSystem\Queries\InsertQuery;
 use \Harmonia\Systems\DatabaseSystem\Queries\SelectQuery;
 use \Harmonia\Systems\DatabaseSystem\ResultSet;
 use \Peneus\Resource;
-use \Peneus\Systems\MailerSystem\Mailer;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
@@ -33,7 +29,6 @@ class RegisterAccountActionTest extends TestCase
     private ?CookieService $originalCookieService = null;
     private ?Config $originalConfig = null;
     private ?Resource $originalResource = null;
-    private ?Logger $originalLogger = null;
 
     protected function setUp(): void
     {
@@ -49,8 +44,6 @@ class RegisterAccountActionTest extends TestCase
             Config::ReplaceInstance($this->config());
         $this->originalResource =
             Resource::ReplaceInstance($this->createMock(Resource::class));
-        $this->originalLogger =
-            Logger::ReplaceInstance($this->createMock(Logger::class));
     }
 
     protected function tearDown(): void
@@ -61,7 +54,6 @@ class RegisterAccountActionTest extends TestCase
         CookieService::ReplaceInstance($this->originalCookieService);
         Config::ReplaceInstance($this->originalConfig);
         Resource::ReplaceInstance($this->originalResource);
-        Logger::ReplaceInstance($this->originalLogger);
     }
 
     private function config()
@@ -795,149 +787,29 @@ class RegisterAccountActionTest extends TestCase
 
     #region sendActivationEmail ------------------------------------------------
 
-    function testSendActivationEmailReturnsFalseIfFileOpenFails()
-    {
-        $sut = $this->systemUnderTest('openFile');
-        $resource = Resource::Instance();
-        $logger = Logger::Instance();
-        $path = new CPath('path/to/email.html');
-
-        $resource->expects($this->once())
-            ->method('TemplateFilePath')
-            ->with('transactional-email')
-            ->willReturn($path);
-        $sut->expects($this->once())
-            ->method('openFile')
-            ->with($path)
-            ->willReturn(null);
-        $logger->expects($this->once())
-            ->method('Error')
-            ->with('Email template not found.');
-
-        $this->assertFalse(AccessHelper::CallMethod(
-            $sut,
-            'sendActivationEmail',
-            ['john@example.com', 'John Doe', 'activation-code-123']
-        ));
-    }
-
-    function testSendActivationEmailReturnsFalseIfTemplateReadFails()
-    {
-        $sut = $this->systemUnderTest('openFile');
-        $resource = Resource::Instance();
-        $logger = Logger::Instance();
-        $path = new CPath('path/to/email.html');
-        $file = $this->createMock(CFile::class);
-
-        $resource->expects($this->once())
-            ->method('TemplateFilePath')
-            ->with('transactional-email')
-            ->willReturn($path);
-        $sut->expects($this->once())
-            ->method('openFile')
-            ->with($path)
-            ->willReturn($file);
-        $file->expects($this->once())
-            ->method('Read')
-            ->willReturn(null);
-        $file->expects($this->once())
-            ->method('Close');
-        $logger->expects($this->once())
-            ->method('Error')
-            ->with('Email template could not be read.');
-
-        $this->assertFalse(AccessHelper::CallMethod(
-            $sut,
-            'sendActivationEmail',
-            ['john@example.com', 'John Doe', 'activation-code-123']
-        ));
-    }
-
     #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
-    function testSendActivationEmailReturns($returnValue)
+    function testSendActivationEmailDelegatesToTrait($returnValue)
     {
-        $sut = $this->systemUnderTest('openFile', 'newMailer', 'currentYear');
+        $sut = $this->systemUnderTest('sendTransactionalEmail');
         $resource = Resource::Instance();
-        $logger = Logger::Instance();
-        $path = new CPath('path/to/email.html');
-        $file = $this->createMock(CFile::class);
-        $config = Config::Instance();
-        $mailer = $this->createMock(Mailer::class);
 
-        $resource->expects($this->once())
-            ->method('TemplateFilePath')
-            ->with('transactional-email')
-            ->willReturn($path);
-        $sut->expects($this->once())
-            ->method('openFile')
-            ->with($path)
-            ->willReturn($file);
-        $file->expects($this->once())
-            ->method('Read')
-            ->willReturn(<<<HTML
-                <!DOCTYPE html>
-                <html lang="{{Language}}">
-                <head><title>{{Title}}</title></head>
-                <h1>{{MastheadText}}</h1>
-                <h2>{{GreetingText}}</h2>
-                <p>{{IntroText}}</p>
-                <a href="{{ActionUrl}}">{{ButtonText}}</a>
-                <p>{{SecurityNoticeText}}</p>
-                <footer>
-                <p>{{ContactUsText}} <a href="mailto:{{SupportEmail}}">{{SupportEmail}}</a></p>
-                <p>{{CopyrightText}}</p>
-                </footer>
-                </body>
-                </html>
-            HTML);
-        $file->expects($this->once())
-            ->method('Close');
-        $config->expects($this->any())
-            ->method('OptionOrDefault')
-            ->willReturnMap([
-                ['Language'     , 'en' , 'en'],
-                ['AppName'      , ''   , 'Example'],
-                ['SupportEmail' , ''   , 'support@example.com']
-            ]);
         $resource->expects($this->once())
             ->method('PageUrl')
             ->with('activate-account')
-            ->willReturn(new CUrl('url/to/activate-account/'));
+            ->willReturn(new CUrl('url/to/page/'));
         $sut->expects($this->once())
-            ->method('currentYear')
-            ->willReturn('1974');
-        $sut->expects($this->once())
-            ->method('newMailer')
-            ->willReturn($mailer);
-        $mailer->expects($this->once())
-            ->method('SetAddress')
-            ->with('john@example.com')
-            ->willReturnSelf();
-        $mailer->expects($this->once())
-            ->method('SetSubject')
-            ->with('Welcome!')
-            ->willReturnSelf();
-        $mailer->expects($this->once())
-            ->method('SetBody')
-            ->with(<<<HTML
-                <!DOCTYPE html>
-                <html lang="en">
-                <head><title>Welcome!</title></head>
-                <h1>Welcome!</h1>
-                <h2>Hi John Doe,</h2>
-                <p>You're almost there! Just click the button below to activate your account.</p>
-                <a href="url/to/activate-account/activation-code-123">Activate My Account</a>
-                <p>You received this email because your email address was used to register on Example. If this wasn't you, you can safely ignore this email.</p>
-                <footer>
-                <p>Need help? Contact us at <a href="mailto:support@example.com">support@example.com</a></p>
-                <p>© 1974 Example. All rights reserved.</p>
-                </footer>
-                </body>
-                </html>
-            HTML)
-            ->willReturnSelf();
-        $mailer->expects($this->once())
-            ->method('Send')
+            ->method('sendTransactionalEmail')
+            ->with(
+                'john@example.com',
+                'John Doe',
+                'url/to/page/activation-code-123',
+                [
+                    'masthead' => 'email_activate_account_masthead',
+                    'intro' => 'email_activate_account_intro',
+                    'buttonText' => 'email_activate_account_button_text',
+                    'securityNotice' => 'email_activate_account_security_notice'
+                ]
+            )
             ->willReturn($returnValue);
 
         $this->assertSame($returnValue, AccessHelper::CallMethod(
