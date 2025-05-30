@@ -340,7 +340,7 @@ class ActivateAccountActionTest extends TestCase
             'findPendingAccount',
             'isEmailAlreadyRegistered',
             'createAccountFromPendingAccount',
-            'redirectUrl'
+            'buildLoginUrl'
         );
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -386,7 +386,7 @@ class ActivateAccountActionTest extends TestCase
                 return $callback();
             });
         $sut->expects($this->once())
-            ->method('redirectUrl')
+            ->method('buildLoginUrl')
             ->willReturn($redirectUrl);
 
         $result = AccessHelper::CallMethod($sut, 'onExecute');

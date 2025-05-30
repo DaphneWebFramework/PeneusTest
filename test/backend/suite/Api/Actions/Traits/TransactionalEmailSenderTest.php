@@ -15,9 +15,9 @@ use \Peneus\Translation;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
-class TraitHost { use TransactionalEmailSender; }
+class _TransactionalEmailSender { use TransactionalEmailSender; }
 
-#[CoversClass(TraitHost::class)]
+#[CoversClass(_TransactionalEmailSender::class)]
 class TransactionalEmailSenderTest extends TestCase
 {
     private ?Config $originalConfig = null;
@@ -45,9 +45,9 @@ class TransactionalEmailSenderTest extends TestCase
         Translation::ReplaceInstance($this->originalTranslation);
     }
 
-    private function systemUnderTest(string ...$mockedMethods): TraitHost
+    private function systemUnderTest(string ...$mockedMethods): _TransactionalEmailSender
     {
-        return $this->getMockBuilder(TraitHost::class)
+        return $this->getMockBuilder(_TransactionalEmailSender::class)
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
