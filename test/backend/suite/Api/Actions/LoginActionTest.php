@@ -15,8 +15,7 @@ use \Harmonia\Services\Security\CsrfToken;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Session;
 use \Harmonia\Systems\DatabaseSystem\Database;
-use \Harmonia\Systems\DatabaseSystem\Queries\SelectQuery;
-use \Harmonia\Systems\DatabaseSystem\ResultSet;
+use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Api\Actions\LogoutAction;
 use \Peneus\Model\Account;
 use \Peneus\Model\Role;
@@ -265,8 +264,12 @@ class LoginActionTest extends TestCase
 
     function testOnExecuteLogsOutAndThrowsIfUpdateLastLoginTimeFails()
     {
-        $sut = $this->systemUnderTest('findAccount', 'verifyPassword',
-            'updateLastLoginTime', 'createLogoutAction');
+        $sut = $this->systemUnderTest(
+            'findAccount',
+            'verifyPassword',
+            'updateLastLoginTime',
+            'createLogoutAction'
+        );
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $account = $this->createStub(Account::class);
@@ -300,8 +303,10 @@ class LoginActionTest extends TestCase
                 try {
                     return $callback();
                 } catch (\Throwable $e) {
-                    $this->assertSame('Failed to update last login time.',
-                                      $e->getMessage());
+                    $this->assertSame(
+                        'Failed to update last login time.',
+                        $e->getMessage()
+                    );
                     return false;
                 }
             });
@@ -319,9 +324,13 @@ class LoginActionTest extends TestCase
 
     function testOnExecuteLogsOutAndThrowsIfEstablishSessionIntegrityFails()
     {
-        $sut = $this->systemUnderTest('findAccount', 'verifyPassword',
-            'updateLastLoginTime', 'establishSessionIntegrity',
-            'createLogoutAction');
+        $sut = $this->systemUnderTest(
+            'findAccount',
+            'verifyPassword',
+            'updateLastLoginTime',
+            'establishSessionIntegrity',
+            'createLogoutAction'
+        );
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $account = $this->createStub(Account::class);
@@ -359,8 +368,10 @@ class LoginActionTest extends TestCase
                 try {
                     return $callback();
                 } catch (\Throwable $e) {
-                    $this->assertSame('Failed to establish session integrity.',
-                                      $e->getMessage());
+                    $this->assertSame(
+                        'Failed to establish session integrity.',
+                        $e->getMessage()
+                    );
                     return false;
                 }
             });
@@ -378,9 +389,13 @@ class LoginActionTest extends TestCase
 
     function testOnExecuteLogsOutAndThrowsIfDeleteCsrfCookieFails()
     {
-        $sut = $this->systemUnderTest('findAccount', 'verifyPassword',
-            'updateLastLoginTime', 'establishSessionIntegrity',
-            'createLogoutAction');
+        $sut = $this->systemUnderTest(
+            'findAccount',
+            'verifyPassword',
+            'updateLastLoginTime',
+            'establishSessionIntegrity',
+            'createLogoutAction'
+        );
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $account = $this->createStub(Account::class);
@@ -439,9 +454,13 @@ class LoginActionTest extends TestCase
 
     function testOnExecuteSucceedsIfDatabaseTransactionSucceeds()
     {
-        $sut = $this->systemUnderTest('findAccount', 'verifyPassword',
-            'updateLastLoginTime', 'establishSessionIntegrity',
-            'createLogoutAction');
+        $sut = $this->systemUnderTest(
+            'findAccount',
+            'verifyPassword',
+            'updateLastLoginTime',
+            'establishSessionIntegrity',
+            'createLogoutAction'
+        );
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $account = $this->createStub(Account::class);
@@ -493,53 +512,38 @@ class LoginActionTest extends TestCase
     function testFindAccountReturnsNullWhenNotFound()
     {
         $sut = $this->systemUnderTest();
-        $database = Database::Instance();
-        $resultSet = $this->createMock(ResultSet::class);
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM account WHERE email = :email LIMIT 1',
+            bindings: ['email' => 'john@example.com'],
+            result: null
+        );
+        Database::ReplaceInstance($fakeDatabase);
 
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn($resultSet);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->willReturn(null);
-
-        $account = AccessHelper::CallMethod(
+        $this->assertNull(AccessHelper::CallMethod(
             $sut,
             'findAccount',
             ['john@example.com']
-        );
-        $this->assertNull($account);
+        ));
     }
 
-    function testFindAccountReturnsAccountWhenFound()
+    function testFindAccountReturnsEntityWhenFound()
     {
         $sut = $this->systemUnderTest();
-        $database = Database::Instance();
-        $resultSet = $this->createMock(ResultSet::class);
-
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame('account', AccessHelper::GetProperty($query, 'table'));
-                $this->assertSame('*', AccessHelper::GetProperty($query, 'columns'));
-                $this->assertSame('email = :email', AccessHelper::GetProperty($query, 'condition'));
-                $this->assertNull(AccessHelper::GetProperty($query, 'orderBy'));
-                $this->assertSame('1', AccessHelper::GetProperty($query, 'limit'));
-                $this->assertSame(['email' => 'john@example.com'], $query->Bindings());
-                return true;
-            }))
-            ->willReturn($resultSet);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->willReturn([
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM account WHERE email = :email LIMIT 1',
+            bindings: ['email' => 'john@example.com'],
+            result: [[
                 'id' => 23,
                 'email' => 'john@example.com',
-                'passwordHash' => 'password-hash',
+                'passwordHash' => 'hash1234',
                 'displayName' => 'John',
                 'timeActivated' => '2024-01-01 00:00:00',
                 'timeLastLogin' => '2025-01-01 00:00:00'
-            ]);
+            ]]
+        );
+        Database::ReplaceInstance($fakeDatabase);
 
         $account = AccessHelper::CallMethod(
             $sut,
@@ -549,10 +553,12 @@ class LoginActionTest extends TestCase
         $this->assertInstanceOf(Account::class, $account);
         $this->assertSame(23, $account->id);
         $this->assertSame('john@example.com', $account->email);
-        $this->assertSame('password-hash', $account->passwordHash);
+        $this->assertSame('hash1234', $account->passwordHash);
         $this->assertSame('John', $account->displayName);
-        $this->assertSame('2024-01-01 00:00:00', $account->timeActivated->format('Y-m-d H:i:s'));
-        $this->assertSame('2025-01-01 00:00:00', $account->timeLastLogin->format('Y-m-d H:i:s'));
+        $this->assertSame('2024-01-01 00:00:00',
+            $account->timeActivated->format('Y-m-d H:i:s'));
+        $this->assertSame('2025-01-01 00:00:00',
+            $account->timeLastLogin->format('Y-m-d H:i:s'));
     }
 
     #endregion findAccount
@@ -562,89 +568,49 @@ class LoginActionTest extends TestCase
     function testFindAccountRoleReturnsNullWhenNotFound()
     {
         $sut = $this->systemUnderTest();
-        $database = Database::Instance();
-        $resultSet = $this->createMock(ResultSet::class);
-
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn($resultSet);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->willReturn(null);
-
-        $role = AccessHelper::CallMethod(
-            $sut,
-            'findAccountRole',
-            [42]
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM accountrole WHERE accountId = :accountId LIMIT 1',
+            bindings: ['accountId' => 42],
+            result: null
         );
-        $this->assertNull($role);
+        Database::ReplaceInstance($fakeDatabase);
+
+        $this->assertNull(AccessHelper::CallMethod($sut, 'findAccountRole', [42]));
     }
 
     function testFindAccountRoleReturnsNullForInvalidEnumValue()
     {
         $sut = $this->systemUnderTest();
-        $database = Database::Instance();
-        $resultSet = $this->createMock(ResultSet::class);
-
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame('accountrole', AccessHelper::GetProperty($query, 'table'));
-                $this->assertSame('*', AccessHelper::GetProperty($query, 'columns'));
-                $this->assertSame('accountId = :accountId', AccessHelper::GetProperty($query, 'condition'));
-                $this->assertNull(AccessHelper::GetProperty($query, 'orderBy'));
-                $this->assertSame('1', AccessHelper::GetProperty($query, 'limit'));
-                $this->assertSame(['accountId' => 42], $query->Bindings());
-                return true;
-            }))
-            ->willReturn($resultSet);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->willReturn([
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM accountrole WHERE accountId = :accountId LIMIT 1',
+            bindings: ['accountId' => 42],
+            result: [[
                 'accountId' => 42,
-                'role' => 999 // invalid enum value
-            ]);
-
-        $role = AccessHelper::CallMethod(
-            $sut,
-            'findAccountRole',
-            [42]
+                'role' => 999 // invalid
+            ]]
         );
-        $this->assertNull($role);
+        Database::ReplaceInstance($fakeDatabase);
+
+        $this->assertNull(AccessHelper::CallMethod($sut, 'findAccountRole', [42]));
     }
 
-    function testFindAccountRoleReturnsRoleWhenFound()
+    function testFindAccountRoleReturnsEntityWhenFound()
     {
         $sut = $this->systemUnderTest();
-        $database = Database::Instance();
-        $resultSet = $this->createMock(ResultSet::class);
-
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame('accountrole', AccessHelper::GetProperty($query, 'table'));
-                $this->assertSame('*', AccessHelper::GetProperty($query, 'columns'));
-                $this->assertSame('accountId = :accountId', AccessHelper::GetProperty($query, 'condition'));
-                $this->assertNull(AccessHelper::GetProperty($query, 'orderBy'));
-                $this->assertSame('1', AccessHelper::GetProperty($query, 'limit'));
-                $this->assertSame(['accountId' => 42], $query->Bindings());
-                return true;
-            }))
-            ->willReturn($resultSet);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->willReturn([
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM accountrole WHERE accountId = :accountId LIMIT 1',
+            bindings: ['accountId' => 42],
+            result: [[
                 'accountId' => 42,
                 'role' => Role::Editor->value
-            ]);
-
-        $role = AccessHelper::CallMethod(
-            $sut,
-            'findAccountRole',
-            [42]
+            ]]
         );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $role = AccessHelper::CallMethod($sut, 'findAccountRole', [42]);
         $this->assertInstanceOf(Role::class, $role);
         $this->assertSame(Role::Editor, $role);
     }
@@ -657,12 +623,12 @@ class LoginActionTest extends TestCase
     function testVerifyPassword($returnValue)
     {
         $sut = $this->systemUnderTest();
-        $account = new Account(['passwordHash' => 'password-hash']);
+        $account = new Account(['passwordHash' => 'hash1234']);
         $securityService = SecurityService::Instance();
 
         $securityService->expects($this->once())
             ->method('VerifyPassword')
-            ->with('plain-password', 'password-hash')
+            ->with('pass1234', 'hash1234')
             ->willReturn($returnValue);
 
         $this->assertSame(
@@ -670,7 +636,7 @@ class LoginActionTest extends TestCase
             AccessHelper::CallMethod(
                 $sut,
                 'verifyPassword',
-                [$account, 'plain-password']
+                [$account, 'pass1234']
             )
         );
     }

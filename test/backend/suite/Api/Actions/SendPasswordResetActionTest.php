@@ -10,9 +10,11 @@ use \Harmonia\Core\CArray;
 use \Harmonia\Core\CUrl;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
+use \Harmonia\Logger;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
+use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Resource;
 use \TestToolkit\AccessHelper;
@@ -27,6 +29,7 @@ class SendPasswordResetActionTest extends TestCase
     private ?CookieService $originalCookieService = null;
     private ?Config $originalConfig = null;
     private ?Resource $originalResource = null;
+    private ?Logger $originalLogger = null;
 
     protected function setUp(): void
     {
@@ -42,6 +45,8 @@ class SendPasswordResetActionTest extends TestCase
             Config::ReplaceInstance($this->config());
         $this->originalResource =
             Resource::ReplaceInstance($this->createMock(Resource::class));
+        $this->originalLogger =
+            Logger::ReplaceInstance($this->createStub(Logger::class));
     }
 
     protected function tearDown(): void
@@ -52,6 +57,7 @@ class SendPasswordResetActionTest extends TestCase
         CookieService::ReplaceInstance($this->originalCookieService);
         Config::ReplaceInstance($this->originalConfig);
         Resource::ReplaceInstance($this->originalResource);
+        Logger::ReplaceInstance($this->originalLogger);
     }
 
     private function config()
@@ -168,10 +174,10 @@ class SendPasswordResetActionTest extends TestCase
             ->willReturn($account);
         $securityService->expects($this->once())
             ->method('GenerateToken')
-            ->willReturn('reset-code-abc');
+            ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('createPasswordReset')
-            ->with(42, 'reset-code-abc')
+            ->with(42, 'code1234')
             ->willReturn(false);
         $sut->expects($this->never())
             ->method('sendPasswordResetEmail');
@@ -224,14 +230,14 @@ class SendPasswordResetActionTest extends TestCase
             ->willReturn($account);
         $securityService->expects($this->once())
             ->method('GenerateToken')
-            ->willReturn('reset-code-abc');
+            ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('createPasswordReset')
-            ->with(42, 'reset-code-abc')
+            ->with(42, 'code1234')
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('sendPasswordResetEmail')
-            ->with('john@example.com', 'John', 'reset-code-abc')
+            ->with('john@example.com', 'John', 'code1234')
             ->willReturn(false);
         $database->expects($this->once())
             ->method('WithTransaction')
@@ -283,14 +289,14 @@ class SendPasswordResetActionTest extends TestCase
             ->willReturn($account);
         $securityService->expects($this->once())
             ->method('GenerateToken')
-            ->willReturn('reset-code-abc');
+            ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('createPasswordReset')
-            ->with(42, 'reset-code-abc')
+            ->with(42, 'code1234')
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('sendPasswordResetEmail')
-            ->with('john@example.com', 'John', 'reset-code-abc')
+            ->with('john@example.com', 'John', 'code1234')
             ->willReturn(true);
         $cookieService->expects($this->once())
             ->method('DeleteCsrfCookie')
@@ -341,14 +347,14 @@ class SendPasswordResetActionTest extends TestCase
             ->willReturn($account);
         $securityService->expects($this->once())
             ->method('GenerateToken')
-            ->willReturn('reset-code-abc');
+            ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('createPasswordReset')
-            ->with(42, 'reset-code-abc')
+            ->with(42, 'code1234')
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('sendPasswordResetEmail')
-            ->with('john@example.com', 'John', 'reset-code-abc')
+            ->with('john@example.com', 'John', 'code1234')
             ->willReturn(true);
         $cookieService->expects($this->once())
             ->method('DeleteCsrfCookie');
@@ -370,6 +376,169 @@ class SendPasswordResetActionTest extends TestCase
 
     #endregion onExecute
 
+    #region findAccount --------------------------------------------------------
+
+    function testFindAccountReturnsNullWhenNotFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM account WHERE email = :email LIMIT 1',
+            bindings: ['email' => 'john@example.com'],
+            result: null
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $this->assertNull(AccessHelper::CallMethod(
+            $sut,
+            'findAccount',
+            ['john@example.com']
+        ));
+    }
+
+    function testFindAccountReturnsEntityWhenFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM account WHERE email = :email LIMIT 1',
+            bindings: ['email' => 'john@example.com'],
+            result: [[
+                'id' => 23,
+                'email' => 'john@example.com',
+                'passwordHash' => 'hash1234',
+                'displayName' => 'John',
+                'timeActivated' => '2024-01-01 00:00:00',
+                'timeLastLogin' => '2025-01-01 00:00:00'
+            ]]
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $account = AccessHelper::CallMethod(
+            $sut,
+            'findAccount',
+            ['john@example.com']
+        );
+        $this->assertInstanceOf(Account::class, $account);
+        $this->assertSame(23, $account->id);
+        $this->assertSame('john@example.com', $account->email);
+        $this->assertSame('hash1234', $account->passwordHash);
+        $this->assertSame('John', $account->displayName);
+        $this->assertSame('2024-01-01 00:00:00',
+            $account->timeActivated->format('Y-m-d H:i:s'));
+        $this->assertSame('2025-01-01 00:00:00',
+            $account->timeLastLogin->format('Y-m-d H:i:s'));
+    }
+
+    #endregion findAccount
+
+    #region createPasswordReset ------------------------------------------------
+
+    function testCreatePasswordResetUpdatesWhenRecordExists()
+    {
+        $sut = $this->systemUnderTest();
+        $now = new \DateTime();
+        $passwordResetId = 1;
+        $accountId = 42;
+        $resetCode = 'code1234';
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM passwordreset WHERE accountId = :accountId LIMIT 1',
+            bindings: ['accountId' => $accountId],
+            result: [[
+                'id' => $passwordResetId,
+                'accountId' => $accountId,
+                'resetCode' => 'old-code',
+                'timeRequested' => '2024-01-01 00:00:00'
+            ]]
+        );
+        $fakeDatabase->Expect(
+            sql: 'UPDATE passwordreset SET'
+              . ' accountId = :accountId, resetCode = :resetCode, timeRequested = :timeRequested'
+              . ' WHERE id = :id',
+            bindings: [
+                'id' => $passwordResetId,
+                'accountId' => $accountId,
+                'resetCode' => $resetCode,
+                'timeRequested' => $now->format('Y-m-d H:i:s')
+            ]
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $this->assertTrue(AccessHelper::CallMethod(
+            $sut,
+            'createPasswordReset',
+            [$accountId, $resetCode, $now]
+        ));
+    }
+
+    function testCreatePasswordResetInsertsWhenRecordDoesNotExist()
+    {
+        $sut = $this->systemUnderTest();
+        $now = new \DateTime();
+        $accountId = 42;
+        $resetCode = 'code1234';
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM passwordreset WHERE accountId = :accountId LIMIT 1',
+            bindings: ['accountId' => $accountId],
+            result: null // no existing record
+        );
+        $fakeDatabase->Expect(
+            sql: 'INSERT INTO passwordreset'
+               . ' (accountId, resetCode, timeRequested)'
+               . ' VALUES'
+               . ' (:accountId, :resetCode, :timeRequested)',
+            bindings: [
+                'accountId' => $accountId,
+                'resetCode' => $resetCode,
+                'timeRequested' => $now->format('Y-m-d H:i:s')
+            ]
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $this->assertTrue(AccessHelper::CallMethod(
+            $sut,
+            'createPasswordReset',
+            [$accountId, $resetCode, $now]
+        ));
+    }
+
+    function testCreatePasswordResetReturnsFalseIfSaveFails()
+    {
+        $sut = $this->systemUnderTest();
+        $now = new \DateTime();
+        $accountId = 42;
+        $resetCode = 'code1234';
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM passwordreset WHERE accountId = :accountId LIMIT 1',
+            bindings: ['accountId' => $accountId],
+            result: null // no existing record
+        );
+        $fakeDatabase->Expect(
+            sql: 'INSERT INTO passwordreset'
+               . ' (accountId, resetCode, timeRequested)'
+               . ' VALUES'
+               . ' (:accountId, :resetCode, :timeRequested)',
+            bindings: [
+                'accountId' => $accountId,
+                'resetCode' => $resetCode,
+                'timeRequested' => $now->format('Y-m-d H:i:s')
+            ],
+            result: null // simulate failure
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $this->assertFalse(AccessHelper::CallMethod(
+            $sut,
+            'createPasswordReset',
+            [$accountId, $resetCode, $now]
+        ));
+    }
+
+    #endregion createPasswordReset
+
     #region sendPasswordResetEmail ---------------------------------------------
 
     #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
@@ -387,7 +556,7 @@ class SendPasswordResetActionTest extends TestCase
             ->with(
                 'john@example.com',
                 'John Doe',
-                'url/to/page/reset-code-abc',
+                'url/to/page/code1234',
                 [
                     'masthead' => 'email_reset_password_masthead',
                     'intro' => 'email_reset_password_intro',
@@ -400,7 +569,7 @@ class SendPasswordResetActionTest extends TestCase
         $this->assertSame($returnValue, AccessHelper::CallMethod(
             $sut,
             'sendPasswordResetEmail',
-            ['john@example.com', 'John Doe', 'reset-code-abc']
+            ['john@example.com', 'John Doe', 'code1234']
         ));
     }
 

@@ -1,17 +1,19 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
-use \PHPUnit\Framework\Attributes\DataProvider;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Services\AccountService;
 
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
+use \Harmonia\Logger;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\Security\CsrfToken;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Session;
+use \Harmonia\Systems\DatabaseSystem\Database;
+use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\Role;
 use \TestToolkit\AccessHelper;
@@ -24,6 +26,7 @@ class AccountServiceTest extends TestCase
     private ?Session $originalSession = null;
     private ?Request $originalRequest = null;
     private ?SecurityService $originalSecurityService = null;
+    private ?Logger $originalLogger = null;
 
     protected function setUp(): void
     {
@@ -35,6 +38,8 @@ class AccountServiceTest extends TestCase
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalSecurityService =
             SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
+        $this->originalLogger =
+            Logger::ReplaceInstance($this->createStub(Logger::class));
     }
 
     protected function tearDown(): void
@@ -43,6 +48,7 @@ class AccountServiceTest extends TestCase
         Session::ReplaceInstance($this->originalSession);
         Request::ReplaceInstance($this->originalRequest);
         SecurityService::ReplaceInstance($this->originalSecurityService);
+        Logger::ReplaceInstance($this->originalLogger);
     }
 
     private function systemUnderTest(string ...$mockedMethods): AccountService
@@ -343,7 +349,7 @@ class AccountServiceTest extends TestCase
 
     #region retrieveLoggedInAccount --------------------------------------------
 
-    function testRetrieveLoggedInAccountReturnsNullIfAccountIdIsMissing()
+    function testRetrieveLoggedInAccountReturnsNullWhenSessionHasNoAccountId()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
@@ -360,39 +366,63 @@ class AccountServiceTest extends TestCase
         ));
     }
 
-    #[DataProvider('nullOrAccountDataProvider')]
-    function testRetrieveLoggedInAccountReturnsWhateverFindAccountByIdReturns($returnValue)
+    function testRetrieveLoggedInAccountReturnsNullWhenNotFound()
     {
-        $sut = $this->systemUnderTest('findAccountById');
+        $sut = $this->systemUnderTest();
         $session = Session::Instance();
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM account WHERE id = :id LIMIT 1',
+            bindings: ['id' => 42],
+            result: null
+        );
+        Database::ReplaceInstance($fakeDatabase);
 
         $session->expects($this->once())
             ->method('Get')
             ->with(AccountService::ACCOUNT_ID_SESSION_KEY)
-            ->willReturn(123);
-        $sut->expects($this->once())
-            ->method('findAccountById')
-            ->with(123)
-            ->willReturn($returnValue);
+            ->willReturn(42);
 
-        $this->assertSame($returnValue, AccessHelper::CallMethod(
+        $this->assertNull(AccessHelper::CallMethod(
             $sut,
             'retrieveLoggedInAccount',
             [$session]
         ));
     }
 
-    #endregion retrieveLoggedInAccount
-
-    #region Data Providers -----------------------------------------------------
-
-    static function nullOrAccountDataProvider()
+    function testRetrieveLoggedInAccountReturnsEntityWhenFound()
     {
-        return [
-            'null' => [null],
-            'account' => [self::createStub(Account::class)]
-        ];
+        $sut = $this->systemUnderTest();
+        $session = Session::Instance();
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM account WHERE id = :id LIMIT 1',
+            bindings: ['id' => 42],
+            result: [[
+                'id' => 42,
+                'email' => 'john@example.com',
+                'passwordHash' => 'hash1234',
+                'displayName' => 'John',
+                'timeActivated' => '2024-01-01 00:00:00',
+                'timeLastLogin' => '2025-01-01 00:00:00'
+            ]]
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $session->expects($this->once())
+            ->method('Get')
+            ->with(AccountService::ACCOUNT_ID_SESSION_KEY)
+            ->willReturn(42);
+
+        $account = AccessHelper::CallMethod($sut, 'retrieveLoggedInAccount', [$session]);
+        $this->assertInstanceOf(Account::class, $account);
+        $this->assertSame(42, $account->id);
+        $this->assertSame('john@example.com', $account->email);
+        $this->assertSame('hash1234', $account->passwordHash);
+        $this->assertSame('John', $account->displayName);
+        $this->assertSame('2024-01-01 00:00:00', $account->timeActivated->format('Y-m-d H:i:s'));
+        $this->assertSame('2025-01-01 00:00:00', $account->timeLastLogin->format('Y-m-d H:i:s'));
     }
 
-    #endregion Data Providers
+    #endregion retrieveLoggedInAccount
 }

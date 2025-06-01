@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\ActivateAccountAction;
 
@@ -8,11 +9,14 @@ use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
+use \Harmonia\Logger;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Systems\DatabaseSystem\Database;
+use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\PendingAccount;
 use \TestToolkit\AccessHelper;
+use \TestToolkit\DataHelper;
 
 #[CoversClass(ActivateAccountAction::class)]
 class ActivateAccountActionTest extends TestCase
@@ -21,6 +25,7 @@ class ActivateAccountActionTest extends TestCase
     private ?Database $originalDatabase = null;
     private ?CookieService $originalCookieService = null;
     private ?Config $originalConfig = null;
+    private ?Logger $originalLogger = null;
 
     protected function setUp(): void
     {
@@ -32,6 +37,8 @@ class ActivateAccountActionTest extends TestCase
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
         $this->originalConfig =
             Config::ReplaceInstance($this->config());
+        $this->originalLogger =
+            Logger::ReplaceInstance($this->createStub(Logger::class));
     }
 
     protected function tearDown(): void
@@ -40,6 +47,7 @@ class ActivateAccountActionTest extends TestCase
         Database::ReplaceInstance($this->originalDatabase);
         CookieService::ReplaceInstance($this->originalCookieService);
         Config::ReplaceInstance($this->originalConfig);
+        Logger::ReplaceInstance($this->originalLogger);
     }
 
     private function config()
@@ -397,4 +405,111 @@ class ActivateAccountActionTest extends TestCase
     }
 
     #endregion onExecute
+
+    #region findPendingAccount -------------------------------------------------
+
+    function testFindPendingAccountReturnsNullWhenNotFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM pendingaccount WHERE activationCode = :activationCode LIMIT 1',
+            bindings: ['activationCode' => 'code1234'],
+            result: null
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $this->assertNull(AccessHelper::CallMethod(
+            $sut,
+            'findPendingAccount',
+            ['code1234']
+        ));
+    }
+
+    function testFindPendingAccountReturnsEntityWhenFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM pendingaccount WHERE activationCode = :activationCode LIMIT 1',
+            bindings: ['activationCode' => 'code1234'],
+            result: [[
+                'id' => 42,
+                'email' => 'john@example.com',
+                'passwordHash' => 'hash1234',
+                'displayName' => 'John Doe',
+                'activationCode' => 'code1234',
+                'timeRegistered' => '2025-01-01 10:00:00'
+            ]]
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $pendingAccount = AccessHelper::CallMethod(
+            $sut,
+            'findPendingAccount',
+            ['code1234']
+        );
+        $this->assertInstanceOf(PendingAccount::class, $pendingAccount);
+        $this->assertSame(42, $pendingAccount->id);
+        $this->assertSame('john@example.com', $pendingAccount->email);
+        $this->assertSame('hash1234', $pendingAccount->passwordHash);
+        $this->assertSame('John Doe', $pendingAccount->displayName);
+        $this->assertSame('code1234', $pendingAccount->activationCode);
+        $this->assertSame('2025-01-01 10:00:00',
+            $pendingAccount->timeRegistered->format('Y-m-d H:i:s'));
+    }
+
+    #endregion findPendingAccount
+
+    #region isEmailAlreadyRegistered -------------------------------------------
+
+    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
+    function testIsEmailAlreadyRegistered($returnValue)
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT COUNT(*) FROM account WHERE email = :email',
+            bindings: ['email' => 'test@example.com'],
+            result: [[$returnValue ? 1 : 0]]
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $this->assertSame($returnValue, AccessHelper::CallMethod(
+            $sut,
+            'isEmailAlreadyRegistered',
+            ['test@example.com']
+        ));
+    }
+
+    #endregion isEmailAlreadyRegistered
+
+    #region createAccountFromPendingAccount ------------------------------------
+
+    function testCreateAccountFromPendingAccount()
+    {
+        $sut = $this->systemUnderTest();
+        $now = new \DateTime();
+        $pendingAccount = new PendingAccount([
+            'email' => 'john@example.com',
+            'passwordHash' => 'hash1234',
+            'displayName' => 'John Doe',
+            'activationCode' => 'code1234',
+            'timeRegistered' => '2024-12-31 23:59:59'
+        ]);
+
+        $account = AccessHelper::CallMethod(
+            $sut,
+            'createAccountFromPendingAccount',
+            [$pendingAccount, $now]
+        );
+        $this->assertInstanceOf(Account::class, $account);
+        $this->assertSame('john@example.com', $account->email);
+        $this->assertSame('hash1234', $account->passwordHash);
+        $this->assertSame('John Doe', $account->displayName);
+        $this->assertSame($now->format('c'), $account->timeActivated->format('c'));
+        $this->assertNull($account->timeLastLogin);
+    }
+
+    #endregion createAccountFromPendingAccount
 }

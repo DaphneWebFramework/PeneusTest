@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\ResetPasswordAction;
 
@@ -8,19 +9,25 @@ use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
+use \Harmonia\Logger;
 use \Harmonia\Services\CookieService;
+use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
+use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\PasswordReset;
 use \TestToolkit\AccessHelper;
+use \TestToolkit\DataHelper;
 
 #[CoversClass(ResetPasswordAction::class)]
 class ResetPasswordActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
+    private ?SecurityService $originalSecurityService = null;
     private ?CookieService $originalCookieService = null;
     private ?Config $originalConfig = null;
+    private ?Logger $originalLogger = null;
 
     protected function setUp(): void
     {
@@ -28,18 +35,24 @@ class ResetPasswordActionTest extends TestCase
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalDatabase =
             Database::ReplaceInstance($this->createMock(Database::class));
+        $this->originalSecurityService =
+            SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
         $this->originalCookieService =
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
         $this->originalConfig =
             Config::ReplaceInstance($this->config());
+        $this->originalLogger =
+            Logger::ReplaceInstance($this->createStub(Logger::class));
     }
 
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
+        SecurityService::ReplaceInstance($this->originalSecurityService);
         CookieService::ReplaceInstance($this->originalCookieService);
         Config::ReplaceInstance($this->originalConfig);
+        Logger::ReplaceInstance($this->originalLogger);
     }
 
     private function config()
@@ -470,4 +483,121 @@ class ResetPasswordActionTest extends TestCase
     }
 
     #endregion onExecute
+
+    #region findPasswordReset --------------------------------------------------
+
+    function testFindPasswordResetReturnsNullWhenNotFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM passwordreset WHERE resetCode = :resetCode LIMIT 1',
+            bindings: ['resetCode' => 'code1234'],
+            result: null
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $this->assertNull(AccessHelper::CallMethod(
+            $sut,
+            'findPasswordReset',
+            ['code1234']
+        ));
+    }
+
+    function testFindPasswordResetReturnsEntityWhenFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM passwordreset WHERE resetCode = :resetCode LIMIT 1',
+            bindings: ['resetCode' => 'code1234'],
+            result: [[
+                'id' => 1,
+                'accountId' => 42,
+                'resetCode' => 'code1234',
+                'timeRequested' => '2024-12-31 00:00:00'
+            ]]
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $passwordReset = AccessHelper::CallMethod(
+            $sut,
+            'findPasswordReset',
+            ['code1234']
+        );
+        $this->assertInstanceOf(PasswordReset::class, $passwordReset);
+        $this->assertSame(1, $passwordReset->id);
+        $this->assertSame(42, $passwordReset->accountId);
+        $this->assertSame('code1234', $passwordReset->resetCode);
+    }
+
+    #endregion findPasswordReset
+
+    #region findAccount --------------------------------------------------------
+
+    function testFindAccountReturnsNullWhenNotFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM account WHERE id = :id LIMIT 1',
+            bindings: ['id' => 42],
+            result: null
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $this->assertNull(AccessHelper::CallMethod($sut, 'findAccount', [42]));
+    }
+
+    function testFindAccountReturnsEntityWhenFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM account WHERE id = :id LIMIT 1',
+            bindings: ['id' => 42],
+            result: [[
+                'id' => 42,
+                'email' => 'john@example.com',
+                'passwordHash' => 'hash1234',
+                'displayName' => 'John',
+                'timeActivated' => '2024-01-01 00:00:00',
+                'timeLastLogin' => '2024-01-02 00:00:00'
+            ]]
+        );
+        Database::ReplaceInstance($fakeDatabase);
+
+        $account = AccessHelper::CallMethod($sut, 'findAccount', [42]);
+        $this->assertInstanceOf(Account::class, $account);
+        $this->assertSame(42, $account->id);
+        $this->assertSame('john@example.com', $account->email);
+    }
+
+    #endregion findAccount
+
+    #region updatePassword -----------------------------------------------------
+
+    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
+    function testUpdatePassword($returnValue)
+    {
+        $sut = $this->systemUnderTest();
+        $account = $this->createMock(Account::class);
+        $security = SecurityService::Instance();
+
+        $security->expects($this->once())
+            ->method('HashPassword')
+            ->with('pass5678')
+            ->willReturn('hashed');
+        $account->expects($this->once())
+            ->method('Save')
+            ->willReturn($returnValue);
+
+        $this->assertSame($returnValue, AccessHelper::CallMethod(
+            $sut,
+            'updatePassword',
+            [$account, 'pass5678']
+        ));
+    }
+
+    #endregion updatePassword
 }

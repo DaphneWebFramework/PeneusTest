@@ -13,9 +13,7 @@ use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
-use \Harmonia\Systems\DatabaseSystem\Queries\InsertQuery;
-use \Harmonia\Systems\DatabaseSystem\Queries\SelectQuery;
-use \Harmonia\Systems\DatabaseSystem\ResultSet;
+use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Resource;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
@@ -323,10 +321,10 @@ class RegisterAccountActionTest extends TestCase
             ->willReturn(false);
         $securityService->expects($this->once())
             ->method('GenerateToken')
-            ->willReturn('activation-code-123');
+            ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('createPendingAccount')
-            ->with('john@example.com', 'pass1234', 'John Doe', 'activation-code-123')
+            ->with('john@example.com', 'pass1234', 'John Doe', 'code1234')
             ->willReturn(false);
         $sut->expects($this->never())
             ->method('sendActivationEmail');
@@ -380,14 +378,14 @@ class RegisterAccountActionTest extends TestCase
             ->willReturn(false);
         $securityService->expects($this->once())
             ->method('GenerateToken')
-            ->willReturn('activation-code-123');
+            ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('createPendingAccount')
-            ->with('john@example.com', 'pass1234', 'John Doe', 'activation-code-123')
+            ->with('john@example.com', 'pass1234', 'John Doe', 'code1234')
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('sendActivationEmail')
-            ->with('john@example.com', 'John Doe', 'activation-code-123')
+            ->with('john@example.com', 'John Doe', 'code1234')
             ->willReturn(false);
         $database->expects($this->once())
             ->method('WithTransaction')
@@ -440,14 +438,14 @@ class RegisterAccountActionTest extends TestCase
             ->willReturn(false);
         $securityService->expects($this->once())
             ->method('GenerateToken')
-            ->willReturn('activation-code-123');
+            ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('createPendingAccount')
-            ->with('john@example.com', 'pass1234', 'John Doe', 'activation-code-123')
+            ->with('john@example.com', 'pass1234', 'John Doe', 'code1234')
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('sendActivationEmail')
-            ->with('john@example.com', 'John Doe', 'activation-code-123')
+            ->with('john@example.com', 'John Doe', 'code1234')
             ->willReturn(true);
         $cookieService->expects($this->once())
             ->method('DeleteCsrfCookie')
@@ -502,14 +500,14 @@ class RegisterAccountActionTest extends TestCase
             ->willReturn(false);
         $securityService->expects($this->once())
             ->method('GenerateToken')
-            ->willReturn('activation-code-123');
+            ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('createPendingAccount')
-            ->with('john@example.com', 'pass1234', 'John Doe', 'activation-code-123')
+            ->with('john@example.com', 'pass1234', 'John Doe', 'code1234')
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('sendActivationEmail')
-            ->with('john@example.com', 'John Doe', 'activation-code-123')
+            ->with('john@example.com', 'John Doe', 'code1234')
             ->willReturn(true);
         $cookieService->expects($this->once())
             ->method('DeleteCsrfCookie');
@@ -533,82 +531,19 @@ class RegisterAccountActionTest extends TestCase
 
     #region isEmailAlreadyRegistered -------------------------------------------
 
-    function testIsEmailAlreadyRegisteredReturnsTrue()
+    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
+    function testIsEmailAlreadyRegistered($returnValue)
     {
         $sut = $this->systemUnderTest();
-        $database = Database::Instance();
-        $resultSet = $this->createMock(ResultSet::class);
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT COUNT(*) FROM account WHERE email = :email',
+            bindings: ['email' => 'test@example.com'],
+            result: [[$returnValue ? 1 : 0]]
+        );
+        Database::ReplaceInstance($fakeDatabase);
 
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame(
-                    'account',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    'COUNT(*)',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    'email = :email',
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertSame(
-                    ['email' => 'test@example.com'],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($resultSet);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->with(ResultSet::ROW_MODE_NUMERIC)
-            ->willReturn([1]);
-
-        $this->assertTrue(AccessHelper::CallMethod(
-            $sut,
-            'isEmailAlreadyRegistered',
-            ['test@example.com']
-        ));
-    }
-
-    function testIsEmailAlreadyRegisteredReturnsFalse()
-    {
-        $sut = $this->systemUnderTest();
-        $database = Database::Instance();
-        $resultSet = $this->createMock(ResultSet::class);
-
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame(
-                    'account',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    'COUNT(*)',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    'email = :email',
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertSame(
-                    ['email' => 'test@example.com'],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($resultSet);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->with(ResultSet::ROW_MODE_NUMERIC)
-            ->willReturn([0]);
-
-        $this->assertFalse(AccessHelper::CallMethod(
+        $this->assertSame($returnValue, AccessHelper::CallMethod(
             $sut,
             'isEmailAlreadyRegistered',
             ['test@example.com']
@@ -619,82 +554,19 @@ class RegisterAccountActionTest extends TestCase
 
     #region isEmailAlreadyPending ----------------------------------------------
 
-    function testIsEmailAlreadyPendingReturnsTrue()
+    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
+    function testIsEmailAlreadyPending($returnValue)
     {
         $sut = $this->systemUnderTest();
-        $database = Database::Instance();
-        $resultSet = $this->createMock(ResultSet::class);
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'SELECT COUNT(*) FROM pendingaccount WHERE email = :email',
+            bindings: ['email' => 'test@example.com'],
+            result: [[$returnValue ? 1 : 0]]
+        );
+        Database::ReplaceInstance($fakeDatabase);
 
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame(
-                    'pendingaccount',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    'COUNT(*)',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    'email = :email',
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertSame(
-                    ['email' => 'test@example.com'],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($resultSet);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->with(ResultSet::ROW_MODE_NUMERIC)
-            ->willReturn([1]);
-
-        $this->assertTrue(AccessHelper::CallMethod(
-            $sut,
-            'isEmailAlreadyPending',
-            ['test@example.com']
-        ));
-    }
-
-    function testIsEmailAlreadyPendingReturnsFalse()
-    {
-        $sut = $this->systemUnderTest();
-        $database = Database::Instance();
-        $resultSet = $this->createMock(ResultSet::class);
-
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame(
-                    'pendingaccount',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    'COUNT(*)',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    'email = :email',
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertSame(
-                    ['email' => 'test@example.com'],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($resultSet);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->with(ResultSet::ROW_MODE_NUMERIC)
-            ->willReturn([0]);
-
-        $this->assertFalse(AccessHelper::CallMethod(
+        $this->assertSame($returnValue, AccessHelper::CallMethod(
             $sut,
             'isEmailAlreadyPending',
             ['test@example.com']
@@ -705,81 +577,39 @@ class RegisterAccountActionTest extends TestCase
 
     #region createPendingAccount -----------------------------------------------
 
-    function testCreatePendingAccountReturnsTrueWhenSaveSucceeds()
+    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
+    function testCreatePendingAccount($returnValue)
     {
         $sut = $this->systemUnderTest();
         $securityService = SecurityService::Instance();
-        $database = Database::Instance();
+        $now = new \DateTime();
+        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase->Expect(
+            sql: 'INSERT INTO pendingaccount'
+               . ' (email, passwordHash, displayName, activationCode, timeRegistered)'
+               . ' VALUES'
+               . ' (:email, :passwordHash, :displayName, :activationCode, :timeRegistered)',
+            bindings: [
+                'email' => 'john@example.com',
+                'passwordHash' => 'hash1234',
+                'displayName' => 'John Doe',
+                'activationCode' => 'code1234',
+                'timeRegistered' => $now->format('Y-m-d H:i:s')
+            ],
+            result: $returnValue ? [] : null,
+            lastInsertId: $returnValue ? 23 : 0
+        );
+        Database::ReplaceInstance($fakeDatabase);
 
         $securityService->expects($this->once())
             ->method('HashPassword')
-            ->with('plain-password')
-            ->willReturn('hashed-password');
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(InsertQuery::class, $query);
-                $this->assertSame(
-                    'pendingaccount',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $bindings = $query->Bindings();
-                $this->assertSame(
-                    'john@example.com',
-                    $bindings['email']
-                );
-                $this->assertSame(
-                    'hashed-password',
-                    $bindings['passwordHash']
-                );
-                $this->assertSame(
-                    'John Doe',
-                    $bindings['displayName']
-                );
-                $this->assertSame(
-                    'activation-code-123',
-                    $bindings['activationCode']
-                );
-                $this->assertEqualsWithDelta(
-                    time(),
-                    \DateTime::createFromFormat(
-                        'Y-m-d H:i:s',
-                        $bindings['timeRegistered']
-                    )->getTimestamp(),
-                    1
-                );
-                return true;
-            }))
-            ->willReturn($this->createStub(ResultSet::class));
-        $database->expects($this->once())
-            ->method('LastInsertId')
-            ->willReturn(23);
+            ->with('pass1234')
+            ->willReturn('hash1234');
 
-        $this->assertTrue(AccessHelper::CallMethod(
+        $this->assertSame($returnValue, AccessHelper::CallMethod(
             $sut,
             'createPendingAccount',
-            ['john@example.com', 'plain-password', 'John Doe', 'activation-code-123']
-        ));
-    }
-
-    function testCreatePendingAccountReturnsFalseWhenSaveFails()
-    {
-        $sut = $this->systemUnderTest();
-        $securityService = SecurityService::Instance();
-        $database = Database::Instance();
-
-        $securityService->expects($this->once())
-            ->method('HashPassword')
-            ->with('plain-password')
-            ->willReturn('hashed-password');
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn(null);
-
-        $this->assertFalse(AccessHelper::CallMethod(
-            $sut,
-            'createPendingAccount',
-            ['john@example.com', 'plain-password', 'John Doe', 'activation-code-123']
+            ['john@example.com', 'pass1234', 'John Doe', 'code1234', $now]
         ));
     }
 
@@ -802,7 +632,7 @@ class RegisterAccountActionTest extends TestCase
             ->with(
                 'john@example.com',
                 'John Doe',
-                'url/to/page/activation-code-123',
+                'url/to/page/code1234',
                 [
                     'masthead' => 'email_activate_account_masthead',
                     'intro' => 'email_activate_account_intro',
@@ -815,7 +645,7 @@ class RegisterAccountActionTest extends TestCase
         $this->assertSame($returnValue, AccessHelper::CallMethod(
             $sut,
             'sendActivationEmail',
-            ['john@example.com', 'John Doe', 'activation-code-123']
+            ['john@example.com', 'John Doe', 'code1234']
         ));
     }
 
