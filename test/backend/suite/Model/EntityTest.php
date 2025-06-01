@@ -580,7 +580,8 @@ class EntityTest extends TestCase
                 $this->assertNull(
                     AccessHelper::GetProperty($query, 'orderBy')
                 );
-                $this->assertNull(
+                $this->assertSame(
+                    '1',
                     AccessHelper::GetProperty($query, 'limit')
                 );
                 $this->assertSame(
@@ -625,7 +626,8 @@ class EntityTest extends TestCase
                 $this->assertNull(
                     AccessHelper::GetProperty($query, 'orderBy')
                 );
-                $this->assertNull(
+                $this->assertSame(
+                    '1',
                     AccessHelper::GetProperty($query, 'limit')
                 );
                 $this->assertSame(
