@@ -374,7 +374,8 @@ class AccountServiceTest extends TestCase
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM account WHERE id = :id LIMIT 1',
             bindings: ['id' => 42],
-            result: null
+            result: null,
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -405,7 +406,8 @@ class AccountServiceTest extends TestCase
                 'displayName' => 'John',
                 'timeActivated' => '2024-01-01 00:00:00',
                 'timeLastLogin' => '2025-01-01 00:00:00'
-            ]]
+            ]],
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 

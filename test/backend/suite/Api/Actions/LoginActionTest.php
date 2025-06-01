@@ -516,7 +516,8 @@ class LoginActionTest extends TestCase
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM account WHERE email = :email LIMIT 1',
             bindings: ['email' => 'john@example.com'],
-            result: null
+            result: null,
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -541,7 +542,8 @@ class LoginActionTest extends TestCase
                 'displayName' => 'John',
                 'timeActivated' => '2024-01-01 00:00:00',
                 'timeLastLogin' => '2025-01-01 00:00:00'
-            ]]
+            ]],
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -572,7 +574,8 @@ class LoginActionTest extends TestCase
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM accountrole WHERE accountId = :accountId LIMIT 1',
             bindings: ['accountId' => 42],
-            result: null
+            result: null,
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -589,7 +592,8 @@ class LoginActionTest extends TestCase
             result: [[
                 'accountId' => 42,
                 'role' => 999 // invalid
-            ]]
+            ]],
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -606,7 +610,8 @@ class LoginActionTest extends TestCase
             result: [[
                 'accountId' => 42,
                 'role' => Role::Editor->value
-            ]]
+            ]],
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 

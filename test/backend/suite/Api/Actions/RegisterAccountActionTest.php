@@ -539,7 +539,8 @@ class RegisterAccountActionTest extends TestCase
         $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM account WHERE email = :email',
             bindings: ['email' => 'test@example.com'],
-            result: [[$returnValue ? 1 : 0]]
+            result: [[$returnValue ? 1 : 0]],
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -562,7 +563,8 @@ class RegisterAccountActionTest extends TestCase
         $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM pendingaccount WHERE email = :email',
             bindings: ['email' => 'test@example.com'],
-            result: [[$returnValue ? 1 : 0]]
+            result: [[$returnValue ? 1 : 0]],
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -597,7 +599,8 @@ class RegisterAccountActionTest extends TestCase
                 'timeRegistered' => $now->format('Y-m-d H:i:s')
             ],
             result: $returnValue ? [] : null,
-            lastInsertId: $returnValue ? 23 : 0
+            lastInsertId: $returnValue ? 23 : 0,
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 

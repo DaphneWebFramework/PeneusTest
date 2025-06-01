@@ -385,7 +385,8 @@ class SendPasswordResetActionTest extends TestCase
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM account WHERE email = :email LIMIT 1',
             bindings: ['email' => 'john@example.com'],
-            result: null
+            result: null,
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -410,7 +411,8 @@ class SendPasswordResetActionTest extends TestCase
                 'displayName' => 'John',
                 'timeActivated' => '2024-01-01 00:00:00',
                 'timeLastLogin' => '2025-01-01 00:00:00'
-            ]]
+            ]],
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -450,7 +452,8 @@ class SendPasswordResetActionTest extends TestCase
                 'accountId' => $accountId,
                 'resetCode' => 'old-code',
                 'timeRequested' => '2024-01-01 00:00:00'
-            ]]
+            ]],
+            times: 1
         );
         $fakeDatabase->Expect(
             sql: 'UPDATE passwordreset SET'
@@ -482,7 +485,8 @@ class SendPasswordResetActionTest extends TestCase
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM passwordreset WHERE accountId = :accountId LIMIT 1',
             bindings: ['accountId' => $accountId],
-            result: null // no existing record
+            result: null, // no existing record
+            times: 1
         );
         $fakeDatabase->Expect(
             sql: 'INSERT INTO passwordreset'
@@ -514,7 +518,8 @@ class SendPasswordResetActionTest extends TestCase
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM passwordreset WHERE accountId = :accountId LIMIT 1',
             bindings: ['accountId' => $accountId],
-            result: null // no existing record
+            result: null, // no existing record
+            times: 1
         );
         $fakeDatabase->Expect(
             sql: 'INSERT INTO passwordreset'

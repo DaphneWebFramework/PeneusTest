@@ -493,7 +493,8 @@ class ResetPasswordActionTest extends TestCase
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM passwordreset WHERE resetCode = :resetCode LIMIT 1',
             bindings: ['resetCode' => 'code1234'],
-            result: null
+            result: null,
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -516,7 +517,8 @@ class ResetPasswordActionTest extends TestCase
                 'accountId' => 42,
                 'resetCode' => 'code1234',
                 'timeRequested' => '2024-12-31 00:00:00'
-            ]]
+            ]],
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -542,7 +544,8 @@ class ResetPasswordActionTest extends TestCase
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM account WHERE id = :id LIMIT 1',
             bindings: ['id' => 42],
-            result: null
+            result: null,
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -563,7 +566,8 @@ class ResetPasswordActionTest extends TestCase
                 'displayName' => 'John',
                 'timeActivated' => '2024-01-01 00:00:00',
                 'timeLastLogin' => '2024-01-02 00:00:00'
-            ]]
+            ]],
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 

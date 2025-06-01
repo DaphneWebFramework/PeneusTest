@@ -415,7 +415,8 @@ class ActivateAccountActionTest extends TestCase
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM pendingaccount WHERE activationCode = :activationCode LIMIT 1',
             bindings: ['activationCode' => 'code1234'],
-            result: null
+            result: null,
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -440,7 +441,8 @@ class ActivateAccountActionTest extends TestCase
                 'displayName' => 'John Doe',
                 'activationCode' => 'code1234',
                 'timeRegistered' => '2025-01-01 10:00:00'
-            ]]
+            ]],
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
@@ -471,7 +473,8 @@ class ActivateAccountActionTest extends TestCase
         $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM account WHERE email = :email',
             bindings: ['email' => 'test@example.com'],
-            result: [[$returnValue ? 1 : 0]]
+            result: [[$returnValue ? 1 : 0]],
+            times: 1
         );
         Database::ReplaceInstance($fakeDatabase);
 
