@@ -5,7 +5,6 @@ use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Model\Entity;
 
-use \Harmonia\Logger;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Queries\DeleteQuery;
 use \Harmonia\Systems\DatabaseSystem\Queries\InsertQuery;
@@ -32,20 +31,16 @@ class TestEntity extends Entity {
 class EntityTest extends TestCase
 {
     private ?Database $originalDatabase = null;
-    private ?Logger $originalLogger = null;
 
     protected function setUp(): void
     {
         $this->originalDatabase =
             Database::ReplaceInstance($this->createMock(Database::class));
-        $this->originalLogger =
-            Logger::ReplaceInstance($this->createStub(Logger::class));
     }
 
     protected function tearDown(): void
     {
         Database::ReplaceInstance($this->originalDatabase);
-        Logger::ReplaceInstance($this->originalLogger);
     }
 
     #region __construct --------------------------------------------------------

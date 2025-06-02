@@ -7,7 +7,6 @@ use \Peneus\Services\AccountService;
 
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
-use \Harmonia\Logger;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\Security\CsrfToken;
 use \Harmonia\Services\SecurityService;
@@ -26,7 +25,6 @@ class AccountServiceTest extends TestCase
     private ?Session $originalSession = null;
     private ?Request $originalRequest = null;
     private ?SecurityService $originalSecurityService = null;
-    private ?Logger $originalLogger = null;
 
     protected function setUp(): void
     {
@@ -38,8 +36,6 @@ class AccountServiceTest extends TestCase
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalSecurityService =
             SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
-        $this->originalLogger =
-            Logger::ReplaceInstance($this->createStub(Logger::class));
     }
 
     protected function tearDown(): void
@@ -48,7 +44,6 @@ class AccountServiceTest extends TestCase
         Session::ReplaceInstance($this->originalSession);
         Request::ReplaceInstance($this->originalRequest);
         SecurityService::ReplaceInstance($this->originalSecurityService);
-        Logger::ReplaceInstance($this->originalLogger);
     }
 
     private function systemUnderTest(string ...$mockedMethods): AccountService

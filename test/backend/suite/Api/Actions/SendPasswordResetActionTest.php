@@ -10,7 +10,6 @@ use \Harmonia\Core\CArray;
 use \Harmonia\Core\CUrl;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
-use \Harmonia\Logger;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
@@ -29,7 +28,6 @@ class SendPasswordResetActionTest extends TestCase
     private ?CookieService $originalCookieService = null;
     private ?Config $originalConfig = null;
     private ?Resource $originalResource = null;
-    private ?Logger $originalLogger = null;
 
     protected function setUp(): void
     {
@@ -45,8 +43,6 @@ class SendPasswordResetActionTest extends TestCase
             Config::ReplaceInstance($this->config());
         $this->originalResource =
             Resource::ReplaceInstance($this->createMock(Resource::class));
-        $this->originalLogger =
-            Logger::ReplaceInstance($this->createStub(Logger::class));
     }
 
     protected function tearDown(): void
@@ -57,7 +53,6 @@ class SendPasswordResetActionTest extends TestCase
         CookieService::ReplaceInstance($this->originalCookieService);
         Config::ReplaceInstance($this->originalConfig);
         Resource::ReplaceInstance($this->originalResource);
-        Logger::ReplaceInstance($this->originalLogger);
     }
 
     private function config()
