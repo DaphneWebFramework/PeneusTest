@@ -7,6 +7,7 @@ use \Peneus\Api\Actions\ActivateAccountAction;
 
 use \Harmonia\Config;
 use \Harmonia\Core\CArray;
+use \Harmonia\Core\CUrl;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
@@ -14,6 +15,7 @@ use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\PendingAccount;
+use \Peneus\Resource;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
@@ -23,6 +25,7 @@ class ActivateAccountActionTest extends TestCase
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
     private ?CookieService $originalCookieService = null;
+    private ?Resource $originalResource = null;
     private ?Config $originalConfig = null;
 
     protected function setUp(): void
@@ -33,6 +36,8 @@ class ActivateAccountActionTest extends TestCase
             Database::ReplaceInstance($this->createMock(Database::class));
         $this->originalCookieService =
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
+        $this->originalResource =
+            Resource::ReplaceInstance($this->createMock(Resource::class));
         $this->originalConfig =
             Config::ReplaceInstance($this->config());
     }
@@ -42,6 +47,7 @@ class ActivateAccountActionTest extends TestCase
         Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
         CookieService::ReplaceInstance($this->originalCookieService);
+        Resource::ReplaceInstance($this->originalResource);
         Config::ReplaceInstance($this->originalConfig);
     }
 
@@ -288,8 +294,8 @@ class ActivateAccountActionTest extends TestCase
         $pendingAccount = $this->createMock(PendingAccount::class);
         $pendingAccount->email = 'john@example.com';
         $account = $this->createMock(Account::class);
-        $database = Database::Instance();
         $cookieService = CookieService::Instance();
+        $database = Database::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -320,7 +326,6 @@ class ActivateAccountActionTest extends TestCase
         $cookieService->expects($this->once())
             ->method('DeleteCsrfCookie')
             ->willThrowException(new \RuntimeException);
-
         $database->expects($this->once())
             ->method('WithTransaction')
             ->willReturnCallback(function($callback) {
@@ -342,8 +347,7 @@ class ActivateAccountActionTest extends TestCase
         $sut = $this->systemUnderTest(
             'findPendingAccount',
             'isEmailAlreadyRegistered',
-            'createAccountFromPendingAccount',
-            'buildLoginUrl'
+            'createAccountFromPendingAccount'
         );
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -351,9 +355,10 @@ class ActivateAccountActionTest extends TestCase
         $pendingAccount = $this->createMock(PendingAccount::class);
         $pendingAccount->email = 'john@example.com';
         $account = $this->createMock(Account::class);
-        $database = Database::Instance();
         $cookieService = CookieService::Instance();
-        $redirectUrl = '/redirect/target';
+        $database = Database::Instance();
+        $resource = Resource::Instance();
+        $redirectUrl = new CUrl('/url/to/login');
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -388,15 +393,16 @@ class ActivateAccountActionTest extends TestCase
             ->willReturnCallback(function($callback) {
                 return $callback();
             });
-        $sut->expects($this->once())
-            ->method('buildLoginUrl')
+        $resource->expects($this->once())
+            ->method('LoginPageUrl')
+            ->with('home')
             ->willReturn($redirectUrl);
 
         $result = AccessHelper::CallMethod($sut, 'onExecute');
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('redirectUrl', $result);
-        $this->assertSame($redirectUrl, $result['redirectUrl']);
+        $this->assertEquals($redirectUrl, $result['redirectUrl']);
     }
 
     #endregion onExecute

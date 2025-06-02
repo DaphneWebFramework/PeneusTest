@@ -7,6 +7,7 @@ use \Peneus\Api\Actions\ResetPasswordAction;
 
 use \Harmonia\Config;
 use \Harmonia\Core\CArray;
+use \Harmonia\Core\CUrl;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
@@ -15,6 +16,7 @@ use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\PasswordReset;
+use \Peneus\Resource;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
@@ -25,6 +27,7 @@ class ResetPasswordActionTest extends TestCase
     private ?Database $originalDatabase = null;
     private ?SecurityService $originalSecurityService = null;
     private ?CookieService $originalCookieService = null;
+    private ?Resource $originalResource = null;
     private ?Config $originalConfig = null;
 
     protected function setUp(): void
@@ -37,6 +40,8 @@ class ResetPasswordActionTest extends TestCase
             SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
         $this->originalCookieService =
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
+        $this->originalResource =
+            Resource::ReplaceInstance($this->createMock(Resource::class));
         $this->originalConfig =
             Config::ReplaceInstance($this->config());
     }
@@ -47,6 +52,7 @@ class ResetPasswordActionTest extends TestCase
         Database::ReplaceInstance($this->originalDatabase);
         SecurityService::ReplaceInstance($this->originalSecurityService);
         CookieService::ReplaceInstance($this->originalCookieService);
+        Resource::ReplaceInstance($this->originalResource);
         Config::ReplaceInstance($this->originalConfig);
     }
 
@@ -422,8 +428,7 @@ class ResetPasswordActionTest extends TestCase
         $sut = $this->systemUnderTest(
             'findPasswordReset',
             'findAccount',
-            'updatePassword',
-            'buildLoginUrl'
+            'updatePassword'
         );
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -433,7 +438,8 @@ class ResetPasswordActionTest extends TestCase
         $account = $this->createStub(Account::class);
         $cookieService = CookieService::Instance();
         $database = Database::Instance();
-        $redirectUrl = '/redirect/to/login';
+        $resource = Resource::Instance();
+        $redirectUrl = new CUrl('/url/to/login');
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -466,15 +472,16 @@ class ResetPasswordActionTest extends TestCase
             ->willReturnCallback(function($callback) {
                 return $callback();
             });
-        $sut->expects($this->once())
-            ->method('buildLoginUrl')
+        $resource->expects($this->once())
+            ->method('LoginPageUrl')
+            ->with('home')
             ->willReturn($redirectUrl);
 
         $result = AccessHelper::CallMethod($sut, 'onExecute');
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('redirectUrl', $result);
-        $this->assertSame($redirectUrl, $result['redirectUrl']);
+        $this->assertEquals($redirectUrl, $result['redirectUrl']);
     }
 
     #endregion onExecute

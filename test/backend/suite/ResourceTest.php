@@ -268,6 +268,32 @@ class ResourceTest extends TestCase
         );
     }
 
+    function testLoginPageUrlWithCustomRedirectPageId()
+    {
+        $sut = $this->systemUnderTest('PageUrl');
+        $server = Server::Instance();
+
+        $sut->expects($this->exactly(2))
+            ->method('PageUrl')
+            ->willReturnCallback(function(string $pageId) {
+                return match ($pageId) {
+                    'login' =>
+                        new CUrl('https://example.com/pages/login/'),
+                    'home' =>
+                        new CUrl('https://example.com/pages/home/'),
+                    default =>
+                        $this->fail("Unexpected page ID: $pageId")
+                };
+            });
+        $server->expects($this->never())
+            ->method('RequestUri');
+
+        $this->assertEquals(
+            'https://example.com/pages/login/?redirect=%2Fpages%2Fhome%2F',
+            $sut->LoginPageUrl('home')
+        );
+    }
+
     #endregion LoginPageUrl
 
     #region ErrorPageUrl ------------------------------------------------------
