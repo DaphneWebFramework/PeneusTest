@@ -6,11 +6,7 @@ use \PHPUnit\Framework\Attributes\DataProviderExternal;
 use \Peneus\Model\Entity;
 
 use \Harmonia\Systems\DatabaseSystem\Database;
-use \Harmonia\Systems\DatabaseSystem\Queries\DeleteQuery;
-use \Harmonia\Systems\DatabaseSystem\Queries\InsertQuery;
-use \Harmonia\Systems\DatabaseSystem\Queries\SelectQuery;
-use \Harmonia\Systems\DatabaseSystem\Queries\UpdateQuery;
-use \Harmonia\Systems\DatabaseSystem\ResultSet;
+use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
@@ -35,7 +31,7 @@ class EntityTest extends TestCase
     protected function setUp(): void
     {
         $this->originalDatabase =
-            Database::ReplaceInstance($this->createMock(Database::class));
+            Database::ReplaceInstance(new FakeDatabase());
     }
 
     protected function tearDown(): void
@@ -461,67 +457,49 @@ class EntityTest extends TestCase
 
     function testDeleteFailsIfIdIsZero()
     {
-        $database = Database::Instance();
-        $database->expects($this->never())
-            ->method('Execute');
         $sut = new TestEntity();
         $this->assertFalse($sut->Delete());
     }
 
     function testDeleteFailsIfExecuteFails()
     {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn(null);
         $sut = new TestEntity(['id' => 1]);
+        Database::Instance()->Expect(
+            sql: 'DELETE FROM testentity WHERE id = :id',
+            bindings: ['id' => 1],
+            result: null,
+            times: 1
+        );
         $this->assertFalse($sut->Delete());
-        $this->assertSame(1, $sut->id); // ID should remain unchanged
+        $this->assertSame(1, $sut->id);
     }
 
     function testDeleteFailsIfLastAffectedRowCountIsNotOne()
     {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->isInstanceOf(DeleteQuery::class))
-            ->willReturn($this->createStub(ResultSet::class));
-        $database->expects($this->once())
-            ->method('LastAffectedRowCount')
-            ->willReturn(0);
         $sut = new TestEntity(['id' => 1]);
+        Database::Instance()->Expect(
+            sql: 'DELETE FROM testentity WHERE id = :id',
+            bindings: ['id' => 1],
+            result: [],
+            lastAffectedRowCount: 0,
+            times: 1
+        );
         $this->assertFalse($sut->Delete());
-        $this->assertSame(1, $sut->id); // ID should remain unchanged
+        $this->assertSame(1, $sut->id);
     }
 
     function testDeleteSucceedsIfLastAffectedRowCountIsOne()
     {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(DeleteQuery::class, $query);
-                $this->assertSame(
-                    'testentity',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    'id = :id',
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertSame(
-                    ['id' => 1],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($this->createStub(ResultSet::class));
-        $database->expects($this->once())
-            ->method('LastAffectedRowCount')
-            ->willReturn(1);
         $sut = new TestEntity(['id' => 1]);
+        Database::Instance()->Expect(
+            sql: 'DELETE FROM testentity WHERE id = :id',
+            bindings: ['id' => 1],
+            result: [],
+            lastAffectedRowCount: 1,
+            times: 1
+        );
         $this->assertTrue($sut->Delete());
-        $this->assertSame(0, $sut->id); // ID should be reset to zero
+        $this->assertSame(0, $sut->id);
     }
 
     #endregion Delete
@@ -530,97 +508,39 @@ class EntityTest extends TestCase
 
     function testFindByIdFailsIfExecuteFails()
     {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn(null);
-        $sut = TestEntity::FindById(1);
-        $this->assertNull($sut);
+        Database::Instance()->Expect(
+            sql: 'SELECT * FROM testentity WHERE id = :id LIMIT 1',
+            bindings: ['id' => 1],
+            result: null,
+            times: 1
+        );
+        $this->assertNull(TestEntity::FindById(1));
     }
 
     function testFindByIdFailsIfResultSetIsEmpty()
     {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->willReturn(null);
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame(
-                    'testentity',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    '*',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    'id = :id',
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertNull(
-                    AccessHelper::GetProperty($query, 'orderBy')
-                );
-                $this->assertSame(
-                    '1',
-                    AccessHelper::GetProperty($query, 'limit')
-                );
-                $this->assertSame(
-                    ['id' => 1],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($resultSet);
-        $sut = TestEntity::FindById(1);
-        $this->assertNull($sut);
+        Database::Instance()->Expect(
+            sql: 'SELECT * FROM testentity WHERE id = :id LIMIT 1',
+            bindings: ['id' => 1],
+            result: [],
+            times: 1
+        );
+        $this->assertNull(TestEntity::FindById(1));
     }
 
     function testFindByIdSucceedsIfResultSetIsNotEmpty()
     {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->willReturn([
+        Database::Instance()->Expect(
+            sql: 'SELECT * FROM testentity WHERE id = :id LIMIT 1',
+            bindings: ['id' => 1],
+            result: [[
                 'id' => 1,
                 'name' => 'John',
                 'age' => 30,
                 'createdAt' => '2021-01-01'
-            ]);
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame(
-                    'testentity',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    '*',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    'id = :id',
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertNull(
-                    AccessHelper::GetProperty($query, 'orderBy')
-                );
-                $this->assertSame(
-                    '1',
-                    AccessHelper::GetProperty($query, 'limit')
-                );
-                $this->assertSame(
-                    ['id' => 1],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($resultSet);
+            ]],
+            times: 1
+        );
         $sut = TestEntity::FindById(1);
         $this->assertInstanceOf(TestEntity::class, $sut);
         $this->assertSame(1, $sut->id);
@@ -635,97 +555,39 @@ class EntityTest extends TestCase
 
     function testFindFirstFailsIfExecuteFails()
     {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn(null);
-        $sut = TestEntity::FindFirst();
-        $this->assertNull($sut);
+        Database::Instance()->Expect(
+            sql: 'SELECT * FROM testentity LIMIT 1',
+            bindings: [],
+            result: null,
+            times: 1
+        );
+        $this->assertNull(TestEntity::FindFirst());
     }
 
     function testFindFirstFailsIfResultSetIsEmpty()
     {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->willReturn(null);
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame(
-                    'testentity',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    '*',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertNull(
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertNull(
-                    AccessHelper::GetProperty($query, 'orderBy')
-                );
-                $this->assertSame(
-                    '1',
-                    AccessHelper::GetProperty($query, 'limit')
-                );
-                $this->assertSame(
-                    [],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($resultSet);
-        $sut = TestEntity::FindFirst(); // No arguments
-        $this->assertNull($sut);
+        Database::Instance()->Expect(
+            sql: 'SELECT * FROM testentity LIMIT 1',
+            bindings: [],
+            result: [],
+            times: 1
+        );
+        $this->assertNull(TestEntity::FindFirst());
     }
 
     function testFindFirstSucceedsIfResultSetIsNotEmpty()
     {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->willReturn([
+        Database::Instance()->Expect(
+            sql: 'SELECT * FROM testentity WHERE age > :age ORDER BY name DESC LIMIT 1',
+            bindings: ['age' => 29],
+            result: [[
                 'id' => 1,
                 'name' => 'John',
                 'age' => 30,
                 'createdAt' => '2021-01-01'
-            ]);
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame(
-                    'testentity',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    '*',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    'age > :age',
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertSame(
-                    'name DESC',
-                    AccessHelper::GetProperty($query, 'orderBy')
-                );
-                $this->assertSame(
-                    '1',
-                    AccessHelper::GetProperty($query, 'limit')
-                );
-                $this->assertSame(
-                    ['age' => 29],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($resultSet);
+            ]],
+            times: 1
+        );
         $sut = TestEntity::FindFirst(
             condition: 'age > :age',
             bindings: ['age' => 29],
@@ -744,10 +606,11 @@ class EntityTest extends TestCase
 
     function testFindFailsIfExecuteFails()
     {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn(null);
+        Database::Instance()->Expect(
+            sql: 'SELECT * FROM testentity',
+            result: null,
+            times: 1
+        );
         $entities = TestEntity::Find();
         $this->assertIsArray($entities);
         $this->assertEmpty($entities);
@@ -755,101 +618,36 @@ class EntityTest extends TestCase
 
     function testFindFailsIfResultSetIsEmpty()
     {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->willReturn(null);
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame(
-                    'testentity',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    '*',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertNull(
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertNull(
-                    AccessHelper::GetProperty($query, 'orderBy')
-                );
-                $this->assertNull(
-                    AccessHelper::GetProperty($query, 'limit')
-                );
-                $this->assertSame(
-                    [],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($resultSet);
-        $entities = TestEntity::Find(); // No arguments
+        Database::Instance()->Expect(
+            sql: 'SELECT * FROM testentity',
+            result: [],
+            times: 1
+        );
+        $entities = TestEntity::Find();
         $this->assertIsArray($entities);
         $this->assertEmpty($entities);
     }
 
     function testFindSucceedsIfResultSetIsNotEmpty()
     {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->expects($invokedCount = $this->exactly(3))
-            ->method('Row')
-            ->willReturnCallback(function() use($invokedCount) {
-                switch ($invokedCount->numberOfInvocations()) {
-                case 1:
-                    return [
-                        'id' => 3,
-                        'name' => 'Alice Doe',
-                        'age' => 27,
-                        'createdAt' => '2021-01-01'
-                    ];
-                case 2:
-                    return [
-                        'id' => 4,
-                        'name' => 'Aziz Smith',
-                        'age' => 35,
-                        'createdAt' => '2021-01-02'
-                    ];
-                case 3:
-                    return null; // Stop iteration
-                }
-            });
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame(
-                    'testentity',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    '*',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    'name LIKE :name AND age >= :age',
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertSame(
-                    'createdAt DESC',
-                    AccessHelper::GetProperty($query, 'orderBy')
-                );
-                $this->assertSame(
-                    '10 OFFSET 5',
-                    AccessHelper::GetProperty($query, 'limit')
-                );
-                $this->assertSame(
-                    ['name' => 'A%', 'age' => 25],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($resultSet);
+        Database::Instance()->Expect(
+            sql: 'SELECT * FROM testentity'
+            . ' WHERE name LIKE :name AND age >= :age'
+            . ' ORDER BY createdAt DESC LIMIT 10 OFFSET 5',
+            bindings: ['name' => 'A%', 'age' => 25],
+            result: [[
+                'id' => 3,
+                'name' => 'Alice Doe',
+                'age' => 27,
+                'createdAt' => '2021-01-01'
+            ], [
+                'id' => 4,
+                'name' => 'Aziz Smith',
+                'age' => 35,
+                'createdAt' => '2021-01-02'
+            ]],
+            times: 1
+        );
         $entities = TestEntity::Find(
             condition: 'name LIKE :name AND age >= :age',
             bindings: ['name' => 'A%', 'age' => 25],
@@ -877,111 +675,53 @@ class EntityTest extends TestCase
 
     function testCountReturnsZeroIfExecuteFails()
     {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn(null);
-        $count = TestEntity::Count();
-        $this->assertSame(0, $count);
+        Database::Instance()->Expect(
+            sql: 'SELECT COUNT(*) FROM testentity',
+            result: null,
+            times: 1
+        );
+        $this->assertSame(0, TestEntity::Count());
     }
 
     function testCountReturnsZeroIfRowIsNull()
     {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->with(ResultSet::ROW_MODE_NUMERIC)
-            ->willReturn(null);
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn($resultSet);
-        $count = TestEntity::Count();
-        $this->assertSame(0, $count);
+        Database::Instance()->Expect(
+            sql: 'SELECT COUNT(*) FROM testentity',
+            result: [],
+            times: 1
+        );
+        $this->assertSame(0, TestEntity::Count());
     }
 
     function testCountReturnsZeroIfRowHasNoIndexZero()
     {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->with(ResultSet::ROW_MODE_NUMERIC)
-            ->willReturn([]);
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn($resultSet);
-        $count = TestEntity::Count();
-        $this->assertSame(0, $count);
+        Database::Instance()->Expect(
+            sql: 'SELECT COUNT(*) FROM testentity',
+            result: [[]],
+            times: 1
+        );
+        $this->assertSame(0, TestEntity::Count());
     }
 
     function testCountReturnsExpectedRowCount()
     {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->with(ResultSet::ROW_MODE_NUMERIC)
-            ->willReturn([123]);
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame(
-                    'testentity',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    'COUNT(*)',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertNull(
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertSame(
-                    [],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($resultSet);
-        $count = TestEntity::Count();
-        $this->assertSame(123, $count);
+        Database::Instance()->Expect(
+            sql: 'SELECT COUNT(*) FROM testentity',
+            result: [[123]],
+            times: 1
+        );
+        $this->assertSame(123, TestEntity::Count());
     }
 
     function testCountAcceptsConditionAndBindings()
     {
-        $resultSet = $this->createMock(ResultSet::class);
-        $resultSet->expects($this->once())
-            ->method('Row')
-            ->with(ResultSet::ROW_MODE_NUMERIC)
-            ->willReturn([7]);
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(SelectQuery::class, $query);
-                $this->assertSame(
-                    'testentity',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    'COUNT(*)',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    'age > :age',
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertSame(
-                    ['age' => 30],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($resultSet);
-        $count = TestEntity::Count('age > :age', ['age' => 30]);
-        $this->assertSame(7, $count);
+        Database::Instance()->Expect(
+            sql: 'SELECT COUNT(*) FROM testentity WHERE age > :age',
+            bindings: ['age' => 30],
+            result: [[7]],
+            times: 1
+        );
+        $this->assertSame(7, TestEntity::Count('age > :age', ['age' => 30]));
     }
 
     #endregion Count
@@ -990,23 +730,20 @@ class EntityTest extends TestCase
 
     function testTableNameCanBeOverridden()
     {
-        $sut = new class(['id' => 1]) extends Entity {
+        $data = ['id' => 1];
+        $sut = new class($data) extends Entity {
             protected static function tableName(): string {
                 return 'custom_table_name';
             }
         };
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(DeleteQuery::class, $query);
-                $this->assertSame(
-                    'custom_table_name',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                return true;
-            }));
-        $sut->Delete();
+        Database::Instance()->Expect(
+            sql: 'DELETE FROM custom_table_name WHERE id = :id',
+            bindings: ['id' => 1],
+            result: [],
+            lastAffectedRowCount: 1,
+            times: 1
+        );
+        $this->assertTrue($sut->Delete());
     }
 
     #endregion tableName
@@ -1030,33 +767,13 @@ class EntityTest extends TestCase
                 return 'custom_table_name';
             }
         };
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(InsertQuery::class, $query);
-                $this->assertSame(
-                    'custom_table_name',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    'aString',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    ':aString',
-                    AccessHelper::GetProperty($query, 'values')
-                );
-                $this->assertSame(
-                    ['aString' => 'Hello, World!'],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($this->createStub(ResultSet::class));
-        $database->expects($this->once())
-            ->method('LastInsertId')
-            ->willReturn(1);
+        Database::Instance()->Expect(
+            sql: 'INSERT INTO custom_table_name (aString) VALUES (:aString)',
+            bindings: ['aString' => 'Hello, World!'],
+            result: [],
+            lastInsertId: 1,
+            times: 1
+        );
         $this->assertTrue(AccessHelper::CallMethod($sut, 'insert'));
         \fclose($sut->aResource);
     }
@@ -1066,56 +783,51 @@ class EntityTest extends TestCase
         $sut = new class extends Entity {
             // No properties
         };
-        $database = Database::Instance();
-        $database->expects($this->never())
-            ->method('Execute');
         $this->assertFalse(AccessHelper::CallMethod($sut, 'insert'));
     }
 
     function testInsertFailsIfExecuteFails()
     {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn(null);
-        $sut = new TestEntity();
-        $this->assertFalse(AccessHelper::CallMethod($sut, 'insert'));
-    }
-
-    function testInsertSucceedsIfExecuteSucceeds()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(InsertQuery::class, $query);
-                $this->assertSame(
-                    'testentity',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    'name, age, createdAt',
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    ':name, :age, :createdAt',
-                    AccessHelper::GetProperty($query, 'values')
-                );
-                $this->assertSame(
-                    ['name' => 'John', 'age' => 30, 'createdAt' => '2021-01-01 12:34:56'],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($this->createStub(ResultSet::class));
-        $database->expects($this->once())
-            ->method('LastInsertId')
-            ->willReturn(23);
         $sut = new TestEntity([
             'name' => 'John',
             'age' => 30,
             'createdAt' => '2021-01-01 12:34:56'
         ]);
+        Database::Instance()->Expect(
+            sql: 'INSERT INTO testentity'
+               . ' (name, age, createdAt)'
+               . ' VALUES (:name, :age, :createdAt)',
+            bindings: [
+                'name' => 'John',
+                'age' => 30,
+                'createdAt' => '2021-01-01 12:34:56'
+            ],
+            result: null,
+            times: 1
+        );
+        $this->assertFalse(AccessHelper::CallMethod($sut, 'insert'));
+    }
+
+    function testInsertSucceedsIfExecuteSucceeds()
+    {
+        $sut = new TestEntity([
+            'name' => 'John',
+            'age' => 30,
+            'createdAt' => '2021-01-01 12:34:56'
+        ]);
+        Database::Instance()->Expect(
+            sql: 'INSERT INTO testentity'
+               . ' (name, age, createdAt)'
+               . ' VALUES (:name, :age, :createdAt)',
+            bindings: [
+                'name' => 'John',
+                'age' => 30,
+                'createdAt' => '2021-01-01 12:34:56'
+            ],
+            result: [],
+            lastInsertId: 23,
+            times: 1
+        );
         $this->assertTrue(AccessHelper::CallMethod($sut, 'insert'));
         $this->assertSame(23, $sut->id);
     }
@@ -1142,34 +854,13 @@ class EntityTest extends TestCase
                 return 'custom_table_name';
             }
         };
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(UpdateQuery::class, $query);
-                $this->assertSame(
-                    'custom_table_name',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    ['aString'],
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    [':aString'],
-                    AccessHelper::GetProperty($query, 'values')
-                );
-                $this->assertSame(
-                    'id = :id',
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertSame(
-                    ['id' => 23, 'aString' => 'Hello, World!'],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($this->createStub(ResultSet::class));
+        Database::Instance()->Expect(
+            sql: 'UPDATE custom_table_name SET aString = :aString WHERE id = :id',
+            bindings: ['id' => 23, 'aString' => 'Hello, World!'],
+            result: [],
+            lastAffectedRowCount: 1,
+            times: 1
+        );
         $this->assertTrue(AccessHelper::CallMethod($sut, 'update'));
         \fclose($sut->aResource);
     }
@@ -1179,77 +870,82 @@ class EntityTest extends TestCase
         $sut = new class extends Entity {
             // No properties
         };
-        $database = Database::Instance();
-        $database->expects($this->never())
-            ->method('Execute');
         $this->assertFalse(AccessHelper::CallMethod($sut, 'update'));
     }
 
     function testUpdateFailsIfExecuteFails()
     {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->willReturn(null);
-        $sut = new TestEntity();
-        $this->assertFalse(AccessHelper::CallMethod($sut, 'update'));
-    }
-
-    function testUpdateFailsIfLastAffectedRowCountIsMinusOne()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->isInstanceOf(UpdateQuery::class))
-            ->willReturn($this->createStub(ResultSet::class));
-        $database->expects($this->once())
-            ->method('LastAffectedRowCount')
-            ->willReturn(-1);
-        $sut = new TestEntity();
-        $this->assertFalse(AccessHelper::CallMethod($sut, 'update'));
-    }
-
-    function testUpdateSucceedsIfLastAffectedRowCountIsNotMinusOne()
-    {
-        $database = Database::Instance();
-        $database->expects($this->once())
-            ->method('Execute')
-            ->with($this->callback(function($query) {
-                $this->assertInstanceOf(UpdateQuery::class, $query);
-                $this->assertSame(
-                    'testentity',
-                    AccessHelper::GetProperty($query, 'table')
-                );
-                $this->assertSame(
-                    ['name', 'age', 'createdAt'],
-                    AccessHelper::GetProperty($query, 'columns')
-                );
-                $this->assertSame(
-                    [':name', ':age', ':createdAt'],
-                    AccessHelper::GetProperty($query, 'values')
-                );
-                $this->assertSame(
-                    'id = :id',
-                    AccessHelper::GetProperty($query, 'condition')
-                );
-                $this->assertSame(
-                    ['id' => 23, 'name' => 'John', 'age' => 30, 'createdAt' => '2021-01-01 12:34:56'],
-                    $query->Bindings()
-                );
-                return true;
-            }))
-            ->willReturn($this->createStub(ResultSet::class));
-        $database->expects($this->once())
-            ->method('LastAffectedRowCount')
-            ->willReturn(1);
         $sut = new TestEntity([
             'id' => 23,
             'name' => 'John',
             'age' => 30,
             'createdAt' => '2021-01-01 12:34:56'
         ]);
+        Database::Instance()->Expect(
+            sql: 'UPDATE testentity'
+               . ' SET name = :name, age = :age, createdAt = :createdAt'
+               . ' WHERE id = :id',
+            bindings: [
+                'id' => 23,
+                'name' => 'John',
+                'age' => 30,
+                'createdAt' => '2021-01-01 12:34:56'
+            ],
+            result: null,
+            times: 1
+        );
+        $this->assertFalse(AccessHelper::CallMethod($sut, 'update'));
+    }
+
+    function testUpdateFailsIfLastAffectedRowCountIsMinusOne()
+    {
+        $sut = new TestEntity([
+            'id' => 23,
+            'name' => 'John',
+            'age' => 30,
+            'createdAt' => '2021-01-01 12:34:56'
+        ]);
+        Database::Instance()->Expect(
+            sql: 'UPDATE testentity'
+               . ' SET name = :name, age = :age, createdAt = :createdAt'
+               . ' WHERE id = :id',
+            bindings: [
+                'id' => 23,
+                'name' => 'John',
+                'age' => 30,
+                'createdAt' => '2021-01-01 12:34:56'
+            ],
+            result: [],
+            lastAffectedRowCount: -1,
+            times: 1
+        );
+        $this->assertFalse(AccessHelper::CallMethod($sut, 'update'));
+    }
+
+    function testUpdateSucceedsIfLastAffectedRowCountIsNotMinusOne()
+    {
+        $sut = new TestEntity([
+            'id' => 23,
+            'name' => 'John',
+            'age' => 30,
+            'createdAt' => '2021-01-01 12:34:56'
+        ]);
+        Database::Instance()->Expect(
+            sql: 'UPDATE testentity'
+               . ' SET name = :name, age = :age, createdAt = :createdAt'
+               . ' WHERE id = :id',
+            bindings: [
+                'id' => 23,
+                'name' => 'John',
+                'age' => 30,
+                'createdAt' => '2021-01-01 12:34:56'
+            ],
+            result: [],
+            lastAffectedRowCount: 1,
+            times: 1
+        );
         $this->assertTrue(AccessHelper::CallMethod($sut, 'update'));
-        $this->assertSame(23, $sut->id); // ID should remain unchanged
+        $this->assertSame(23, $sut->id);
     }
 
     #endregion update
