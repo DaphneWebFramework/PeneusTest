@@ -593,6 +593,31 @@ class PageTest extends TestCase
 
     #endregion RequireLogin
 
+    #region SetProperty --------------------------------------------------------
+
+    function testSetProperty()
+    {
+        $sut = $this->systemUnderTest();
+        $properties = AccessHelper::GetMockProperty(Page::class, $sut, 'properties');
+        $this->assertSame(null, $properties->GetOrDefault('theme', null));
+        $this->assertSame($sut, $sut->SetProperty('theme', 'dark'));
+        $this->assertSame('dark', $properties->GetOrDefault('theme', null));
+    }
+
+    #endregion SetProperty
+
+    #region Property -----------------------------------------------------------
+
+    function testPropertyReturnsValueOrDefault()
+    {
+        $sut = $this->systemUnderTest();
+        $sut->SetProperty('layout', 'compact');
+        $this->assertSame('compact', $sut->Property('layout'));
+        $this->assertSame('full', $sut->Property('mode', 'full'));
+    }
+
+    #endregion Property
+
     #region CsrfTokenName ------------------------------------------------------
 
     function testCsrfTokenName()
