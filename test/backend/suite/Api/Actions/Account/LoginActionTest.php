@@ -3,7 +3,7 @@ use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
-use \Peneus\Api\Actions\LoginAction;
+use \Peneus\Api\Actions\Account\LoginAction;
 
 use \Harmonia\Config;
 use \Harmonia\Core\CArray;
@@ -15,7 +15,7 @@ use \Harmonia\Services\SecurityService;
 use \Harmonia\Session;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
-use \Peneus\Api\Actions\LogoutAction;
+use \Peneus\Api\Actions\Account\LogoutAction;
 use \Peneus\Model\Account;
 use \Peneus\Model\Role;
 use \Peneus\Services\AccountService;

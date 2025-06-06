@@ -3,7 +3,7 @@ use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
-use \Peneus\Api\Actions\SendPasswordResetAction;
+use \Peneus\Api\Actions\Account\SendPasswordResetAction;
 
 use \Harmonia\Config;
 use \Harmonia\Core\CArray;

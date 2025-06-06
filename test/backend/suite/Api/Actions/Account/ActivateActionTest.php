@@ -3,7 +3,7 @@ use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
-use \Peneus\Api\Actions\ActivateAccountAction;
+use \Peneus\Api\Actions\Account\ActivateAction;
 
 use \Harmonia\Config;
 use \Harmonia\Core\CArray;
@@ -19,8 +19,8 @@ use \Peneus\Resource;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
-#[CoversClass(ActivateAccountAction::class)]
-class ActivateAccountActionTest extends TestCase
+#[CoversClass(ActivateAction::class)]
+class ActivateActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
@@ -58,9 +58,9 @@ class ActivateAccountActionTest extends TestCase
         return $mock;
     }
 
-    private function systemUnderTest(string ...$mockedMethods): ActivateAccountAction
+    private function systemUnderTest(string ...$mockedMethods): ActivateAction
     {
-        return $this->getMockBuilder(ActivateAccountAction::class)
+        return $this->getMockBuilder(ActivateAction::class)
             ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();

@@ -4,12 +4,12 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\Handlers\AccountHandler;
 
-use \Peneus\Api\Actions\ActivateAccountAction;
-use \Peneus\Api\Actions\LoginAction;
-use \Peneus\Api\Actions\LogoutAction;
-use \Peneus\Api\Actions\RegisterAccountAction;
-use \Peneus\Api\Actions\ResetPasswordAction;
-use \Peneus\Api\Actions\SendPasswordResetAction;
+use \Peneus\Api\Actions\Account\ActivateAction;
+use \Peneus\Api\Actions\Account\LoginAction;
+use \Peneus\Api\Actions\Account\LogoutAction;
+use \Peneus\Api\Actions\Account\RegisterAction;
+use \Peneus\Api\Actions\Account\ResetPasswordAction;
+use \Peneus\Api\Actions\Account\SendPasswordResetAction;
 use \Peneus\Api\Guards\FormTokenGuard;
 use \Peneus\Api\Guards\SessionGuard;
 use \TestToolkit\AccessHelper;
@@ -23,7 +23,7 @@ class AccountHandlerTest extends TestCase
     {
         $handler = new AccountHandler;
         $action = AccessHelper::CallMethod($handler, 'createAction', ['register']);
-        $this->assertInstanceOf(RegisterAccountAction::class, $action);
+        $this->assertInstanceOf(RegisterAction::class, $action);
         $guards = AccessHelper::GetProperty($action, 'guards');
         $this->assertCount(1, $guards);
         $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);
@@ -33,7 +33,7 @@ class AccountHandlerTest extends TestCase
     {
         $handler = new AccountHandler;
         $action = AccessHelper::CallMethod($handler, 'createAction', ['activate']);
-        $this->assertInstanceOf(ActivateAccountAction::class, $action);
+        $this->assertInstanceOf(ActivateAction::class, $action);
         $guards = AccessHelper::GetProperty($action, 'guards');
         $this->assertCount(1, $guards);
         $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);

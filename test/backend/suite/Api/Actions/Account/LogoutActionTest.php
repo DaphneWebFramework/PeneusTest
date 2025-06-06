@@ -2,7 +2,7 @@
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 
-use \Peneus\Api\Actions\LogoutAction;
+use \Peneus\Api\Actions\Account\LogoutAction;
 
 use \Harmonia\Services\CookieService;
 use \Harmonia\Session;
