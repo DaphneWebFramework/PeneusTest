@@ -593,7 +593,7 @@ class ResetPasswordActionTest extends TestCase
         $security->expects($this->once())
             ->method('HashPassword')
             ->with('pass5678')
-            ->willReturn('hashed');
+            ->willReturn('hash5678');
         $account->expects($this->once())
             ->method('Save')
             ->willReturn($returnValue);

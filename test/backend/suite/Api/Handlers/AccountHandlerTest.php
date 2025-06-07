@@ -5,6 +5,8 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 use \Peneus\Api\Handlers\AccountHandler;
 
 use \Peneus\Api\Actions\Account\ActivateAction;
+use \Peneus\Api\Actions\Account\ChangeDisplayNameAction;
+use \Peneus\Api\Actions\Account\ChangePasswordAction;
 use \Peneus\Api\Actions\Account\LoginAction;
 use \Peneus\Api\Actions\Account\LogoutAction;
 use \Peneus\Api\Actions\Account\RegisterAction;
@@ -77,6 +79,26 @@ class AccountHandlerTest extends TestCase
         $guards = AccessHelper::GetProperty($action, 'guards');
         $this->assertCount(1, $guards);
         $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);
+    }
+
+    function testCreateActionWithChangeDisplayName()
+    {
+        $handler = new AccountHandler;
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['change-display-name']);
+        $this->assertInstanceOf(ChangeDisplayNameAction::class, $action);
+        $guards = AccessHelper::GetProperty($action, 'guards');
+        $this->assertCount(1, $guards);
+        $this->assertInstanceOf(SessionGuard::class, $guards[0]);
+    }
+
+    function testCreateActionWithChangePassword()
+    {
+        $handler = new AccountHandler;
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['change-password']);
+        $this->assertInstanceOf(ChangePasswordAction::class, $action);
+        $guards = AccessHelper::GetProperty($action, 'guards');
+        $this->assertCount(1, $guards);
+        $this->assertInstanceOf(SessionGuard::class, $guards[0]);
     }
 
     public function testCreateActionWithUnknownAction()

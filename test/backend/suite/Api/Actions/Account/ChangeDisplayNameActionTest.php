@@ -91,7 +91,7 @@ class ChangeDisplayNameActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfNotLoggedIn()
+    function testOnExecuteThrowsIfUserNotLoggedIn()
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
@@ -168,8 +168,7 @@ class ChangeDisplayNameActionTest extends TestCase
             ->method('Save')
             ->willReturn(true);
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
-        $this->assertNull($result);
+        $this->assertNull(AccessHelper::CallMethod($sut, 'onExecute'));
     }
 
     #endregion onExecute

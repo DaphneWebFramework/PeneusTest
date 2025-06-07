@@ -240,7 +240,7 @@ class LoginActionTest extends TestCase
             ->method('ToArray')
             ->willReturn([
                 'email' => 'john@example.com',
-                'password' => 'pass1234'
+                'password' => 'wrongpass'
             ]);
         $sut->expects($this->once())
             ->method('findAccount')
@@ -248,7 +248,7 @@ class LoginActionTest extends TestCase
             ->willReturn($account);
         $sut->expects($this->once())
             ->method('verifyPassword')
-            ->with($account, 'pass1234')
+            ->with($account, 'wrongpass')
             ->willReturn(false);
 
         $this->expectException(\RuntimeException::class);
