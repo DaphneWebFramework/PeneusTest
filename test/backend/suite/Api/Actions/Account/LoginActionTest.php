@@ -79,7 +79,7 @@ class LoginActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfAlreadyLoggedIn()
+    function testOnExecuteThrowsIfUserAlreadyLoggedIn()
     {
         $sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
@@ -447,7 +447,7 @@ class LoginActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteSucceedsIfDatabaseTransactionSucceeds()
+    function testOnExecuteSucceeds()
     {
         $sut = $this->systemUnderTest(
             'findAccount',

@@ -423,7 +423,7 @@ class ResetPasswordActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteSucceedsIfDatabaseTransactionSucceeds()
+    function testOnExecuteSucceeds()
     {
         $sut = $this->systemUnderTest(
             'findPasswordReset',

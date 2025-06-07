@@ -13,6 +13,7 @@ use \Harmonia\Services\SecurityService;
 use \Harmonia\Session;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
+use \Peneus\Api\Hooks\IAccountDeletionHook;
 use \Peneus\Model\Account;
 use \Peneus\Model\Role;
 use \TestToolkit\AccessHelper;
@@ -253,6 +254,49 @@ class AccountServiceTest extends TestCase
     }
 
     #endregion LoggedInAccountRole
+
+    #region RegisterDeletionHook -----------------------------------------------
+
+    function testRegisterDeletionHook()
+    {
+        $sut = $this->systemUnderTest();
+        $hook = $this->createStub(IAccountDeletionHook::class);
+
+        $sut->RegisterDeletionHook($hook);
+
+        $hooks = AccessHelper::GetMockProperty(
+            AccountService::class,
+            $sut,
+            'deletionHooks'
+        );
+        $this->assertCount(1, $hooks);
+        $this->assertSame($hook, $hooks[0]);
+    }
+
+    #endregion RegisterDeletionHook
+
+    #region DeletionHooks ------------------------------------------------------
+
+    function testDeletionHooks()
+    {
+        $sut = $this->systemUnderTest();
+        $hook1 = $this->createStub(IAccountDeletionHook::class);
+        $hook2 = $this->createStub(IAccountDeletionHook::class);
+
+        AccessHelper::SetMockProperty(
+            AccountService::class,
+            $sut,
+            'deletionHooks',
+            [$hook1, $hook2]
+        );
+
+        $hooks = $sut->DeletionHooks();
+        $this->assertCount(2, $hooks);
+        $this->assertSame($hook1, $hooks[0]);
+        $this->assertSame($hook2, $hooks[1]);
+    }
+
+    #endregion DeletionHooks
 
     #region verifySessionIntegrity ---------------------------------------------
 

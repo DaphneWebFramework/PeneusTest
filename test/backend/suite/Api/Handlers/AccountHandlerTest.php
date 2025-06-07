@@ -7,6 +7,7 @@ use \Peneus\Api\Handlers\AccountHandler;
 use \Peneus\Api\Actions\Account\ActivateAction;
 use \Peneus\Api\Actions\Account\ChangeDisplayNameAction;
 use \Peneus\Api\Actions\Account\ChangePasswordAction;
+use \Peneus\Api\Actions\Account\DeleteAction;
 use \Peneus\Api\Actions\Account\LoginAction;
 use \Peneus\Api\Actions\Account\LogoutAction;
 use \Peneus\Api\Actions\Account\RegisterAction;
@@ -96,6 +97,16 @@ class AccountHandlerTest extends TestCase
         $handler = new AccountHandler;
         $action = AccessHelper::CallMethod($handler, 'createAction', ['change-password']);
         $this->assertInstanceOf(ChangePasswordAction::class, $action);
+        $guards = AccessHelper::GetProperty($action, 'guards');
+        $this->assertCount(1, $guards);
+        $this->assertInstanceOf(SessionGuard::class, $guards[0]);
+    }
+
+    function testCreateActionWithDelete()
+    {
+        $handler = new AccountHandler;
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['delete']);
+        $this->assertInstanceOf(DeleteAction::class, $action);
         $guards = AccessHelper::GetProperty($action, 'guards');
         $this->assertCount(1, $guards);
         $this->assertInstanceOf(SessionGuard::class, $guards[0]);

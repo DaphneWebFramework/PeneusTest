@@ -111,7 +111,8 @@ class ChangeDisplayNameActionTest extends TestCase
             ->willReturn(null);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('You do not have permission to perform this action.');
+        $this->expectExceptionMessage(
+            'You do not have permission to perform this action.');
         $this->expectExceptionCode(StatusCode::Unauthorized->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }

@@ -68,7 +68,7 @@ class ActivateActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfActivationCodeIsMissing(): void
+    function testOnExecuteThrowsIfActivationCodeIsMissing()
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
@@ -86,7 +86,7 @@ class ActivateActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfActivationCodeIsInvalid(): void
+    function testOnExecuteThrowsIfActivationCodeIsInvalid()
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
@@ -106,7 +106,7 @@ class ActivateActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfPendingAccountNotFound(): void
+    function testOnExecuteThrowsIfPendingAccountNotFound()
     {
         $sut = $this->systemUnderTest('findPendingAccount');
         $request = Request::Instance();
@@ -133,7 +133,7 @@ class ActivateActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfEmailAlreadyRegistered(): void
+    function testOnExecuteThrowsIfEmailAlreadyRegistered()
     {
         $sut = $this->systemUnderTest(
             'findPendingAccount',
@@ -168,7 +168,7 @@ class ActivateActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfSavingAccountFails(): void
+    function testOnExecuteThrowsIfSavingAccountFails()
     {
         $sut = $this->systemUnderTest(
             'findPendingAccount',
@@ -223,7 +223,7 @@ class ActivateActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfDeletingPendingAccountFails(): void
+    function testOnExecuteThrowsIfDeletingPendingAccountFails()
     {
         $sut = $this->systemUnderTest(
             'findPendingAccount',
@@ -281,7 +281,7 @@ class ActivateActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfDeleteCsrfCookieFails(): void
+    function testOnExecuteThrowsIfDeleteCsrfCookieFails()
     {
         $sut = $this->systemUnderTest(
             'findPendingAccount',
@@ -342,7 +342,7 @@ class ActivateActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteSucceedsIfDatabaseTransactionSucceeds(): void
+    function testOnExecuteSucceeds()
     {
         $sut = $this->systemUnderTest(
             'findPendingAccount',
