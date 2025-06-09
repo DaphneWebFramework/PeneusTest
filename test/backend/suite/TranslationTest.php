@@ -23,11 +23,12 @@ class TranslationTest extends TestCase
     function testFilePaths()
     {
         $sut = $this->systemUnderTest();
-        $path = CPath::Join(
-            \dirname((new ReflectionClass(Translation::class))->getFileName()),
-            'translations.json'
-        );
-        $this->assertEquals([$path], AccessHelper::CallMethod($sut, 'filePaths'));
+        $reflectionClass = new \ReflectionClass(Translation::class);
+        $directory = \dirname($reflectionClass->getFileName());
+        $path = CPath::Join($directory, 'translations.json');
+
+        $paths = AccessHelper::CallMethod($sut, 'filePaths');
+        $this->assertEquals([$path], $paths);
     }
 
     #endregion filePaths
