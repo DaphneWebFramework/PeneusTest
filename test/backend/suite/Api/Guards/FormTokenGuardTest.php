@@ -42,7 +42,7 @@ class FormTokenGuardTest extends TestCase
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('GetOrDefault')
-            ->with(FormTokenGuard::TOKEN_FIELD, '')
+            ->with(FormTokenGuard::CSRF_TOKEN_NAME, '')
             ->willReturn('token-value');
         $cookieService->expects($this->once())
             ->method('CsrfCookieName')

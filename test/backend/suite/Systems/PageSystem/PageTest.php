@@ -624,7 +624,7 @@ class PageTest extends TestCase
     {
         $sut = $this->systemUnderTest();
 
-        $this->assertSame(FormTokenGuard::TOKEN_FIELD, $sut->CsrfTokenName());
+        $this->assertSame(FormTokenGuard::CSRF_TOKEN_NAME, $sut->CsrfTokenName());
     }
 
     #endregion CsrfTokenName
