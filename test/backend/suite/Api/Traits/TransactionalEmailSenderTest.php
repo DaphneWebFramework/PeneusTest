@@ -159,8 +159,8 @@ class TransactionalEmailSenderTest extends TestCase
             ]);
         $translation->expects($this->any())
             ->method('Get')
-            ->willReturnCallback(function(string $translationId, mixed ...$args): string {
-                return match ([$translationId, ...$args]) {
+            ->willReturnCallback(function(string $key, mixed ...$args): string {
+                return match ([$key, ...$args]) {
                     ['email_activate_account_masthead'] =>
                         'Welcome!',
                     ['email_common_greeting', 'John Doe'] =>
@@ -176,7 +176,7 @@ class TransactionalEmailSenderTest extends TestCase
                     ['email_common_copyright', '2020', 'Example'] =>
                         '© 2020 Example. All rights reserved.',
                     default =>
-                        $this->fail("Unexpected translation key: {$translationId}")
+                        $this->fail("Unexpected translation key: {$key}")
                 };
             });
         $sut->expects($this->once())
