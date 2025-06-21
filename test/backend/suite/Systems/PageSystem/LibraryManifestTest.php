@@ -271,8 +271,8 @@ class LibraryManifestTest extends TestCase
     {
         $sut = $this->systemUnderTest(
             'openFile',
-            'validateAssetField',
-            'validateBooleanField'
+            'parseField',
+            'parseBooleanField'
         );
         $file = $this->createMock(CFile::class);
         $resource = Resource::Instance();
@@ -302,20 +302,19 @@ class LibraryManifestTest extends TestCase
                   },
                   "audiojs": {
                     "css": "audiojs-1.0.1/audio",
-                    "js": "audiojs-1.0.1/audio",
-                    "*": "audiojs-1.0.1/player-graphics.gif"
+                    "js": "audiojs-1.0.1/audio"
                   }
                 }
             JSON);
         $file->expects($this->once())
             ->method('Close');
-        $sut->expects($this->exactly(9))
-            ->method('validateAssetField')
+        $sut->expects($this->exactly(6))
+            ->method('parseField')
             ->willReturnCallback(function(array $data, string $key) {
                 return $data[$key] ?? null;
             });
         $sut->expects($this->exactly(3))
-            ->method('validateBooleanField')
+            ->method('parseBooleanField')
             ->willReturnCallback(function(array $data, string $key) {
                 return $data[$key] ?? false;
             });
@@ -327,7 +326,6 @@ class LibraryManifestTest extends TestCase
                           $items->Get('jquery')->Css());
         $this->assertSame(['jquery-3.5.1/jquery', 'jquery-ui-1.12.1.custom/jquery-ui'],
                           $items->Get('jquery')->Js());
-        $this->assertSame([], $items->Get('jquery')->Extras());
         $this->assertTrue($items->Get('jquery')->IsDefault());
 
         $this->assertInstanceOf(LibraryItem::class, $items->Get('selectize'));
@@ -335,126 +333,123 @@ class LibraryManifestTest extends TestCase
                           $items->Get('selectize')->Css());
         $this->assertSame(['selectize-0.13.6/js/standalone/selectize'],
                           $items->Get('selectize')->Js());
-        $this->assertSame([], $items->Get('selectize')->Extras());
         $this->assertFalse($items->Get('selectize')->IsDefault());
 
         $this->assertInstanceOf(LibraryItem::class, $items->Get('audiojs'));
         $this->assertSame(['audiojs-1.0.1/audio'], $items->Get('audiojs')->Css());
         $this->assertSame(['audiojs-1.0.1/audio'], $items->Get('audiojs')->Js());
-        $this->assertSame(['audiojs-1.0.1/player-graphics.gif'],
-                          $items->Get('audiojs')->Extras());
         $this->assertFalse($items->Get('audiojs')->IsDefault());
     }
 
     #endregion loadFile
 
-    #region validateAssetField -------------------------------------------------
+    #region parseField ---------------------------------------------------------
 
-    function testValidateAssetFieldReturnsNullIfKeyIsMissing()
+    function testParseFieldReturnsNullIfKeyIsMissing()
     {
-        $sut = $this->systemUnderTest('validateAssetValue');
+        $sut = $this->systemUnderTest('parseValue');
         $data = ['js' => ['a.js']];
         $key = 'css';
 
         $sut->expects($this->never())
-            ->method('validateAssetValue');
+            ->method('parseValue');
 
         $this->assertNull(AccessHelper::CallMethod(
             $sut,
-            'validateAssetField',
+            'parseField',
             [$data, $key]
         ));
     }
 
-    function testValidateAssetFieldDelegatesToValidateAssetValue()
+    function testParseFieldDelegatesToParseValue()
     {
-        $sut = $this->systemUnderTest('validateAssetValue');
+        $sut = $this->systemUnderTest('parseValue');
         $value = ['a.js'];
         $data = ['js' => $value];
         $key = 'js';
 
         $sut->expects($this->once())
-            ->method('validateAssetValue')
+            ->method('parseValue')
             ->with($value)
             ->willReturn($value);
 
         $this->assertSame($value, AccessHelper::CallMethod(
             $sut,
-            'validateAssetField',
+            'parseField',
             [$data, $key]
         ));
     }
 
-    #endregion validateAssetField
+    #endregion parseField
 
-    #region validateAssetValue -------------------------------------------------
+    #region parseValue ---------------------------------------------------------
 
-    function testValidateAssetValueReturnsStringWhenInputIsString()
+    function testParseValueReturnsStringWhenInputIsString()
     {
         $sut = $this->systemUnderTest();
         $value = 'foo.css';
 
-        $result = AccessHelper::CallMethod($sut, 'validateAssetValue', [$value]);
+        $result = AccessHelper::CallMethod($sut, 'parseValue', [$value]);
         $this->assertSame($value, $result);
     }
 
-    function testValidateAssetValueReturnsArrayWhenInputIsArrayOfStrings()
+    function testParseValueReturnsArrayWhenInputIsArrayOfStrings()
     {
         $sut = $this->systemUnderTest();
         $value = ['a.css', 'b.css'];
 
-        $result = AccessHelper::CallMethod($sut, 'validateAssetValue', [$value]);
+        $result = AccessHelper::CallMethod($sut, 'parseValue', [$value]);
         $this->assertSame($value, $result);
     }
 
     #[DataProvider('invalidAssetValueDataProvider')]
-    function testValidateAssetValueThrowsOnInvalidInput(string $jsonValue)
+    function testParseValueThrowsOnInvalidInput(string $jsonValue)
     {
         $sut = $this->systemUnderTest();
         $value = \json_decode($jsonValue, true);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches(
-            '/^Library asset value must be a string( or an array of strings)?\.$/');
-        AccessHelper::CallMethod($sut, 'validateAssetValue', [$value]);
+            '/^Manifest entry must be a string( or an array of strings)?\.$/');
+        AccessHelper::CallMethod($sut, 'parseValue', [$value]);
     }
 
-    #endregion validateAssetValue
+    #endregion parseValue
 
-    #region validateBooleanField -----------------------------------------------
+    #region parseBooleanField --------------------------------------------------
 
-    function testValidateBooleanFieldCastsValidBooleans()
+    function testParseBooleanFieldCastsValidBooleans()
     {
         $sut = $this->systemUnderTest();
 
         $this->assertTrue(AccessHelper::CallMethod(
             $sut,
-            'validateBooleanField',
+            'parseBooleanField',
             [['default' => true], 'default']
         ));
         $this->assertFalse(AccessHelper::CallMethod(
             $sut,
-            'validateBooleanField',
+            'parseBooleanField',
             [['default' => false], 'default']
         ));
         $this->assertTrue(AccessHelper::CallMethod(
             $sut,
-            'validateBooleanField',
+            'parseBooleanField',
             [['default' => 1], 'default']
         ));
         $this->assertFalse(AccessHelper::CallMethod(
             $sut,
-            'validateBooleanField',
+            'parseBooleanField',
             [['default' => 0], 'default']
         ));
         $this->assertFalse(AccessHelper::CallMethod(
             $sut,
-            'validateBooleanField',
+            'parseBooleanField',
             [['other' => true], 'default']
         ));
     }
 
-    #endregion validateBooleanField
+    #endregion parseBooleanField
 
     #region Data Providers -----------------------------------------------------
 

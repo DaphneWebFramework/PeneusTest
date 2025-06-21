@@ -58,22 +58,16 @@ class RendererTest extends TestCase
                     'jquery-3.5.1/jquery',
                     'jquery-ui-1.12.1.custom/jquery-ui'
                 ],
-                'Extras' => [],
                 'IsDefault' => true
             ]),
             $this->createConfiguredMock(LibraryItem::class, [
                 'Css' => ['bootstrap-4.6.2/css/bootstrap'],
                 'Js' => ['bootstrap-4.6.2/js/bootstrap.bundle'],
-                'Extras' => [
-                    'bootstrap-4.6.2/css/bootstrap.min.css.map',
-                    'bootstrap-4.6.2/js/bootstrap.bundle.min.js.map'
-                ],
                 'IsDefault' => true
             ]),
             $this->createConfiguredMock(LibraryItem::class, [
                 'Css' => ['bootstrap-icons-1.9.1/bootstrap-icons'],
                 'Js' => [],
-                'Extras' => ['bootstrap-icons-1.9.1/fonts/*'],
                 'IsDefault' => true
             ]),
             $this->createConfiguredMock(LibraryItem::class, [
@@ -82,7 +76,6 @@ class RendererTest extends TestCase
                     'dataTables-1.11.3/js/jquery.dataTables',
                     'dataTables-1.11.3/js/dataTables.bootstrap4'
                 ],
-                'Extras' => ['dataTables-1.11.3/i18n/*.json'],
                 'IsDefault' => false
             ]),
         ]);
@@ -101,10 +94,6 @@ class RendererTest extends TestCase
                 'Model',
                 'View',
                 'Controller'
-            ],
-            'Extras' => [
-                'locales/en.json',
-                'fonts/*.woff2'
             ]
         ]);
     }

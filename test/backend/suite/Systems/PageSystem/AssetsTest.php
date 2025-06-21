@@ -54,28 +54,4 @@ class AssetsTest extends TestCase
     }
 
     #endregion Js
-
-    #region Extras -------------------------------------------------------------
-
-    function testExtrasAcceptsNull()
-    {
-        $sut = new Assets(null, null, null);
-        $this->assertSame([], $sut->Extras());
-    }
-
-    function testExtrasAcceptsString()
-    {
-        $path = 'foo/bar.map';
-        $sut = new Assets(null, null, $path);
-        $this->assertSame([$path], $sut->Extras());
-    }
-
-    function testExtrasAcceptsArray()
-    {
-        $paths = ['foo/a.txt', 'foo/b.png'];
-        $sut = new Assets(null, null, $paths);
-        $this->assertSame($paths, $sut->Extras());
-    }
-
-    #endregion Extras
 }

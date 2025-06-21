@@ -55,9 +55,9 @@ class PageManifestTest extends TestCase
 
     #endregion __construct
 
-    #region Css, Js, Extras ----------------------------------------------------
+    #region Css, Js ------------------------------------------------------------
 
-    function testCssJsExtrasDelegateToAssets()
+    function testCssJsDelegateToAssets()
     {
         $sut = $this->systemUnderTest();
         $assets = $this->createMock(Assets::class);
@@ -68,9 +68,6 @@ class PageManifestTest extends TestCase
         $assets->expects($this->once())
             ->method('Js')
             ->willReturn(['b.js']);
-        $assets->expects($this->once())
-            ->method('Extras')
-            ->willReturn(['c.map']);
 
         AccessHelper::SetMockProperty(
             PageManifest::class,
@@ -81,10 +78,9 @@ class PageManifestTest extends TestCase
 
         $this->assertSame(['a.css'], $sut->Css());
         $this->assertSame(['b.js'], $sut->Js());
-        $this->assertSame(['c.map'], $sut->Extras());
     }
 
-    #endregion Css, Js, Extras
+    #endregion Css, Js
 
     #region loadFile -----------------------------------------------------------
 
@@ -107,7 +103,6 @@ class PageManifestTest extends TestCase
         $this->assertInstanceOf(Assets::class, $assets);
         $this->assertSame([], $assets->Css());
         $this->assertSame([], $assets->Js());
-        $this->assertSame([], $assets->Extras());
     }
 
     function testLoadFileReturnsEmptyAssetsWhenFileCannotBeRead()
@@ -134,7 +129,6 @@ class PageManifestTest extends TestCase
         $assets = AccessHelper::CallMethod($sut, 'loadFile', [$pageId]);
         $this->assertSame([], $assets->Css());
         $this->assertSame([], $assets->Js());
-        $this->assertSame([], $assets->Extras());
     }
 
     function testLoadFileReturnsEmptyAssetsWhenJsonCannotBeDecoded()
@@ -161,12 +155,11 @@ class PageManifestTest extends TestCase
         $assets = AccessHelper::CallMethod($sut, 'loadFile', [$pageId]);
         $this->assertSame([], $assets->Css());
         $this->assertSame([], $assets->Js());
-        $this->assertSame([], $assets->Extras());
     }
 
     function testLoadFileReturnsParsedAssetsFromValidJson()
     {
-        $sut = $this->systemUnderTest('openFile', 'validateAssetField');
+        $sut = $this->systemUnderTest('openFile', 'parseField');
         $resource = Resource::Instance();
         $file = $this->createMock(CFile::class);
         $pageId = 'mypage';
@@ -184,14 +177,13 @@ class PageManifestTest extends TestCase
             ->willReturn(<<<JSON
                 {
                   "css": ["index.css"],
-                  "js": ["app.js"],
-                  "*": ["extra.json"]
+                  "js": ["app.js"]
                 }
             JSON);
         $file->expects($this->once())
             ->method('Close');
-        $sut->expects($this->exactly(3))
-            ->method('validateAssetField')
+        $sut->expects($this->exactly(2))
+            ->method('parseField')
             ->willReturnCallback(function(array $data, string $key) {
                 return $data[$key] ?? null;
             });
@@ -199,83 +191,82 @@ class PageManifestTest extends TestCase
         $assets = AccessHelper::CallMethod($sut, 'loadFile', [$pageId]);
         $this->assertSame(['index.css'], $assets->Css());
         $this->assertSame(['app.js'], $assets->Js());
-        $this->assertSame(['extra.json'], $assets->Extras());
     }
 
     #endregion loadFile
 
-    #region validateAssetField -------------------------------------------------
+    #region parseField ---------------------------------------------------------
 
-    function testValidateAssetFieldReturnsNullIfKeyMissing()
+    function testParseFieldReturnsNullIfKeyMissing()
     {
-        $sut = $this->systemUnderTest('validateAssetValue');
+        $sut = $this->systemUnderTest('parseValue');
         $data = ['js' => ['a.js']];
         $key = 'css';
 
         $sut->expects($this->never())
-            ->method('validateAssetValue');
+            ->method('parseValue');
 
         $this->assertNull(AccessHelper::CallMethod(
             $sut,
-            'validateAssetField',
+            'parseField',
             [$data, $key]
         ));
     }
 
-    function testValidateAssetFieldDelegatesToValidateAssetValue()
+    function testParseFieldDelegatesToParseValue()
     {
-        $sut = $this->systemUnderTest('validateAssetValue');
+        $sut = $this->systemUnderTest('parseValue');
         $value = ['a.js'];
         $data = ['js' => $value];
         $key = 'js';
 
         $sut->expects($this->once())
-            ->method('validateAssetValue')
+            ->method('parseValue')
             ->with($value)
             ->willReturn($value);
 
         $this->assertSame($value, AccessHelper::CallMethod(
             $sut,
-            'validateAssetField',
+            'parseField',
             [$data, $key]
         ));
     }
 
-    #endregion validateAssetField
+    #endregion parseField
 
-    #region validateAssetValue -------------------------------------------------
+    #region parseValue ---------------------------------------------------------
 
-    function testValidateAssetValueReturnsStringWhenInputIsString()
+    function testParseValueReturnsStringWhenInputIsString()
     {
         $sut = $this->systemUnderTest();
         $value = 'foo.css';
 
-        $result = AccessHelper::CallMethod($sut, 'validateAssetValue', [$value]);
+        $result = AccessHelper::CallMethod($sut, 'parseValue', [$value]);
         $this->assertSame($value, $result);
     }
 
-    function testValidateAssetValueReturnsArrayWhenInputIsArrayOfStrings()
+    function testParseValueReturnsArrayWhenInputIsArrayOfStrings()
     {
         $sut = $this->systemUnderTest();
         $value = ['a.css', 'b.css'];
 
-        $result = AccessHelper::CallMethod($sut, 'validateAssetValue', [$value]);
+        $result = AccessHelper::CallMethod($sut, 'parseValue', [$value]);
         $this->assertSame($value, $result);
     }
 
     #[DataProvider('invalidAssetValueDataProvider')]
-    function testValidateAssetValueThrowsOnInvalidInput(string $jsonValue)
+    function testParseValueThrowsOnInvalidInput(string $jsonValue)
     {
         $sut = $this->systemUnderTest();
         $value = \json_decode($jsonValue, true);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches(
-            '/^Page asset value must be a string( or an array of strings)?\.$/');
-        AccessHelper::CallMethod($sut, 'validateAssetValue', [$value]);
+            '/^Manifest entry must be a string( or an array of strings)?\.$/');
+        AccessHelper::CallMethod($sut, 'parseValue', [$value]);
     }
 
-    #endregion validateAssetValue
+    #endregion parseValue
 
     #region Data Providers -----------------------------------------------------
 
