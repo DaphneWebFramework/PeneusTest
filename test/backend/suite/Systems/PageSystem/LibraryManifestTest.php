@@ -271,8 +271,8 @@ class LibraryManifestTest extends TestCase
     {
         $sut = $this->systemUnderTest(
             'openFile',
-            'parseField',
-            'parseBooleanField'
+            'parseAssetBlock',
+            'parseBooleanValue'
         );
         $file = $this->createMock(CFile::class);
         $resource = Resource::Instance();
@@ -309,12 +309,12 @@ class LibraryManifestTest extends TestCase
         $file->expects($this->once())
             ->method('Close');
         $sut->expects($this->exactly(6))
-            ->method('parseField')
+            ->method('parseAssetBlock')
             ->willReturnCallback(function(array $data, string $key) {
                 return $data[$key] ?? null;
             });
         $sut->expects($this->exactly(3))
-            ->method('parseBooleanField')
+            ->method('parseBooleanValue')
             ->willReturnCallback(function(array $data, string $key) {
                 return $data[$key] ?? false;
             });
@@ -343,53 +343,53 @@ class LibraryManifestTest extends TestCase
 
     #endregion loadFile
 
-    #region parseField ---------------------------------------------------------
+    #region parseAssetBlock ----------------------------------------------------
 
     function testParseFieldReturnsNullIfKeyIsMissing()
     {
-        $sut = $this->systemUnderTest('parseValue');
+        $sut = $this->systemUnderTest('parseAssetValue');
         $data = ['js' => ['a.js']];
         $key = 'css';
 
         $sut->expects($this->never())
-            ->method('parseValue');
+            ->method('parseAssetValue');
 
         $this->assertNull(AccessHelper::CallMethod(
             $sut,
-            'parseField',
+            'parseAssetBlock',
             [$data, $key]
         ));
     }
 
     function testParseFieldDelegatesToParseValue()
     {
-        $sut = $this->systemUnderTest('parseValue');
+        $sut = $this->systemUnderTest('parseAssetValue');
         $value = ['a.js'];
         $data = ['js' => $value];
         $key = 'js';
 
         $sut->expects($this->once())
-            ->method('parseValue')
+            ->method('parseAssetValue')
             ->with($value)
             ->willReturn($value);
 
         $this->assertSame($value, AccessHelper::CallMethod(
             $sut,
-            'parseField',
+            'parseAssetBlock',
             [$data, $key]
         ));
     }
 
-    #endregion parseField
+    #endregion parseAssetBlock
 
-    #region parseValue ---------------------------------------------------------
+    #region parseAssetValue ----------------------------------------------------
 
     function testParseValueReturnsStringWhenInputIsString()
     {
         $sut = $this->systemUnderTest();
         $value = 'foo.css';
 
-        $result = AccessHelper::CallMethod($sut, 'parseValue', [$value]);
+        $result = AccessHelper::CallMethod($sut, 'parseAssetValue', [$value]);
         $this->assertSame($value, $result);
     }
 
@@ -398,7 +398,7 @@ class LibraryManifestTest extends TestCase
         $sut = $this->systemUnderTest();
         $value = ['a.css', 'b.css'];
 
-        $result = AccessHelper::CallMethod($sut, 'parseValue', [$value]);
+        $result = AccessHelper::CallMethod($sut, 'parseAssetValue', [$value]);
         $this->assertSame($value, $result);
     }
 
@@ -411,12 +411,12 @@ class LibraryManifestTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches(
             '/^Manifest entry must be a string( or an array of strings)?\.$/');
-        AccessHelper::CallMethod($sut, 'parseValue', [$value]);
+        AccessHelper::CallMethod($sut, 'parseAssetValue', [$value]);
     }
 
-    #endregion parseValue
+    #endregion parseAssetValue
 
-    #region parseBooleanField --------------------------------------------------
+    #region parseBooleanValue --------------------------------------------------
 
     function testParseBooleanFieldCastsValidBooleans()
     {
@@ -424,32 +424,32 @@ class LibraryManifestTest extends TestCase
 
         $this->assertTrue(AccessHelper::CallMethod(
             $sut,
-            'parseBooleanField',
+            'parseBooleanValue',
             [['default' => true], 'default']
         ));
         $this->assertFalse(AccessHelper::CallMethod(
             $sut,
-            'parseBooleanField',
+            'parseBooleanValue',
             [['default' => false], 'default']
         ));
         $this->assertTrue(AccessHelper::CallMethod(
             $sut,
-            'parseBooleanField',
+            'parseBooleanValue',
             [['default' => 1], 'default']
         ));
         $this->assertFalse(AccessHelper::CallMethod(
             $sut,
-            'parseBooleanField',
+            'parseBooleanValue',
             [['default' => 0], 'default']
         ));
         $this->assertFalse(AccessHelper::CallMethod(
             $sut,
-            'parseBooleanField',
+            'parseBooleanValue',
             [['other' => true], 'default']
         ));
     }
 
-    #endregion parseBooleanField
+    #endregion parseBooleanValue
 
     #region Data Providers -----------------------------------------------------
 

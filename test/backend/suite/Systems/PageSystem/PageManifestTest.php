@@ -159,7 +159,7 @@ class PageManifestTest extends TestCase
 
     function testLoadFileReturnsParsedAssetsFromValidJson()
     {
-        $sut = $this->systemUnderTest('openFile', 'parseField');
+        $sut = $this->systemUnderTest('openFile', 'parseAssetBlock');
         $resource = Resource::Instance();
         $file = $this->createMock(CFile::class);
         $pageId = 'mypage';
@@ -183,7 +183,7 @@ class PageManifestTest extends TestCase
         $file->expects($this->once())
             ->method('Close');
         $sut->expects($this->exactly(2))
-            ->method('parseField')
+            ->method('parseAssetBlock')
             ->willReturnCallback(function(array $data, string $key) {
                 return $data[$key] ?? null;
             });
@@ -195,53 +195,53 @@ class PageManifestTest extends TestCase
 
     #endregion loadFile
 
-    #region parseField ---------------------------------------------------------
+    #region parseAssetBlock ----------------------------------------------------
 
     function testParseFieldReturnsNullIfKeyMissing()
     {
-        $sut = $this->systemUnderTest('parseValue');
+        $sut = $this->systemUnderTest('parseAssetValue');
         $data = ['js' => ['a.js']];
         $key = 'css';
 
         $sut->expects($this->never())
-            ->method('parseValue');
+            ->method('parseAssetValue');
 
         $this->assertNull(AccessHelper::CallMethod(
             $sut,
-            'parseField',
+            'parseAssetBlock',
             [$data, $key]
         ));
     }
 
     function testParseFieldDelegatesToParseValue()
     {
-        $sut = $this->systemUnderTest('parseValue');
+        $sut = $this->systemUnderTest('parseAssetValue');
         $value = ['a.js'];
         $data = ['js' => $value];
         $key = 'js';
 
         $sut->expects($this->once())
-            ->method('parseValue')
+            ->method('parseAssetValue')
             ->with($value)
             ->willReturn($value);
 
         $this->assertSame($value, AccessHelper::CallMethod(
             $sut,
-            'parseField',
+            'parseAssetBlock',
             [$data, $key]
         ));
     }
 
-    #endregion parseField
+    #endregion parseAssetBlock
 
-    #region parseValue ---------------------------------------------------------
+    #region parseAssetValue ----------------------------------------------------
 
     function testParseValueReturnsStringWhenInputIsString()
     {
         $sut = $this->systemUnderTest();
         $value = 'foo.css';
 
-        $result = AccessHelper::CallMethod($sut, 'parseValue', [$value]);
+        $result = AccessHelper::CallMethod($sut, 'parseAssetValue', [$value]);
         $this->assertSame($value, $result);
     }
 
@@ -250,7 +250,7 @@ class PageManifestTest extends TestCase
         $sut = $this->systemUnderTest();
         $value = ['a.css', 'b.css'];
 
-        $result = AccessHelper::CallMethod($sut, 'parseValue', [$value]);
+        $result = AccessHelper::CallMethod($sut, 'parseAssetValue', [$value]);
         $this->assertSame($value, $result);
     }
 
@@ -263,10 +263,10 @@ class PageManifestTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches(
             '/^Manifest entry must be a string( or an array of strings)?\.$/');
-        AccessHelper::CallMethod($sut, 'parseValue', [$value]);
+        AccessHelper::CallMethod($sut, 'parseAssetValue', [$value]);
     }
 
-    #endregion parseValue
+    #endregion parseAssetValue
 
     #region Data Providers -----------------------------------------------------
 

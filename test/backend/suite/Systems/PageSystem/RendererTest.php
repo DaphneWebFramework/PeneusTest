@@ -375,7 +375,6 @@ class RendererTest extends TestCase
 
     #endregion renderMetaTags
 
-
     #region libraryStylesheetLinks ---------------------------------------------
 
     function testLibraryStylesheetLinks()
@@ -425,19 +424,14 @@ class RendererTest extends TestCase
 
     #region pageStylesheetLinks ------------------------------------------------
 
-    function testPageStylesheetLinksInDebugMode()
+    function testPageStylesheetLinks()
     {
         $sut = $this->systemUnderTest('resolvePageAssetUrl');
         $page = $this->createMock(Page::class);
-        $config = Config::Instance();
 
         $page->expects($this->once())
             ->method('Id')
             ->willReturn('home');
-        $config->expects($this->once())
-            ->method('OptionOrDefault')
-            ->with('IsDebug', false)
-            ->willReturn(true);
         $page->expects($this->once())
             ->method('Manifest')
             ->willReturn($this->pageManifest());
@@ -458,62 +452,18 @@ class RendererTest extends TestCase
         );
     }
 
-    function testPageStylesheetLinksInProductionMode()
-    {
-        $sut = $this->systemUnderTest('isRemoteAsset', 'pageMinifiedAssetExists');
-        $config = Config::Instance();
-        $resource = Resource::Instance();
-        $page = $this->createMock(Page::class);
-        $pageId = 'home';
-
-        $page->expects($this->once())
-            ->method('Id')
-            ->willReturn($pageId);
-        $config->expects($this->once())
-            ->method('OptionOrDefault')
-            ->with('IsDebug', false)
-            ->willReturn(false);
-        $page->expects($this->once())
-            ->method('Manifest')
-            ->willReturn($this->pageManifest());
-        $sut->expects($this->any())
-            ->method('isRemoteAsset')
-            ->willReturnCallback(function($path) {
-                return \str_starts_with($path, 'http');
-            });
-        $sut->expects($this->once())
-            ->method('pageMinifiedAssetExists')
-            ->with($pageId, 'css')
-            ->willReturn(true);
-        $resource->expects($this->once())
-            ->method('PageFileUrl')
-            ->with($pageId, 'page.min.css')
-            ->willReturn(new CUrl('http://localhost/app/pages/home/page.min.css'));
-
-        $this->assertSame(
-            "\t" . '<link rel="stylesheet" href="https://cdn.example.com/fonts.css">' . "\n"
-          . "\t" . '<link rel="stylesheet" href="http://localhost/app/pages/home/page.min.css">'
-          , AccessHelper::CallMethod($sut, 'pageStylesheetLinks', [$page])
-        );
-    }
-
     #endregion pageStylesheetLinks
 
     #region pageJavascriptLinks ------------------------------------------------
 
-    function testPageJavascriptLinksInDebugMode()
+    function testPageJavascriptLinks()
     {
         $sut = $this->systemUnderTest('resolvePageAssetUrl');
         $page = $this->createMock(Page::class);
-        $config = Config::Instance();
 
         $page->expects($this->once())
             ->method('Id')
             ->willReturn('home');
-        $config->expects($this->once())
-            ->method('OptionOrDefault')
-            ->with('IsDebug', false)
-            ->willReturn(true);
         $page->expects($this->once())
             ->method('Manifest')
             ->willReturn($this->pageManifest());
@@ -531,45 +481,6 @@ class RendererTest extends TestCase
           . "\t" . '<script src="url/to/pages/home/Model.js"></script>' . "\n"
           . "\t" . '<script src="url/to/pages/home/View.js"></script>' . "\n"
           . "\t" . '<script src="url/to/pages/home/Controller.js"></script>'
-          , AccessHelper::CallMethod($sut, 'pageJavascriptLinks', [$page])
-        );
-    }
-
-    function testPageJavascriptLinksInProductionMode()
-    {
-        $sut = $this->systemUnderTest('isRemoteAsset', 'pageMinifiedAssetExists');
-        $config = Config::Instance();
-        $resource = Resource::Instance();
-        $page = $this->createMock(Page::class);
-        $pageId = 'home';
-
-        $page->expects($this->once())
-            ->method('Id')
-            ->willReturn($pageId);
-        $config->expects($this->once())
-            ->method('OptionOrDefault')
-            ->with('IsDebug', false)
-            ->willReturn(false);
-        $page->expects($this->once())
-            ->method('Manifest')
-            ->willReturn($this->pageManifest());
-        $sut->expects($this->any())
-            ->method('isRemoteAsset')
-            ->willReturnCallback(function($path) {
-                return \str_starts_with($path, 'http');
-            });
-        $sut->expects($this->once())
-            ->method('pageMinifiedAssetExists')
-            ->with($pageId, 'js')
-            ->willReturn(true);
-        $resource->expects($this->once())
-            ->method('PageFileUrl')
-            ->with($pageId, 'page.min.js')
-            ->willReturn(new CUrl('http://localhost/app/pages/home/page.min.js'));
-
-        $this->assertSame(
-            "\t" . '<script src="http://cdn.example.com/script.js"></script>' . "\n"
-          . "\t" . '<script src="http://localhost/app/pages/home/page.min.js"></script>'
           , AccessHelper::CallMethod($sut, 'pageJavascriptLinks', [$page])
         );
     }
@@ -745,56 +656,6 @@ class RendererTest extends TestCase
     }
 
     #endregion lowercaseExtension
-
-    #region pageMinifiedAssetExists --------------------------------------------
-
-    function testPageMinifiedAssetExistsReturnsTrueIfFileExists()
-    {
-        $sut = $this->systemUnderTest();
-        $resource = Resource::Instance();
-        $pageId = 'home';
-        $extension = 'css';
-        $path = $this->createMock(CPath::class);
-
-        $resource->expects($this->once())
-            ->method('PageFilePath')
-            ->with($pageId, "page.min.{$extension}")
-            ->willReturn($path);
-        $path->expects($this->once())
-            ->method('IsFile')
-            ->willReturn(true);
-
-        $this->assertTrue(AccessHelper::CallMethod(
-            $sut,
-            'pageMinifiedAssetExists',
-            [$pageId, $extension]
-        ));
-    }
-
-    function testPageMinifiedAssetExistsReturnsFalseIfFileDoesNotExist()
-    {
-        $sut = $this->systemUnderTest();
-        $resource = Resource::Instance();
-        $pageId = 'home';
-        $extension = 'css';
-        $path = $this->createMock(CPath::class);
-
-        $resource->expects($this->once())
-            ->method('PageFilePath')
-            ->with($pageId, "page.min.{$extension}")
-            ->willReturn($path);
-        $path->expects($this->once())
-            ->method('IsFile')
-            ->willReturn(false);
-
-        $this->assertFalse(AccessHelper::CallMethod(
-            $sut,
-            'pageMinifiedAssetExists',
-            [$pageId, $extension]
-        ));
-    }
-
-    #endregion pageMinifiedAssetExists
 
     #region Data Providers -----------------------------------------------------
 
