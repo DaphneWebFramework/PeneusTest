@@ -504,6 +504,28 @@ class EntityTest extends TestCase
 
     #endregion Delete
 
+    #region TableName ----------------------------------------------------------
+
+    function testTableNameCanBeOverridden()
+    {
+        $data = ['id' => 1];
+        $sut = new class($data) extends Entity {
+            public static function TableName(): string {
+                return 'custom_table_name';
+            }
+        };
+        Database::Instance()->Expect(
+            sql: 'DELETE FROM custom_table_name WHERE id = :id',
+            bindings: ['id' => 1],
+            result: [],
+            lastAffectedRowCount: 1,
+            times: 1
+        );
+        $this->assertTrue($sut->Delete());
+    }
+
+    #endregion TableName
+
     #region FindById -----------------------------------------------------------
 
     function testFindByIdFailsIfExecuteFails()
@@ -726,28 +748,6 @@ class EntityTest extends TestCase
 
     #endregion Count
 
-    #region tableName ----------------------------------------------------------
-
-    function testTableNameCanBeOverridden()
-    {
-        $data = ['id' => 1];
-        $sut = new class($data) extends Entity {
-            protected static function tableName(): string {
-                return 'custom_table_name';
-            }
-        };
-        Database::Instance()->Expect(
-            sql: 'DELETE FROM custom_table_name WHERE id = :id',
-            bindings: ['id' => 1],
-            result: [],
-            lastAffectedRowCount: 1,
-            times: 1
-        );
-        $this->assertTrue($sut->Delete());
-    }
-
-    #endregion tableName
-
     #region insert -------------------------------------------------------------
 
     function testInsertSkipsNonBindableProperties()
@@ -763,7 +763,7 @@ class EntityTest extends TestCase
             public mixed $aResource;
             public \stdClass $anObjectWithoutToString;
             public string $aString;
-            protected static function tableName(): string {
+            public static function TableName(): string {
                 return 'custom_table_name';
             }
         };
@@ -850,7 +850,7 @@ class EntityTest extends TestCase
             public mixed $aResource;
             public \stdClass $anObjectWithoutToString;
             public string $aString;
-            protected static function tableName(): string {
+            public static function TableName(): string {
                 return 'custom_table_name';
             }
         };
