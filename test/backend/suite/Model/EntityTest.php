@@ -526,6 +526,56 @@ class EntityTest extends TestCase
 
     #endregion TableName
 
+    #region Columns ------------------------------------------------------------
+
+    function testColumnsReturnsIdInFirstPosition()
+    {
+        $this->assertSame(
+            ['id', 'name', 'age', 'createdAt'],
+            TestEntity::Columns()
+        );
+    }
+
+    function testColumnsSkipsInaccessibleProperties()
+    {
+        $sut = new class extends Entity {
+            public string $aString;
+            protected string $aProtected;
+            private string $aPrivate;
+            public readonly string $aPublicReadonly;
+            protected readonly string $aProtectedReadonly;
+            private readonly string $aPrivateReadonly;
+            static public string $aStaticPublic;
+            static protected string $aStaticProtected;
+            static private string $aStaticPrivate;
+            public function __construct() {
+                $this->aPublicReadonly = '';
+                $this->aProtectedReadonly = '';
+                $this->aPrivateReadonly = '';
+                parent::__construct();
+            }
+        };
+        $this->assertSame(
+            ['id', 'aString'],
+            (\get_class($sut))::Columns()
+        );
+    }
+
+    function testColumnsSkipsNonBindableProperties()
+    {
+        $sut = new class extends Entity {
+            public array $anArray;
+            public \stdClass $anObjectWithoutToString;
+            public string $aString;
+        };
+        $this->assertSame(
+            ['id', 'aString'],
+            (\get_class($sut))::Columns()
+        );
+    }
+
+    #endregion Columns
+
     #region FindById -----------------------------------------------------------
 
     function testFindByIdFailsIfExecuteFails()
