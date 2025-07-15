@@ -97,26 +97,6 @@ class ListRecordsActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfTableNameIsNotWhitelisted()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'not-a-whitelisted-table'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'table' failed custom validation.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
     #[DataProviderExternal(DataHelper::class, 'NonIntegerExcludingNumericStringProvider')]
     function testOnExecuteThrowsIfPageNumberIsNotInteger($value)
     {
@@ -311,6 +291,24 @@ class ListRecordsActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'sortdir' failed custom validation.");
+        AccessHelper::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfModelResolutionFails()
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $queryParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
+        $queryParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn(['table' => 'not-allowed']);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Table 'not-allowed' is not allowed.");
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -545,7 +543,7 @@ class ListRecordsActionTest extends TestCase
 
     function testOnExecuteWithPageNumberAndPageSize()
     {
-        $sut = $this->systemUnderTest('columnNames');
+        $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $database = Database::Instance();
@@ -560,9 +558,6 @@ class ListRecordsActionTest extends TestCase
                 'page' => 3,
                 'pagesize' => 5
             ]);
-        $sut->method('columnNames')
-            ->with('accountrole')
-            ->willReturn(['id', 'accountId', 'role']);
         $database->Expect(
             sql: 'SELECT * FROM accountrole LIMIT 5 OFFSET 10', // (3 - 1) * 5
             result: [
@@ -588,7 +583,7 @@ class ListRecordsActionTest extends TestCase
 
     function testOnExecuteWithSearchTerm()
     {
-        $sut = $this->systemUnderTest('columnNames');
+        $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $database = Database::Instance();
@@ -607,16 +602,6 @@ class ListRecordsActionTest extends TestCase
             ->willReturn([
                 'table' => 'account',
                 'search' => $searchTerm
-            ]);
-        $sut->method('columnNames')
-            ->with('account')
-            ->willReturn([
-                'id',
-                'email',
-                'passwordHash',
-                'displayName',
-                'timeActivated',
-                'timeLastLogin'
             ]);
         $database->Expect(
             sql: 'SELECT * FROM account WHERE '
@@ -666,7 +651,7 @@ class ListRecordsActionTest extends TestCase
 
     function testOnExecuteThrowsIfSortKeyDoesNotExist()
     {
-        $sut = $this->systemUnderTest('columnNames');
+        $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
 
@@ -679,19 +664,16 @@ class ListRecordsActionTest extends TestCase
                 'table' => 'accountrole',
                 'sortkey' => 'not-a-column'
             ]);
-        $sut->method('columnNames')
-            ->with('accountrole')
-            ->willReturn(['id', 'accountId', 'role']);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            "Table `accountrole` does not have a column named `not-a-column`.");
+            "Table 'accountrole' does not have a column named 'not-a-column'.");
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteWithSortKey()
     {
-        $sut = $this->systemUnderTest('columnNames');
+        $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $database = Database::Instance();
@@ -705,9 +687,6 @@ class ListRecordsActionTest extends TestCase
                 'table' => 'accountrole',
                 'sortkey' => 'role'
             ]);
-        $sut->method('columnNames')
-            ->with('accountrole')
-            ->willReturn(['id', 'accountId', 'role']);
         $database->Expect(
             sql: 'SELECT * FROM accountrole ORDER BY `role` LIMIT 10 OFFSET 0',
             result: [
@@ -733,7 +712,7 @@ class ListRecordsActionTest extends TestCase
 
     function testOnExecuteWithSortKeyAndSortDirection()
     {
-        $sut = $this->systemUnderTest('columnNames');
+        $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $database = Database::Instance();
@@ -748,9 +727,6 @@ class ListRecordsActionTest extends TestCase
                 'sortkey' => 'role',
                 'sortdir' => 'desc'
             ]);
-        $sut->method('columnNames')
-            ->with('accountrole')
-            ->willReturn(['id', 'accountId', 'role']);
         $database->Expect(
             sql: 'SELECT * FROM accountrole ORDER BY `role` DESC LIMIT 10 OFFSET 0',
             result: [
@@ -776,7 +752,7 @@ class ListRecordsActionTest extends TestCase
 
     function testOnExecuteWithAllQueryParameters()
     {
-        $sut = $this->systemUnderTest('columnNames');
+        $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $database = Database::Instance();
@@ -794,9 +770,6 @@ class ListRecordsActionTest extends TestCase
                 'sortkey' => 'role',
                 'sortdir' => 'asc'
             ]);
-        $sut->method('columnNames')
-            ->with('accountrole')
-            ->willReturn(['id', 'accountId', 'role']);
         $database->Expect(
             sql: 'SELECT * FROM accountrole WHERE '
                . '`id` LIKE :search OR '
@@ -831,62 +804,4 @@ class ListRecordsActionTest extends TestCase
     }
 
     #endregion onExecute
-
-    #region columnNames --------------------------------------------------------
-
-    function testColumnNamesThrowsIfQueryFails()
-    {
-        $sut = $this->systemUnderTest();
-        $database = Database::Instance();
-
-        $database->Expect(
-            sql: 'SHOW COLUMNS FROM `account`',
-            result: null,
-            times: 1
-        );
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Failed to retrieve columns for table: account');
-        AccessHelper::CallMethod($sut, 'columnNames', ['account']);
-        $database->VerifyAllExpectationsMet();
-    }
-
-    function testColumnNamesReturnsColumnNamesIfQuerySucceeds()
-    {
-        $sut = $this->systemUnderTest();
-        $database = Database::Instance();
-
-        $database->Expect(
-            sql: 'SHOW COLUMNS FROM `account`',
-            result: [
-                ['Field' => 'id'],
-                ['Field' => 'email'],
-                ['Field' => 'passwordHash'],
-                ['Field' => 'displayName'],
-                ['Field' => 'timeActivated'],
-                ['Field' => 'timeLastLogin']
-            ],
-            times: 1
-        );
-
-        $result = AccessHelper::CallMethod($sut, 'columnNames', ['account']);
-        $this->assertSame([
-            'id',
-            'email',
-            'passwordHash',
-            'displayName',
-            'timeActivated',
-            'timeLastLogin'
-        ], $result);
-
-        // Call again to verify caching (`times: 1` above will help ensure it)
-        $this->assertSame(
-            $result,
-            AccessHelper::CallMethod($sut, 'columnNames', ['account'])
-        );
-
-        $database->VerifyAllExpectationsMet();
-    }
-
-    #endregion columnNames
 }
