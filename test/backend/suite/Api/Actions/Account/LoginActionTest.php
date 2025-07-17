@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProvider;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Account\LoginAction;
@@ -94,8 +95,11 @@ class LoginActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfEmailIsMissing()
-    {
+    #[DataProvider('invalidModelDataProvider')]
+    function testOnExecuteThrowsForInvalidModelData(
+        array $data,
+        string $exceptionMessage
+    ) {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -105,98 +109,10 @@ class LoginActionTest extends TestCase
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn([
-                'password' => 'pass1234'
-            ]);
+            ->willReturn($data);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Required field 'email' is missing.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfEmailIsInvalid()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'invalid-email',
-                'password' => 'pass1234'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'email' must be a valid email address.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPasswordIsMissing()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'john@example.com'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Required field 'password' is missing.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPasswordLengthIsLessThanMinimum()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'john@example.com',
-                'password' => '1234567'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'password' must have a minimum length of 8 characters.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPasswordLengthIsGreaterThanMaximum()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'john@example.com',
-                'password' => \str_repeat('a', 73)
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'password' must have a maximum length of 72 characters.");
+        $this->expectExceptionMessage($exceptionMessage);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -905,4 +821,44 @@ class LoginActionTest extends TestCase
     }
 
     #endregion createLogoutAction
+
+    #region Data Providers -----------------------------------------------------
+
+    static function invalidModelDataProvider()
+    {
+        return [
+            'email missing' => [
+                'data' => [],
+                'exceptionMessage' => "Required field 'email' is missing."
+            ],
+            'email invalid' => [
+                'data' => [
+                    'email' => 'invalid-email'
+                ],
+                'exceptionMessage' => "Field 'email' must be a valid email address."
+            ],
+            'password missing' => [
+                'data' => [
+                    'email' => 'john@example.com'
+                ],
+                'exceptionMessage' => "Required field 'password' is missing."
+            ],
+            'password too short' => [
+                'data' => [
+                    'email' => 'john@example.com',
+                    'password' => '1234567'
+                ],
+                'exceptionMessage' => "Field 'password' must have a minimum length of 8 characters."
+            ],
+            'password too long' => [
+                'data' => [
+                    'email' => 'john@example.com',
+                    'password' => str_repeat('a', 73)
+                ],
+                'exceptionMessage' => "Field 'password' must have a maximum length of 72 characters."
+            ],
+        ];
+    }
+
+    #endregion Data Providers
 }

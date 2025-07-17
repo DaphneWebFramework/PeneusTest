@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProvider;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Account\SendPasswordResetAction;
@@ -72,8 +73,11 @@ class SendPasswordResetActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfEmailIsMissing()
-    {
+    #[DataProvider('invalidModelDataProvider')]
+    function testOnExecuteThrowsForInvalidModelData(
+        array $data,
+        string $exceptionMessage
+    ) {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -83,32 +87,10 @@ class SendPasswordResetActionTest extends TestCase
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn([]);
+            ->willReturn($data);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Required field 'email' is missing.");
-
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfEmailIsInvalid()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'not-an-email'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'email' must be a valid email address.");
-
+        $this->expectExceptionMessage($exceptionMessage);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -574,4 +556,22 @@ class SendPasswordResetActionTest extends TestCase
     }
 
     #endregion sendPasswordResetEmail
+
+    #region Data Providers -----------------------------------------------------
+
+    static function invalidModelDataProvider()
+    {
+        return [
+            'email missing' => [
+                'data' => [],
+                'exceptionMessage' => "Required field 'email' is missing."
+            ],
+            'email invalid' => [
+                'data' => ['email' => 'invalid-email'],
+                'exceptionMessage' => "Field 'email' must be a valid email address."
+            ]
+        ];
+    }
+
+    #endregion Data Providers
 }

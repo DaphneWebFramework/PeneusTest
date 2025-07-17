@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProvider;
 
 use \Peneus\Api\Actions\Account\ChangeDisplayNameAction;
 
@@ -50,8 +51,11 @@ class ChangeDisplayNameActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfDisplayNameIsMissing()
-    {
+    #[DataProvider('invalidModelDataProvider')]
+    function testOnExecuteThrowsForInvalidModelData(
+        array $data,
+        string $exceptionMessage
+    ) {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -61,33 +65,10 @@ class ChangeDisplayNameActionTest extends TestCase
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn([]);
+            ->willReturn($data);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Required field 'displayName' is missing.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfDisplayNameIsInvalid()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'displayName' => '<script>'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            'Display name is invalid. It must start with a letter or number'
-          . ' and may only contain letters, numbers, spaces, dots, hyphens,'
-          . ' and apostrophes.');
+        $this->expectExceptionMessage($exceptionMessage);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -173,4 +154,24 @@ class ChangeDisplayNameActionTest extends TestCase
     }
 
     #endregion onExecute
+
+    #region Data Providers -----------------------------------------------------
+
+    static function invalidModelDataProvider()
+    {
+        return [
+            'displayName missing' => [
+                'data' => [],
+                'exceptionMessage' => "Required field 'displayName' is missing."
+            ],
+            'displayName invalid' => [
+                'data' => [ 'displayName' => '<invalid-display-name>' ],
+                'exceptionMessage' => 'Display name is invalid. It must start '
+                    . 'with a letter or number and may only contain letters, '
+                    . 'numbers, spaces, dots, hyphens, and apostrophes.'
+            ],
+        ];
+    }
+
+    #endregion Data Providers
 }

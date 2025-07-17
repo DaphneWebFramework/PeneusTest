@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProvider;
 
 use \Peneus\Api\Actions\Account\ChangePasswordAction;
 
@@ -55,8 +56,11 @@ class ChangePasswordActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfCurrentPasswordIsMissing()
-    {
+    #[DataProvider('invalidModelDataProvider')]
+    function testOnExecuteThrowsForInvalidModelData(
+        array $data,
+        string $exceptionMessage
+    ) {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -66,122 +70,10 @@ class ChangePasswordActionTest extends TestCase
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn([
-                'newPassword' => 'pass1234'
-            ]);
+            ->willReturn($data);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Required field 'currentPassword' is missing.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfCurrentPasswordTooShort()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'currentPassword' => '1234567',
-                'newPassword' => 'pass1234'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'currentPassword' must have a minimum length of 8 characters.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfCurrentPasswordTooLong()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'currentPassword' => str_repeat('a', 73),
-                'newPassword' => 'pass1234'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'currentPassword' must have a maximum length of 72 characters.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfNewPasswordIsMissing()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'currentPassword' => 'pass1234'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Required field 'newPassword' is missing.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfNewPasswordTooShort()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'currentPassword' => 'pass1234',
-                'newPassword' => '1234567'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'newPassword' must have a minimum length of 8 characters.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfNewPasswordTooLong()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'currentPassword' => 'pass1234',
-                'newPassword' => str_repeat('a', 73)
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'newPassword' must have a maximum length of 72 characters.");
+        $this->expectExceptionMessage($exceptionMessage);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -323,4 +215,50 @@ class ChangePasswordActionTest extends TestCase
     }
 
     #endregion onExecute
+
+    #region Data Providers -----------------------------------------------------
+
+    static function invalidModelDataProvider()
+    {
+        return [
+            'currentPassword missing' => [
+                'data' => [],
+                'exceptionMessage' => "Required field 'currentPassword' is missing."
+            ],
+            'currentPassword too short' => [
+                'data' => [
+                    'currentPassword' => '1234567'
+                ],
+                'exceptionMessage' => "Field 'currentPassword' must have a minimum length of 8 characters."
+            ],
+            'currentPassword too long' => [
+                'data' => [
+                    'currentPassword' => str_repeat('a', 73)
+                ],
+                'exceptionMessage' => "Field 'currentPassword' must have a maximum length of 72 characters."
+            ],
+            'newPassword missing' => [
+                'data' => [
+                    'currentPassword' => 'pass1234'
+                ],
+                'exceptionMessage' => "Required field 'newPassword' is missing."
+            ],
+            'newPassword too short' => [
+                'data' => [
+                    'currentPassword' => 'pass1234',
+                    'newPassword' => '1234567'
+                ],
+                'exceptionMessage' => "Field 'newPassword' must have a minimum length of 8 characters."
+            ],
+            'newPassword too long' => [
+                'data' => [
+                    'currentPassword' => 'pass1234',
+                    'newPassword' => str_repeat('a', 73)
+                ],
+                'exceptionMessage' => "Field 'newPassword' must have a maximum length of 72 characters."
+            ],
+        ];
+    }
+
+    #endregion Data Providers
 }

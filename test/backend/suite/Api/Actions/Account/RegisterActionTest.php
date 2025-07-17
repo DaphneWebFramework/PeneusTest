@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProvider;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Account\RegisterAction;
@@ -71,8 +72,11 @@ class RegisterActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfEmailIsMissing()
-    {
+    #[DataProvider('invalidModelDataProvider')]
+    function testOnExecuteThrowsForInvalidModelData(
+        array $data,
+        string $exceptionMessage
+    ) {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -82,209 +86,10 @@ class RegisterActionTest extends TestCase
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn([
-                'password' => 'pass1234',
-                'displayName' => 'John Doe'
-            ]);
+            ->willReturn($data);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Required field 'email' is missing.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfEmailIsInvalid()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'not-an-email',
-                'password' => 'pass1234',
-                'displayName' => 'John Doe'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'email' must be a valid email address.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPasswordIsMissing()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'john@example.com',
-                'displayName' => 'John Doe'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Required field 'password' is missing.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPasswordTooShort()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'john@example.com',
-                'password' => '1234567',
-                'displayName' => 'John Doe'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'password' must have a minimum length of 8 characters.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPasswordTooLong()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'john@example.com',
-                'password' => str_repeat('a', 73),
-                'displayName' => 'John Doe'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'password' must have a maximum length of 72 characters.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfDisplayNameIsMissing()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'john@example.com',
-                'password' => 'pass1234'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Required field 'displayName' is missing.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfDisplayNameIsInvalid()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'john@example.com',
-                'password' => 'pass1234',
-                'displayName' => '<script>'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            'Display name is invalid. It must start with a letter or number'
-          . ' and may only contain letters, numbers, spaces, dots, hyphens,'
-          . ' and apostrophes.');
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfEmailAlreadyRegistered()
-    {
-        $sut = $this->systemUnderTest('isEmailAlreadyRegistered');
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'john@example.com',
-                'password' => 'pass1234',
-                'displayName' => 'John Doe'
-            ]);
-        $sut->expects($this->once())
-            ->method('isEmailAlreadyRegistered')
-            ->with('john@example.com')
-            ->willReturn(true);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('This email address is already registered.');
-        $this->expectExceptionCode(StatusCode::Conflict->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfEmailAlreadyPending()
-    {
-        $sut = $this->systemUnderTest(
-            'isEmailAlreadyRegistered',
-            'isEmailAlreadyPending'
-        );
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'email' => 'john@example.com',
-                'password' => 'pass1234',
-                'displayName' => 'John Doe'
-            ]);
-        $sut->expects($this->once())
-            ->method('isEmailAlreadyRegistered')
-            ->with('john@example.com')
-            ->willReturn(false);
-        $sut->expects($this->once())
-            ->method('isEmailAlreadyPending')
-            ->with('john@example.com')
-            ->willReturn(true);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('This email address is already awaiting activation.');
-        $this->expectExceptionCode(StatusCode::Conflict->value);
+        $this->expectExceptionMessage($exceptionMessage);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -653,4 +458,61 @@ class RegisterActionTest extends TestCase
     }
 
     #endregion sendActivationEmail
+
+    #region Data Providers -----------------------------------------------------
+
+    static function invalidModelDataProvider()
+    {
+        return [
+            'email missing' => [
+                'data' => [],
+                'exceptionMessage' => "Required field 'email' is missing."
+            ],
+            'email invalid' => [
+                'data' => [
+                    'email' => 'invalid-email'
+                ],
+                'exceptionMessage' => "Field 'email' must be a valid email address."
+            ],
+            'password missing' => [
+                'data' => [
+                    'email' => 'john@example.com'
+                ],
+                'exceptionMessage' => "Required field 'password' is missing."
+            ],
+            'password too short' => [
+                'data' => [
+                    'email' => 'john@example.com',
+                    'password' => '1234567'
+                ],
+                'exceptionMessage' => "Field 'password' must have a minimum length of 8 characters."
+            ],
+            'password too long' => [
+                'data' => [
+                    'email' => 'john@example.com',
+                    'password' => str_repeat('a', 73)
+                ],
+                'exceptionMessage' => "Field 'password' must have a maximum length of 72 characters."
+            ],
+            'displayName missing' => [
+                'data' => [
+                    'email' => 'john@example.com',
+                    'password' => 'pass1234'
+                ],
+                'exceptionMessage' => "Required field 'displayName' is missing."
+            ],
+            'displayName invalid' => [
+                'data' => [
+                    'email' => 'john@example.com',
+                    'password' => 'pass1234',
+                    'displayName' => '<invalid-display-name>'
+                ],
+                'exceptionMessage' => 'Display name is invalid. It must start '
+                    . 'with a letter or number and may only contain letters, '
+                    . 'numbers, spaces, dots, hyphens, and apostrophes.'
+            ],
+        ];
+    }
+
+    #endregion Data Providers
 }

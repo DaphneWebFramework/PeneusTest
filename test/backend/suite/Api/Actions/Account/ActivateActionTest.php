@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProvider;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Account\ActivateAction;
@@ -68,8 +69,11 @@ class ActivateActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfActivationCodeIsMissing()
-    {
+    #[DataProvider('invalidModelDataProvider')]
+    function testOnExecuteThrowsForInvalidModelData(
+        array $data,
+        string $exceptionMessage
+    ) {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -79,30 +83,10 @@ class ActivateActionTest extends TestCase
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn([]); // Missing activationCode
+            ->willReturn($data);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Activation code is required.');
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfActivationCodeIsInvalid()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'activationCode' => 'not-a-valid-code'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Activation code format is invalid.');
+        $this->expectExceptionMessage($exceptionMessage);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -516,4 +500,22 @@ class ActivateActionTest extends TestCase
     }
 
     #endregion createAccountFromPendingAccount
+
+    #region Data Providers -----------------------------------------------------
+
+    static function invalidModelDataProvider()
+    {
+        return [
+            'activationCode missing' => [
+                'data' => [],
+                'exceptionMessage' => 'Activation code is required.'
+            ],
+            'activationCode invalid' => [
+                'data' => ['activationCode' => 'invalid-code'],
+                'exceptionMessage' => 'Activation code format is invalid.'
+            ],
+        ];
+    }
+
+    #endregion Data Providers
 }

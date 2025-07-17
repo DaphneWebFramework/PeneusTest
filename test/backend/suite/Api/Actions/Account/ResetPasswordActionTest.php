@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProvider;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Account\ResetPasswordAction;
@@ -73,8 +74,11 @@ class ResetPasswordActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfResetCodeMissing()
-    {
+    #[DataProvider('invalidModelDataProvider')]
+    function testOnExecuteThrowsForInvalidModelData(
+        array $data,
+        string $exceptionMessage
+    ) {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -84,100 +88,10 @@ class ResetPasswordActionTest extends TestCase
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn(['newPassword' => 'pass1234']);
+            ->willReturn($data);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Reset code is required.');
-
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfResetCodeInvalid()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'resetCode' => 'not-a-valid-code',
-                'newPassword' => 'pass1234'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Reset code format is invalid.');
-
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfNewPasswordIsMissing()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'resetCode' => str_repeat('a', 64),
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Required field 'newPassword' is missing.");
-
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfNewPasswordTooShort()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'resetCode' => str_repeat('a', 64),
-                'newPassword' => '1234567'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'newPassword' must have a minimum length of 8 characters.");
-
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfNewPasswordTooLong()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'resetCode' => str_repeat('a', 64),
-                'newPassword' => str_repeat('a', 73)
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'newPassword' must have a maximum length of 72 characters.");
-
+        $this->expectExceptionMessage($exceptionMessage);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -606,4 +520,44 @@ class ResetPasswordActionTest extends TestCase
     }
 
     #endregion updatePassword
+
+    #region Data Providers -----------------------------------------------------
+
+    static function invalidModelDataProvider()
+    {
+        return [
+            'resetCode missing' => [
+                'data' => [],
+                'exceptionMessage' => 'Reset code is required.'
+            ],
+            'resetCode invalid' => [
+                'data' => [
+                    'resetCode' => 'invalid-code'
+                ],
+                'exceptionMessage' => 'Reset code format is invalid.'
+            ],
+            'newPassword missing' => [
+                'data' => [
+                    'resetCode' => str_repeat('a', 64)
+                ],
+                'exceptionMessage' => "Required field 'newPassword' is missing."
+            ],
+            'newPassword too short' => [
+                'data' => [
+                    'resetCode' => str_repeat('a', 64),
+                    'newPassword' => '1234567'
+                ],
+                'exceptionMessage' => "Field 'newPassword' must have a minimum length of 8 characters."
+            ],
+            'newPassword too long' => [
+                'data' => [
+                    'resetCode' => str_repeat('a', 64),
+                    'newPassword' => str_repeat('a', 73)
+                ],
+                'exceptionMessage' => "Field 'newPassword' must have a maximum length of 72 characters."
+            ],
+        ];
+    }
+
+    #endregion Data Providers
 }
