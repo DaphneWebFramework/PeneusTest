@@ -30,10 +30,10 @@ class AccountRoleDeletionHookTest extends TestCase
     function testOnDeleteAccountSkipsWhenNoRolesExist()
     {
         $sut = new AccountRoleDeletionHook();
-        $database = Database::Instance();
+        $fakeDatabase = Database::Instance();
         $account = new Account(['id' => 42]);
 
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT * FROM accountrole WHERE accountId = :accountId',
             bindings: ['accountId' => 42],
             result: [],
@@ -42,16 +42,16 @@ class AccountRoleDeletionHookTest extends TestCase
 
         $this->expectNotToPerformAssertions();
         $sut->OnDeleteAccount($account);
-        $database->VerifyAllExpectationsMet();
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     function testOnDeleteAccountThrowsIfAnyDeleteFails()
     {
         $sut = new AccountRoleDeletionHook();
-        $database = Database::Instance();
+        $fakeDatabase = Database::Instance();
         $account = new Account(['id' => 42]);
 
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT * FROM accountrole WHERE accountId = :accountId',
             bindings: ['accountId' => 42],
             result: [[
@@ -66,14 +66,14 @@ class AccountRoleDeletionHookTest extends TestCase
             ]],
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'DELETE FROM accountrole WHERE id = :id',
             bindings: ['id' => 1],
             result: [],
             lastAffectedRowCount: 1,
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'DELETE FROM accountrole WHERE id = :id',
             bindings: ['id' => 2],
             result: null,
@@ -83,16 +83,16 @@ class AccountRoleDeletionHookTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Failed to delete account role.');
         $sut->OnDeleteAccount($account);
-        $database->VerifyAllExpectationsMet();
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     function testOnDeleteAccountSucceedsIfAllDeletesSucceed()
     {
         $sut = new AccountRoleDeletionHook();
-        $database = Database::Instance();
+        $fakeDatabase = Database::Instance();
         $account = new Account(['id' => 42]);
 
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT * FROM accountrole WHERE accountId = :accountId',
             bindings: ['accountId' => 42],
             result: [[
@@ -104,14 +104,14 @@ class AccountRoleDeletionHookTest extends TestCase
             ]],
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'DELETE FROM accountrole WHERE id = :id',
             bindings: ['id' => 1],
             result: [],
             lastAffectedRowCount: 1,
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'DELETE FROM accountrole WHERE id = :id',
             bindings: ['id' => 2],
             result: [],
@@ -121,7 +121,7 @@ class AccountRoleDeletionHookTest extends TestCase
 
         $this->expectNotToPerformAssertions();
         $sut->OnDeleteAccount($account);
-        $database->VerifyAllExpectationsMet();
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     #endregion OnDeleteAccount

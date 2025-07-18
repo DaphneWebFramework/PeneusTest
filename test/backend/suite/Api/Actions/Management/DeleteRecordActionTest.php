@@ -26,7 +26,7 @@ class DeleteRecordActionTest extends TestCase
         $this->originalRequest =
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalDatabase =
-            Database::ReplaceInstance($this->createMock(Database::class));
+            Database::ReplaceInstance(new FakeDatabase());
         $this->originalConfig =
             Config::ReplaceInstance($this->config());
     }
@@ -288,14 +288,13 @@ class DeleteRecordActionTest extends TestCase
     function testFindEntityReturnsNullWhenNotFound()
     {
         $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM accountrole WHERE id = :id LIMIT 1',
             bindings: ['id' => 42],
             result: null,
             times: 1
         );
-        Database::ReplaceInstance($fakeDatabase);
 
         $this->assertNull(AccessHelper::CallMethod(
             $sut,
@@ -308,7 +307,7 @@ class DeleteRecordActionTest extends TestCase
     function testFindEntityReturnsEntityWhenFound()
     {
         $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM accountrole WHERE id = :id LIMIT 1',
             bindings: ['id' => 42],
@@ -319,7 +318,6 @@ class DeleteRecordActionTest extends TestCase
             ]],
             times: 1
         );
-        Database::ReplaceInstance($fakeDatabase);
 
         $result = AccessHelper::CallMethod(
             $sut,

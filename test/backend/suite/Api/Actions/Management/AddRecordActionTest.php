@@ -144,7 +144,7 @@ class AddRecordActionTest extends TestCase
         $queryParams = $this->createMock(CArray::class);
         $data = [
             'accountId' => 1,
-            'role' => 0
+            'role' => 10
         ];
         $entity = $this->createMock(AccountRole::class);
 
@@ -313,7 +313,7 @@ class AddRecordActionTest extends TestCase
                 ],
                 'exceptionMessage' => "Field 'accountId' must be an integer."
             ],
-            'accountRole: accountId less than minimum' => [
+            'accountRole: accountId less than one' => [
                 'table' => 'accountrole',
                 'data' => [
                     'accountId' => 0
@@ -446,7 +446,7 @@ class AddRecordActionTest extends TestCase
                 ],
                 'exceptionMessage' => "Field 'accountId' must be an integer."
             ],
-            'passwordReset: accountId less than minimum' => [
+            'passwordReset: accountId less than one' => [
                 'table' => 'passwordreset',
                 'data' => [
                     'accountId' => 0

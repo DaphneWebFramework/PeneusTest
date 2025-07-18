@@ -317,7 +317,7 @@ class ListRecordsActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $database = Database::Instance();
+        $fakeDatabase = Database::Instance();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -327,7 +327,7 @@ class ListRecordsActionTest extends TestCase
             ->willReturn([
                 'table' => 'account'
             ]);
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT * FROM account LIMIT 10 OFFSET 0',
             result: [
                 [
@@ -349,7 +349,7 @@ class ListRecordsActionTest extends TestCase
             ],
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM account',
             result: [[2]],
             times: 1
@@ -372,7 +372,7 @@ class ListRecordsActionTest extends TestCase
           $this->assertSame('2023-02-01 00:00:00', $result['data'][1]->timeActivated->format('Y-m-d H:i:s'));
           $this->assertNull($result['data'][1]->timeLastLogin);
         $this->assertSame(2, $result['total']);
-        $database->VerifyAllExpectationsMet();
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     function testOnExecuteReturnsFirstPageForAccountRoleTableWithDefaults()
@@ -380,7 +380,7 @@ class ListRecordsActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $database = Database::Instance();
+        $fakeDatabase = Database::Instance();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -390,7 +390,7 @@ class ListRecordsActionTest extends TestCase
             ->willReturn([
                 'table' => 'accountrole'
             ]);
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT * FROM accountrole LIMIT 10 OFFSET 0',
             result: [
                 ['id' => 1, 'accountId' => 101, 'role' => 0],
@@ -399,7 +399,7 @@ class ListRecordsActionTest extends TestCase
             ],
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM accountrole',
             result: [[3]],
             times: 1
@@ -420,7 +420,7 @@ class ListRecordsActionTest extends TestCase
           $this->assertSame(103, $result['data'][2]->accountId);
           $this->assertSame(20, $result['data'][2]->role);
         $this->assertSame(3, $result['total']);
-        $database->VerifyAllExpectationsMet();
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     function testOnExecuteReturnsFirstPageForPasswordResetTableWithDefaults()
@@ -428,7 +428,7 @@ class ListRecordsActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $database = Database::Instance();
+        $fakeDatabase = Database::Instance();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -438,7 +438,7 @@ class ListRecordsActionTest extends TestCase
             ->willReturn([
                 'table' => 'passwordreset'
             ]);
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT * FROM passwordreset LIMIT 10 OFFSET 0',
             result: [
                 [
@@ -456,7 +456,7 @@ class ListRecordsActionTest extends TestCase
             ],
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM passwordreset',
             result: [[2]],
             times: 1
@@ -475,7 +475,7 @@ class ListRecordsActionTest extends TestCase
           $this->assertSame('def456', $result['data'][1]->resetCode);
           $this->assertSame('2024-04-02 13:00:00', $result['data'][1]->timeRequested->format('Y-m-d H:i:s'));
         $this->assertSame(2, $result['total']);
-        $database->VerifyAllExpectationsMet();
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     function testOnExecuteReturnsFirstPageForPendingAccountTableWithDefaults()
@@ -483,7 +483,7 @@ class ListRecordsActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $database = Database::Instance();
+        $fakeDatabase = Database::Instance();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -493,7 +493,7 @@ class ListRecordsActionTest extends TestCase
             ->willReturn([
                 'table' => 'pendingaccount'
             ]);
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT * FROM pendingaccount LIMIT 10 OFFSET 0',
             result: [
                 [
@@ -515,7 +515,7 @@ class ListRecordsActionTest extends TestCase
             ],
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM pendingaccount',
             result: [[2]],
             times: 1
@@ -538,7 +538,7 @@ class ListRecordsActionTest extends TestCase
           $this->assertSame('ACT-002', $result['data'][1]->activationCode);
           $this->assertSame('2024-05-02 11:00:00', $result['data'][1]->timeRegistered->format('Y-m-d H:i:s'));
         $this->assertSame(2, $result['total']);
-        $database->VerifyAllExpectationsMet();
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     function testOnExecuteWithPageNumberAndPageSize()
@@ -546,7 +546,7 @@ class ListRecordsActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $database = Database::Instance();
+        $fakeDatabase = Database::Instance();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -558,14 +558,14 @@ class ListRecordsActionTest extends TestCase
                 'page' => 3,
                 'pagesize' => 5
             ]);
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT * FROM accountrole LIMIT 5 OFFSET 10', // (3 - 1) * 5
             result: [
                 ['id' => 42, 'accountId' => 101, 'role' => 99]
             ],
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM accountrole',
             result: [[1]],
             times: 1
@@ -578,7 +578,7 @@ class ListRecordsActionTest extends TestCase
           $this->assertSame(101, $result['data'][0]->accountId);
           $this->assertSame(99, $result['data'][0]->role);
         $this->assertSame(1, $result['total']);
-        $database->VerifyAllExpectationsMet();
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     function testOnExecuteWithSearchTerm()
@@ -586,7 +586,7 @@ class ListRecordsActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $database = Database::Instance();
+        $fakeDatabase = Database::Instance();
         $searchTerm = '100%_core\dev';
         $escapedSearchTerm = '%' . \strtr($searchTerm, [
             '\\' => '\\\\',
@@ -603,7 +603,7 @@ class ListRecordsActionTest extends TestCase
                 'table' => 'account',
                 'search' => $searchTerm
             ]);
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT * FROM account WHERE '
                . '`id` LIKE :search OR '
                . '`email` LIKE :search OR '
@@ -623,7 +623,7 @@ class ListRecordsActionTest extends TestCase
             ]],
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM account WHERE '
                . '`id` LIKE :search OR '
                . '`email` LIKE :search OR '
@@ -646,7 +646,7 @@ class ListRecordsActionTest extends TestCase
           $this->assertSame('2024-01-01 00:00:00', $result['data'][0]->timeActivated->format('Y-m-d H:i:s'));
           $this->assertSame('2024-01-02 12:00:00', $result['data'][0]->timeLastLogin->format('Y-m-d H:i:s'));
         $this->assertSame(1, $result['total']);
-        $database->VerifyAllExpectationsMet();
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     function testOnExecuteThrowsIfSortKeyDoesNotExist()
@@ -676,7 +676,7 @@ class ListRecordsActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $database = Database::Instance();
+        $fakeDatabase = Database::Instance();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -687,14 +687,14 @@ class ListRecordsActionTest extends TestCase
                 'table' => 'accountrole',
                 'sortkey' => 'role'
             ]);
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT * FROM accountrole ORDER BY `role` LIMIT 10 OFFSET 0',
             result: [
                 ['id' => 5, 'accountId' => 200, 'role' => 10]
             ],
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM accountrole',
             result: [[1]],
             times: 1
@@ -707,7 +707,7 @@ class ListRecordsActionTest extends TestCase
           $this->assertSame(200, $result['data'][0]->accountId);
           $this->assertSame(10, $result['data'][0]->role);
         $this->assertSame(1, $result['total']);
-        $database->VerifyAllExpectationsMet();
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     function testOnExecuteWithSortKeyAndSortDirection()
@@ -715,7 +715,7 @@ class ListRecordsActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $database = Database::Instance();
+        $fakeDatabase = Database::Instance();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -727,14 +727,14 @@ class ListRecordsActionTest extends TestCase
                 'sortkey' => 'role',
                 'sortdir' => 'desc'
             ]);
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT * FROM accountrole ORDER BY `role` DESC LIMIT 10 OFFSET 0',
             result: [
                 ['id' => 7, 'accountId' => 300, 'role' => 99]
             ],
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM accountrole',
             result: [[1]],
             times: 1
@@ -747,7 +747,7 @@ class ListRecordsActionTest extends TestCase
           $this->assertSame(300, $result['data'][0]->accountId);
           $this->assertSame(99, $result['data'][0]->role);
         $this->assertSame(1, $result['total']);
-        $database->VerifyAllExpectationsMet();
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     function testOnExecuteWithAllQueryParameters()
@@ -755,7 +755,7 @@ class ListRecordsActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $database = Database::Instance();
+        $fakeDatabase = Database::Instance();
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -770,7 +770,7 @@ class ListRecordsActionTest extends TestCase
                 'sortkey' => 'role',
                 'sortdir' => 'asc'
             ]);
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT * FROM accountrole WHERE '
                . '`id` LIKE :search OR '
                . '`accountId` LIKE :search OR '
@@ -783,7 +783,7 @@ class ListRecordsActionTest extends TestCase
             ],
             times: 1
         );
-        $database->Expect(
+        $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM accountrole WHERE '
                . '`id` LIKE :search OR '
                . '`accountId` LIKE :search OR '
@@ -800,7 +800,7 @@ class ListRecordsActionTest extends TestCase
           $this->assertSame(9001, $result['data'][0]->accountId);
           $this->assertSame(20, $result['data'][0]->role);
         $this->assertSame(1, $result['total']);
-        $database->VerifyAllExpectationsMet();
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     #endregion onExecute
