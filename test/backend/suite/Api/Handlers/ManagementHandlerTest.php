@@ -4,6 +4,9 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\Handlers\ManagementHandler;
 
+use \Peneus\Api\Actions\Management\AddRecordAction;
+use \Peneus\Api\Actions\Management\DeleteRecordAction;
+use \Peneus\Api\Actions\Management\EditRecordAction;
 use \Peneus\Api\Actions\Management\ListRecordsAction;
 use \Peneus\Api\Guards\SessionGuard;
 use \Peneus\Model\Role;
@@ -25,7 +28,40 @@ class ManagementHandlerTest extends TestCase
         $this->assertSame(Role::Admin, AccessHelper::GetProperty($guards[0], 'minimumRole'));
     }
 
-    public function testCreateActionWithUnknownAction()
+    function testCreateActionWithAddRecord()
+    {
+        $handler = new ManagementHandler;
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['add-record']);
+        $this->assertInstanceOf(AddRecordAction::class, $action);
+        $guards = AccessHelper::GetProperty($action, 'guards');
+        $this->assertCount(1, $guards);
+        $this->assertInstanceOf(SessionGuard::class, $guards[0]);
+        $this->assertSame(Role::Admin, AccessHelper::GetProperty($guards[0], 'minimumRole'));
+    }
+
+    function testCreateActionWithEditRecord()
+    {
+        $handler = new ManagementHandler;
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['edit-record']);
+        $this->assertInstanceOf(EditRecordAction::class, $action);
+        $guards = AccessHelper::GetProperty($action, 'guards');
+        $this->assertCount(1, $guards);
+        $this->assertInstanceOf(SessionGuard::class, $guards[0]);
+        $this->assertSame(Role::Admin, AccessHelper::GetProperty($guards[0], 'minimumRole'));
+    }
+
+    function testCreateActionWithDeleteRecord()
+    {
+        $handler = new ManagementHandler;
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['delete-record']);
+        $this->assertInstanceOf(DeleteRecordAction::class, $action);
+        $guards = AccessHelper::GetProperty($action, 'guards');
+        $this->assertCount(1, $guards);
+        $this->assertInstanceOf(SessionGuard::class, $guards[0]);
+        $this->assertSame(Role::Admin, AccessHelper::GetProperty($guards[0], 'minimumRole'));
+    }
+
+    function testCreateActionWithUnknownAction()
     {
         $handler = new ManagementHandler;
         $action = AccessHelper::CallMethod($handler, 'createAction', ['unknown']);
