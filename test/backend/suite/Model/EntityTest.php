@@ -47,177 +47,224 @@ class EntityTest extends TestCase
         new Entity();
     }
 
-    function testConstructorWithNoData()
+    function testConstructorDoesNotCallPopulateWhenDataIsOmitted()
     {
-        $sut = new TestEntity();
-        $this->assertSame(0, $sut->id);
-        $this->expectException(\Error::class);
-        $sut->name;
-        $this->expectException(\Error::class);
-        $sut->age;
-        $this->expectException(\Error::class);
-        $sut->createdAt;
+        $sut = $this->getMockBuilder(TestEntity::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['Populate'])
+            ->getMock();
+        $sut->expects($this->never())
+            ->method('Populate');
+
+        $sut->__construct();
     }
 
-    function testConstructorWithEmptyData()
+    function testConstructorDoesNotCallPopulateWhenDataIsNull()
     {
-        $sut = new TestEntity([]);
+        $sut = $this->getMockBuilder(TestEntity::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['Populate'])
+            ->getMock();
+        $sut->expects($this->never())
+            ->method('Populate');
+
+        $sut->__construct(null);
+    }
+
+    function testConstructorCallsPopulateWhenDataIsProvided()
+    {
+        $sut = $this->getMockBuilder(TestEntity::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['Populate'])
+            ->getMock();
+        $sut->expects($this->once())
+            ->method('Populate')
+            ->with(['id' => 1, 'name' => 'John']);
+
+        $sut->__construct(['id' => 1, 'name' => 'John']);
+    }
+
+    #endregion __construct
+
+    #region Populate -----------------------------------------------------------
+
+    function testPopulateWithEmptyData()
+    {
+        $sut = new TestEntity();
+        $sut->Populate([]);
+
         $this->assertSame(0, $sut->id);
         $this->assertSame('', $sut->name);
         $this->assertSame(0, $sut->age);
         $this->assertInstanceOf(\DateTime::class, $sut->createdAt);
     }
 
-    function testConstructorWithDataExcludingId()
+    function testPopulateWithDataExcludingId()
     {
-        $sut = new TestEntity([
+        $sut = new TestEntity();
+        $data = [
             'name' => 'John',
             'age' => 30,
             'createdAt' => '2021-01-01'
-        ]);
+        ];
+        $sut->Populate($data);
+
         $this->assertSame(0, $sut->id);
-        $this->assertSame('John', $sut->name);
-        $this->assertSame(30, $sut->age);
-        $this->assertSame('2021-01-01', $sut->createdAt->format('Y-m-d'));
+        $this->assertSame($data['name'], $sut->name);
+        $this->assertSame($data['age'], $sut->age);
+        $this->assertSame($data['createdAt'], $sut->createdAt->format('Y-m-d'));
     }
 
-    function testConstructorWithDataIncludingId()
+    function testPopulateWithDataIncludingId()
     {
-        $sut = new TestEntity([
+        $sut = new TestEntity();
+        $data = [
             'id' => 42,
             'name' => 'John',
             'age' => 30,
             'createdAt' => '2021-01-01'
-        ]);
-        $this->assertSame(42, $sut->id);
-        $this->assertSame('John', $sut->name);
-        $this->assertSame(30, $sut->age);
-        $this->assertSame('2021-01-01', $sut->createdAt->format('Y-m-d'));
+        ];
+        $sut->Populate($data);
+
+        $this->assertSame($data['id'], $sut->id);
+        $this->assertSame($data['name'], $sut->name);
+        $this->assertSame($data['age'], $sut->age);
+        $this->assertSame($data['createdAt'], $sut->createdAt->format('Y-m-d'));
     }
 
-    function testConstructorSkipsUnknownProperty()
+    function testPopulateSkipsUnknownProperty()
     {
-        $sut = new TestEntity([
+        $sut = new TestEntity();
+        $sut->Populate([
             'unknown' => 'value'
         ]);
+
         $this->assertFalse(\property_exists($sut, 'unknown'));
     }
 
-    function testConstructorSkipsNumericKeys()
+    function testPopulateSkipsNumericKeys()
     {
-        $sut = new TestEntity([
+        $sut = new TestEntity();
+        $sut->Populate([
             'John',
             30,
             '2021-01-01'
         ]);
+
         $this->assertSame(0, $sut->id);
         $this->assertSame('', $sut->name);
         $this->assertSame(0, $sut->age);
         $this->assertInstanceOf(\DateTime::class, $sut->createdAt);
     }
 
-    function testConstructorSkipsIncorrectTypes()
+    function testPopulateSkipsIncorrectTypes()
     {
-        $sut = new TestEntity([
+        $sut = new TestEntity();
+        $sut->Populate([
             'id' => '42',
             'name' => 30,
             'age' => '30',
             'createdAt' => 20210101
         ]);
+
         $this->assertSame(0, $sut->id);
         $this->assertSame('', $sut->name);
         $this->assertSame(0, $sut->age);
         $this->assertInstanceOf(\DateTime::class, $sut->createdAt);
     }
 
-    function testConstructorSkipsNonPublicProperties()
+    function testPopulateSkipsNonPublicProperties()
     {
-        $data = [
-            'aPrivate' => 99,
-            'aProtected' => 99
-        ];
-        $sut = new class($data) extends Entity {
+        $sut = new class extends Entity {
             private int $aPrivate = 1;
             protected int $aProtected = 2;
         };
+        $sut->Populate([
+            'aPrivate' => 99,
+            'aProtected' => 99
+        ]);
+
         $this->assertSame(1, AccessHelper::GetProperty($sut, 'aPrivate'));
         $this->assertSame(2, AccessHelper::GetProperty($sut, 'aProtected'));
     }
 
-    function testConstructorSkipsStaticProperties()
+    function testPopulateSkipsStaticProperties()
     {
-        $data = [
-            'aStaticPrivate' => 99,
-            'aStaticProtected' => 99,
-            'aStaticPublic' => 99
-        ];
-        $sut = new class($data) extends Entity {
+        $sut = new class extends Entity {
             static private int $aStaticPrivate = 1;
             static protected int $aStaticProtected = 2;
             static public int $aStaticPublic = 3;
         };
+        $sut->Populate([
+            'aStaticPrivate' => 99,
+            'aStaticProtected' => 99,
+            'aStaticPublic' => 99
+        ]);
+
         $class = \get_class($sut);
         $this->assertSame(1, AccessHelper::GetStaticProperty($class, 'aStaticPrivate'));
         $this->assertSame(2, AccessHelper::GetStaticProperty($class, 'aStaticProtected'));
         $this->assertSame(3, AccessHelper::GetStaticProperty($class, 'aStaticPublic'));
     }
 
-    function testConstructorSkipsReadonlyProperties()
+    function testPopulateSkipsReadonlyProperties()
     {
-        $data = [
-            'aPublicReadonly' => 99,
-            'aProtectedReadonly' => 99,
-            'aPrivateReadonly' => 99
-        ];
-        $sut = new class($data) extends Entity {
+        $sut = new class extends Entity {
             public readonly int $aPublicReadonly;
             protected readonly int $aProtectedReadonly;
             private readonly int $aPrivateReadonly;
-            public function __construct(?array $data = null) {
-                parent::__construct($data);
+            public function __construct() {
                 $this->aPublicReadonly = 1;
                 $this->aProtectedReadonly = 2;
                 $this->aPrivateReadonly = 3;
             }
         };
+        $sut->Populate([
+            'aPublicReadonly' => 99,
+            'aProtectedReadonly' => 99,
+            'aPrivateReadonly' => 99
+        ]);
+
         $this->assertSame(1, $sut->aPublicReadonly);
         $this->assertSame(2, AccessHelper::GetProperty($sut, 'aProtectedReadonly'));
         $this->assertSame(3, AccessHelper::GetProperty($sut, 'aPrivateReadonly'));
     }
 
-    function testConstructorSkipsUninitializableProperties()
+    function testPopulateSkipsUninitializableProperties()
     {
-        $data = [
-            'anObject' => new \stdClass(),
-            'anIterable' => new \ArrayIterator([1, 2, 3])
-        ];
-        $sut = new class($data) extends Entity {
+        $sut = new class extends Entity {
             public object $anObject;
             public iterable $anIterable;
         };
+        $sut->Populate([
+            'anObject' => new \stdClass(),
+            'anIterable' => new \ArrayIterator([1, 2, 3])
+        ]);
+
         $this->expectException(\Error::class);
         $sut->anObject;
         $this->expectException(\Error::class);
         $sut->anIterable;
     }
 
-    function testConstructorSkipsNonExistentClassProperty()
+    function testPopulateSkipsNonExistentClassProperty()
     {
-        $data = [
-            'aNullableProperty' => null
-        ];
-        $sut = new class($data) extends Entity {
+        $sut = new class extends Entity {
             public ?NonExistentClass $aNullableProperty;
             public NonExistentClass $aProperty;
         };
+        $sut->Populate([
+            'aNullableProperty' => null
+        ]);
+
         $this->assertNull($sut->aNullableProperty);
         $this->expectException(\Error::class);
         $sut->aProperty;
     }
 
-    function testConstructorSkipsNonInstantiableClassProperties()
+    function testPopulateSkipsNonInstantiableClassProperties()
     {
-        $sut = new class([]) extends Entity {
+        $sut = new class extends Entity {
             public NonInstantiableClass1 $aProperty1;
             public NonInstantiableClass2 $aProperty2;
             public NonInstantiableClass3 $aProperty3;
@@ -225,6 +272,8 @@ class EntityTest extends TestCase
             public NonInstantiableClass5 $aProperty5;
             public NonInstantiableClass6 $aProperty6;
         };
+        $sut->Populate([]);
+
         $this->expectException(\Error::class);
         $sut->aProperty1;
         $this->expectException(\Error::class);
@@ -239,39 +288,54 @@ class EntityTest extends TestCase
         $sut->aProperty6;
     }
 
-    function testConstructorSkipsIntersectionProperty()
+    function testPopulateSkipsIntersectionProperty()
     {
-        $data = [
-            'aProperty' => new \ArrayIterator([1, 2, 3])
-        ];
-        $sut = new class($data) extends Entity {
+        $sut = new class extends Entity {
             public \Iterator&\Countable $aProperty;
         };
+        $sut->Populate([
+            'aProperty' => new \ArrayIterator([1, 2, 3])
+        ]);
+
         $this->expectException(\Error::class);
         $sut->aProperty;
     }
 
-    function testConstructorSkipsUninitializedUnionProperty()
+    function testPopulateSkipsUninitializedUnionProperty()
     {
-        $data = ['aProperty' => 99];
-        $sut = new class($data) extends Entity {
+        $sut = new class extends Entity {
             public int|string $aProperty;
         };
+        $sut->Populate([
+            'aProperty' => 99
+        ]);
+
         $this->expectException(\Error::class);
         $sut->aProperty;
     }
 
-    function testConstructorAssignsInitializedUnionProperty()
+    function testPopulateAssignsInitializedUnionProperty()
     {
-        $data = ['aProperty' => 99];
-        $sut = new class($data) extends Entity {
+        $sut = new class extends Entity {
             public int|string $aProperty = 1;
         };
-        $this->assertSame($data['aProperty'], $sut->aProperty);
+        $sut->Populate([
+            'aProperty' => 99
+        ]);
+
+        $this->assertSame(99, $sut->aProperty);
     }
 
-    function testConstructorAssignsPrimitiveAndMixedProperties()
+    function testPopulateAssignsPrimitiveAndMixedProperties()
     {
+        $sut = new class extends Entity {
+            public bool $aBool;
+            public int $anInt;
+            public float $aFloat;
+            public string $aString;
+            public array $anArray;
+            public mixed $aMixed;
+        };
         $data = [
             'aBool' => true,
             'anInt' => 42,
@@ -280,14 +344,8 @@ class EntityTest extends TestCase
             'anArray' => [1, 2, 3],
             'aMixed' => "I'm a string too"
         ];
-        $sut = new class($data) extends Entity {
-            public bool $aBool;
-            public int $anInt;
-            public float $aFloat;
-            public string $aString;
-            public array $anArray;
-            public mixed $aMixed;
-        };
+        $sut->Populate($data);
+
         $this->assertSame($data['aBool'], $sut->aBool);
         $this->assertSame($data['anInt'], $sut->anInt);
         $this->assertSame($data['aFloat'], $sut->aFloat);
@@ -296,8 +354,17 @@ class EntityTest extends TestCase
         $this->assertSame($data['aMixed'], $sut->aMixed);
     }
 
-    function testConstructorAssignsNullableProperties()
+    function testPopulateAssignsNullableProperties()
     {
+        $sut = new class extends Entity {
+            public ?bool $aBool;
+            public ?int $anInt;
+            public ?float $aFloat;
+            public ?string $aString;
+            public ?array $anArray;
+            public ?object $anObject;
+            public ?iterable $anIterable;
+        };
         $data = [
             'aBool' => true,
             'anInt' => 42,
@@ -307,15 +374,8 @@ class EntityTest extends TestCase
             'anObject' => new \stdClass(),
             'anIterable' => new \ArrayIterator([1, 2, 3])
         ];
-        $sut = new class($data) extends Entity {
-            public ?bool $aBool;
-            public ?int $anInt;
-            public ?float $aFloat;
-            public ?string $aString;
-            public ?array $anArray;
-            public ?object $anObject;
-            public ?iterable $anIterable;
-        };
+        $sut->Populate($data);
+
         $this->assertSame($data['aBool'], $sut->aBool);
         $this->assertSame($data['anInt'], $sut->anInt);
         $this->assertSame($data['aFloat'], $sut->aFloat);
@@ -325,8 +385,16 @@ class EntityTest extends TestCase
         $this->assertSame($data['anIterable'], $sut->anIterable);
     }
 
-    function testConstructorAssignsInitializedProperties()
+    function testPopulateOverridesInitializedProperties()
     {
+        $sut = new class extends Entity {
+            public bool $aBool = true;
+            public int $anInt = 42;
+            public float $aFloat = 3.14;
+            public string $aString = "I'm a string";
+            public array $anArray = [1, 2, 3];
+            public mixed $aMixed = "I'm a string too";
+        };
         $data = [
             'aBool' => false,
             'anInt' => 99,
@@ -335,14 +403,8 @@ class EntityTest extends TestCase
             'anArray' => [4, 5, 6],
             'aMixed' => "I'm another string too"
         ];
-        $sut = new class($data) extends Entity {
-            public bool $aBool = true;
-            public int $anInt = 42;
-            public float $aFloat = 3.14;
-            public string $aString = "I'm a string";
-            public array $anArray = [1, 2, 3];
-            public mixed $aMixed = "I'm a string too";
-        };
+        $sut->Populate($data);
+
         $this->assertSame($data['aBool'], $sut->aBool);
         $this->assertSame($data['anInt'], $sut->anInt);
         $this->assertSame($data['aFloat'], $sut->aFloat);
@@ -351,8 +413,18 @@ class EntityTest extends TestCase
         $this->assertSame($data['aMixed'], $sut->aMixed);
     }
 
-    function testConstructorAssignsUntypedProperties()
+    function testPopulateAssignsUntypedProperties()
     {
+        $sut = new class extends Entity {
+            public $aNull;
+            public $aBool;
+            public $anInt;
+            public $aFloat;
+            public $aString;
+            public $anArray;
+            public $anObject;
+            public $anIterable;
+        };
         $data = [
             'aNull' => null,
             'aBool' => true,
@@ -363,16 +435,8 @@ class EntityTest extends TestCase
             'anObject' => new \stdClass(),
             'anIterable' => new \ArrayIterator([1, 2, 3])
         ];
-        $sut = new class($data) extends Entity {
-            public $aNull;
-            public $aBool;
-            public $anInt;
-            public $aFloat;
-            public $aString;
-            public $anArray;
-            public $anObject;
-            public $anIterable;
-        };
+        $sut->Populate($data);
+
         $this->assertSame($data['aNull'], $sut->aNull);
         $this->assertSame($data['aBool'], $sut->aBool);
         $this->assertSame($data['anInt'], $sut->anInt);
@@ -383,45 +447,56 @@ class EntityTest extends TestCase
         $this->assertSame($data['anIterable'], $sut->anIterable);
     }
 
-    function testConstructorAssignsPromotedProperty()
+    function testPopulateOverridesPromotedProperty()
     {
-        $data = ['aProperty' => 99];
-        $sut = new class(99, $data) extends Entity {
-            public function __construct(public int $aProperty, ?array $data = null) {
-                parent::__construct($data);
+        $sut = new class(1) extends Entity {
+            public function __construct(public int $aProperty) {
             }
         };
-        $this->assertSame($data['aProperty'], $sut->aProperty);
+        $sut->Populate([
+            'aProperty' => 99
+        ]);
+
+        $this->assertSame(99, $sut->aProperty);
     }
 
-    function testConstructorSkipsInvalidDateTimeString()
+    function testPopulateSkipsInvalidDateTimeString()
     {
-        $data = ['aDateTime' => 'not-a-date'];
-        $sut = new class($data) extends Entity {
+        $sut = new class extends Entity {
             public \DateTime $aDateTime;
         };
+        $sut->Populate([
+            'aDateTime' => 'not-a-datetime'
+        ]);
+
         $this->assertInstanceOf(\DateTime::class, $sut->aDateTime);
     }
 
-    function testConstructorSkipsNullForNonNullableDateTime()
+    function testPopulateSkipsNullForNonNullableDateTime()
     {
-        $data = ['aDateTime' => null];
-        $sut = new class($data) extends Entity {
+        $sut = new class extends Entity {
             public \DateTime $aDateTime;
         };
+        $sut->Populate([
+            'aDateTime' => null
+        ]);
+
         $this->assertNotNull($sut->aDateTime);
     }
 
-    function testConstructorAssignsNullToNullableDateTime()
+    function testPopulateAssignsNullToNullableDateTime()
     {
-        $data = ['aDateTime' => null];
-        $sut = new class($data) extends Entity {
+        $sut = new class extends Entity {
             public ?\DateTime $aDateTime;
         };
+        $sut->Populate([
+            'aDateTime' => null
+        ]);
+
         $this->assertNull($sut->aDateTime);
     }
 
-    #endregion __construct
+    #endregion Populate
 
     #region Save ---------------------------------------------------------------
 
