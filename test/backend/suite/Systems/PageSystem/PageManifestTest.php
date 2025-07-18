@@ -197,7 +197,7 @@ class PageManifestTest extends TestCase
 
     #region parseAssetBlock ----------------------------------------------------
 
-    function testParseFieldReturnsNullIfKeyMissing()
+    function testParseFieldReturnsNullIfKeyIsMissing()
     {
         $sut = $this->systemUnderTest('parseAssetValue');
         $data = ['js' => ['a.js']];

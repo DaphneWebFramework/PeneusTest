@@ -159,7 +159,7 @@ class ResourceTest extends TestCase
         );
     }
 
-    function testFrontendLibraryFileUrlWithoutCacheBusterIfFileMissing()
+    function testFrontendLibraryFileUrlWithoutCacheBusterIfFileIsMissing()
     {
         $sut = $this->systemUnderTest();
         $baseResource = _BaseResource::Instance();
@@ -372,7 +372,7 @@ class ResourceTest extends TestCase
         );
     }
 
-    function testPageFileUrlWithoutCacheBusterIfFileMissing()
+    function testPageFileUrlWithoutCacheBusterIfFileIsMissing()
     {
         $sut = $this->systemUnderTest('PageUrl', 'PageFilePath');
         $baseResource = _BaseResource::Instance();
