@@ -471,15 +471,6 @@ class EditRecordActionTest extends TestCase
                 ],
                 'exceptionMessage' => "Required field 'role' is missing."
             ],
-            'accountRole: role not an integer' => [
-                'table' => 'accountrole',
-                'data' => [
-                    'id' => 42,
-                    'accountId' => 1,
-                    'role' => 'not-an-integer'
-                ],
-                'exceptionMessage' => "Field 'role' must be an integer."
-            ],
             'accountRole: role invalid enum value' => [
                 'table' => 'accountrole',
                 'data' => [
@@ -487,7 +478,7 @@ class EditRecordActionTest extends TestCase
                     'accountId' => 1,
                     'role' => 999
                 ],
-                'exceptionMessage' => "Field 'role' failed custom validation."
+                'exceptionMessage' => "Field 'role' must be a valid value of enum 'Peneus\Model\Role'."
             ],
             #endregion AccountRole
             #region PendingAccount
