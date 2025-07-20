@@ -93,6 +93,69 @@ class RegisterActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
+    function testOnExecuteThrowsIfEmailAlreadyRegistered()
+    {
+        $sut = $this->systemUnderTest('isEmailAlreadyRegistered');
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'email' => 'john@example.com',
+                'password' => 'pass1234',
+                'displayName' => 'John Doe'
+            ]);
+        $sut->expects($this->once())
+            ->method('isEmailAlreadyRegistered')
+            ->with('john@example.com')
+            ->willReturn(true);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(
+            'This email address is already registered.');
+        $this->expectExceptionCode(StatusCode::Conflict->value);
+        AccessHelper::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfEmailAlreadyPending()
+    {
+        $sut = $this->systemUnderTest(
+            'isEmailAlreadyRegistered',
+            'isEmailAlreadyPending'
+        );
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'email' => 'john@example.com',
+                'password' => 'pass1234',
+                'displayName' => 'John Doe'
+            ]);
+        $sut->expects($this->once())
+            ->method('isEmailAlreadyRegistered')
+            ->with('john@example.com')
+            ->willReturn(false);
+        $sut->expects($this->once())
+            ->method('isEmailAlreadyPending')
+            ->with('john@example.com')
+            ->willReturn(true);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(
+            'This email address is already awaiting activation.');
+        $this->expectExceptionCode(StatusCode::Conflict->value);
+        AccessHelper::CallMethod($sut, 'onExecute');
+    }
+
     function testOnExecuteThrowsIfCreatePendingAccountFails()
     {
         $sut = $this->systemUnderTest(
