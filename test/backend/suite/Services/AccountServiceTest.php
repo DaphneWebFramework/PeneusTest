@@ -85,14 +85,39 @@ class AccountServiceTest extends TestCase
         $session->expects($this->once())
             ->method('Start')
             ->willThrowException(new \RuntimeException());
+        $session->expects($this->never())
+            ->method('Close');
         $sut->expects($this->never())
             ->method('verifySessionIntegrity');
         $sut->expects($this->never())
             ->method('retrieveLoggedInAccount');
         $session->expects($this->never())
             ->method('Destroy');
+
+        $this->expectException(\RuntimeException::class);
+        $sut->LoggedInAccount();
+    }
+
+    function testLoggedInAccountThrowsIfSessionCloseThrows()
+    {
+        $sut = $this->systemUnderTest(
+            'verifySessionIntegrity',
+            'retrieveLoggedInAccount'
+        );
+        $session = Session::Instance();
+
+        $session->expects($this->once())
+            ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Close')
+            ->willThrowException(new \RuntimeException());
+        $sut->expects($this->never())
+            ->method('verifySessionIntegrity');
+        $sut->expects($this->never())
+            ->method('retrieveLoggedInAccount');
         $session->expects($this->never())
-            ->method('Close');
+            ->method('Destroy');
 
         $this->expectException(\RuntimeException::class);
         $sut->LoggedInAccount();
@@ -106,8 +131,11 @@ class AccountServiceTest extends TestCase
         );
         $session = Session::Instance();
 
-        $session->expects($this->once())
+        $session->expects($this->exactly(2)) // 2nd call is before Destroy
             ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Close')
             ->willReturn($session);
         $sut->expects($this->once())
             ->method('verifySessionIntegrity')
@@ -117,8 +145,6 @@ class AccountServiceTest extends TestCase
             ->method('retrieveLoggedInAccount');
         $session->expects($this->once())
             ->method('Destroy');
-        $session->expects($this->never())
-            ->method('Close');
 
         $this->assertNull($sut->LoggedInAccount());
     }
@@ -131,8 +157,11 @@ class AccountServiceTest extends TestCase
         );
         $session = Session::Instance();
 
-        $session->expects($this->once())
+        $session->expects($this->exactly(2)) // 2nd call is before Destroy
             ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Close')
             ->willReturn($session);
         $sut->expects($this->once())
             ->method('verifySessionIntegrity')
@@ -144,8 +173,6 @@ class AccountServiceTest extends TestCase
             ->willReturn(null);
         $session->expects($this->once())
             ->method('Destroy');
-        $session->expects($this->never())
-            ->method('Close');
 
         $this->assertNull($sut->LoggedInAccount());
     }
@@ -162,6 +189,9 @@ class AccountServiceTest extends TestCase
         $session->expects($this->once())
             ->method('Start')
             ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Close')
+            ->willReturn($session);
         $sut->expects($this->once())
             ->method('verifySessionIntegrity')
             ->with($session)
@@ -170,8 +200,8 @@ class AccountServiceTest extends TestCase
             ->method('retrieveLoggedInAccount')
             ->with($session)
             ->willReturn($account);
-        $session->expects($this->once())
-            ->method('Close');
+        $session->expects($this->never())
+            ->method('Destroy');
 
         $this->assertSame($account, $sut->LoggedInAccount());
     }
@@ -189,9 +219,9 @@ class AccountServiceTest extends TestCase
             ->method('Start')
             ->willThrowException(new \RuntimeException());
         $session->expects($this->never())
-            ->method('Get');
-        $session->expects($this->never())
             ->method('Close');
+        $session->expects($this->never())
+            ->method('Get');
 
         $this->expectException(\RuntimeException::class);
         $sut->LoggedInAccountRole();
@@ -206,36 +236,35 @@ class AccountServiceTest extends TestCase
             ->method('Start')
             ->willReturn($session);
         $session->expects($this->once())
-            ->method('Get')
-            ->with(AccountService::ACCOUNT_ROLE_SESSION_KEY)
-            ->willReturn(20); // Role::Admin
-        $session->expects($this->once())
             ->method('Close')
             ->willThrowException(new \RuntimeException());
+        $session->expects($this->never())
+            ->method('Get');
 
         $this->expectException(\RuntimeException::class);
         $sut->LoggedInAccountRole();
     }
 
-    function testLoggedInAccountRoleReturnsNullIfNotSetInSession()
+    function testLoggedInAccountRoleReturnsNullIfSessionGetReturnsNull()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
 
         $session->expects($this->once())
             ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Close')
             ->willReturn($session);
         $session->expects($this->once())
             ->method('Get')
             ->with(AccountService::ACCOUNT_ROLE_SESSION_KEY)
             ->willReturn(null);
-        $session->expects($this->once())
-            ->method('Close');
 
         $this->assertNull($sut->LoggedInAccountRole());
     }
 
-    function testLoggedInAccountRoleReturnsRoleIfSetInSession()
+    function testLoggedInAccountRoleReturnsRoleIfSessionGetReturnsRole()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
@@ -244,11 +273,12 @@ class AccountServiceTest extends TestCase
             ->method('Start')
             ->willReturn($session);
         $session->expects($this->once())
+            ->method('Close')
+            ->willReturn($session);
+        $session->expects($this->once())
             ->method('Get')
             ->with(AccountService::ACCOUNT_ROLE_SESSION_KEY)
             ->willReturn(20); // Role::Admin
-        $session->expects($this->once())
-            ->method('Close');
 
         $this->assertSame(Role::Admin, $sut->LoggedInAccountRole());
     }
