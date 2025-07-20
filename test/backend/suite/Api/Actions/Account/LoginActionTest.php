@@ -629,7 +629,7 @@ class LoginActionTest extends TestCase
         ));
     }
 
-    function testEstablishSessionIntegrityFailsIfSessionCloseThrows()
+    function testEstablishSessionIntegrityFailsIfSessionRenewIdThrows()
     {
         $sut = $this->systemUnderTest();
         $securityService = SecurityService::Instance();
@@ -643,9 +643,39 @@ class LoginActionTest extends TestCase
         $session->expects($this->once())
             ->method('Clear')
             ->willReturn($session);
+        $session->expects($this->once())
+            ->method('RenewId')
+            ->willThrowException(new \RuntimeException);
+
+        $this->assertFalse(AccessHelper::CallMethod(
+            $sut,
+            'establishSessionIntegrity',
+            [new Account]
+        ));
+    }
+
+    function testEstablishSessionIntegrityFailsIfSessionCloseThrows()
+    {
+        $sut = $this->systemUnderTest('findAccountRole');
+        $securityService = SecurityService::Instance();
+        $session = Session::Instance();
+
+        $securityService->expects($this->once())
+            ->method('GenerateCsrfToken');
+        $session->expects($this->once())
+            ->method('Start')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('Clear')
+            ->willReturn($session);
+        $session->expects($this->once())
+            ->method('RenewId')
+            ->willReturn($session);
         $session->expects($this->exactly(2))
             ->method('Set')
             ->willReturn($session);
+        $sut->expects($this->once())
+            ->method('findAccountRole');
         $session->expects($this->once())
             ->method('Close')
             ->willThrowException(new \RuntimeException);
@@ -659,7 +689,7 @@ class LoginActionTest extends TestCase
 
     function testEstablishSessionIntegrityFailsIfSetCookieThrows()
     {
-        $sut = $this->systemUnderTest();
+        $sut = $this->systemUnderTest('findAccountRole');
         $securityService = SecurityService::Instance();
         $session = Session::Instance();
         $cookieService = CookieService::Instance();
@@ -672,9 +702,14 @@ class LoginActionTest extends TestCase
         $session->expects($this->once())
             ->method('Clear')
             ->willReturn($session);
+        $session->expects($this->once())
+            ->method('RenewId')
+            ->willReturn($session);
         $session->expects($this->exactly(2))
             ->method('Set')
             ->willReturn($session);
+        $sut->expects($this->once())
+            ->method('findAccountRole');
         $session->expects($this->once())
             ->method('Close');
         $cookieService->expects($this->once())
@@ -691,12 +726,12 @@ class LoginActionTest extends TestCase
     function testEstablishSessionIntegritySucceedsWithoutAccountRole()
     {
         $sut = $this->systemUnderTest('findAccountRole');
-        $account = new Account(['id' => 23]);
         $securityService = SecurityService::Instance();
         $csrfToken = $this->createMock(CsrfToken::class);
         $session = Session::Instance();
         $accountService = AccountService::Instance();
         $cookieService = CookieService::Instance();
+        $account = new Account(['id' => 23]);
 
         $securityService->expects($this->once())
             ->method('GenerateCsrfToken')
@@ -707,13 +742,12 @@ class LoginActionTest extends TestCase
         $session->expects($this->once())
             ->method('Clear')
             ->willReturn($session);
+        $session->expects($this->once())
+            ->method('RenewId')
+            ->willReturn($session);
         $csrfToken->expects($this->once())
             ->method('Token')
             ->willReturn('integrity-token');
-        $sut->expects($this->once())
-            ->method('findAccountRole')
-            ->with(23)
-            ->willReturn(null); // no role explicitly set in the database
         $session->expects($this->exactly(2))
             ->method('Set')
             ->with($this->callback(function(...$args) {
@@ -727,6 +761,10 @@ class LoginActionTest extends TestCase
                 };
             }))
             ->willReturn($session);
+        $sut->expects($this->once())
+            ->method('findAccountRole')
+            ->with(23)
+            ->willReturn(null); // no role explicitly set in the database
         $session->expects($this->once())
             ->method('Close');
         $accountService->expects($this->once())
@@ -749,12 +787,12 @@ class LoginActionTest extends TestCase
     function testEstablishSessionIntegritySucceedsWithAccountRole()
     {
         $sut = $this->systemUnderTest('findAccountRole');
-        $account = new Account(['id' => 23]);
         $securityService = SecurityService::Instance();
         $csrfToken = $this->createMock(CsrfToken::class);
         $session = Session::Instance();
         $accountService = AccountService::Instance();
         $cookieService = CookieService::Instance();
+        $account = new Account(['id' => 23]);
 
         $securityService->expects($this->once())
             ->method('GenerateCsrfToken')
@@ -765,13 +803,12 @@ class LoginActionTest extends TestCase
         $session->expects($this->once())
             ->method('Clear')
             ->willReturn($session);
+        $session->expects($this->once())
+            ->method('RenewId')
+            ->willReturn($session);
         $csrfToken->expects($this->once())
             ->method('Token')
             ->willReturn('integrity-token');
-        $sut->expects($this->once())
-            ->method('findAccountRole')
-            ->with(23)
-            ->willReturn(Role::Editor);
         $session->expects($this->exactly(3))
             ->method('Set')
             ->with($this->callback(function(...$args) {
@@ -787,6 +824,10 @@ class LoginActionTest extends TestCase
                 };
             }))
             ->willReturn($session);
+        $sut->expects($this->once())
+            ->method('findAccountRole')
+            ->with(23)
+            ->willReturn(Role::Editor);
         $session->expects($this->once())
             ->method('Close');
         $accountService->expects($this->once())
