@@ -157,20 +157,15 @@ class EntityTest extends TestCase
         $this->assertInstanceOf(\DateTime::class, $sut->createdAt);
     }
 
-    function testPopulateSkipsIncorrectTypes()
+    function testPopulateThrowsOnInvalidPropertyAssignment()
     {
         $sut = new TestEntity();
+        $this->expectException(\InvalidArgumentException::class);
         $sut->Populate([
-            'id' => '42',
-            'name' => 30,
-            'age' => '30',
-            'createdAt' => 20210101
+            'name' => 123,
+            'age' => 'thirty',
+            'createdAt' => 'not-a-date'
         ]);
-
-        $this->assertSame(0, $sut->id);
-        $this->assertSame('', $sut->name);
-        $this->assertSame(0, $sut->age);
-        $this->assertInstanceOf(\DateTime::class, $sut->createdAt);
     }
 
     function testPopulateSkipsNonPublicProperties()
@@ -464,24 +459,27 @@ class EntityTest extends TestCase
     {
         $sut = new class extends Entity {
             public \DateTime $aDateTime;
+            public function __construct() {
+                $this->aDateTime = new \DateTime('2021-01-01');
+            }
         };
-        $sut->Populate([
+        @$sut->Populate([
             'aDateTime' => 'not-a-datetime'
         ]);
 
-        $this->assertInstanceOf(\DateTime::class, $sut->aDateTime);
+        $this->assertSame('2021-01-01', $sut->aDateTime->format('Y-m-d'));
     }
 
-    function testPopulateSkipsNullForNonNullableDateTime()
+    function testPopulateThrowsWhenNullIsAssignedToNonNullableDateTime()
     {
         $sut = new class extends Entity {
             public \DateTime $aDateTime;
         };
-        $sut->Populate([
+
+        $this->expectException(\InvalidArgumentException::class);
+        @$sut->Populate([
             'aDateTime' => null
         ]);
-
-        $this->assertNotNull($sut->aDateTime);
     }
 
     function testPopulateAssignsNullToNullableDateTime()
