@@ -2,6 +2,7 @@
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
+use \PHPUnit\Framework\Attributes\RequiresPhp;
 
 use \Peneus\Model\Entity;
 
@@ -455,6 +456,7 @@ class EntityTest extends TestCase
         $this->assertSame(99, $sut->aProperty);
     }
 
+    #[RequiresPhp('< 8.3.0')]
     function testPopulateSkipsInvalidDateTimeString()
     {
         $sut = new class extends Entity {
@@ -470,7 +472,23 @@ class EntityTest extends TestCase
         $this->assertSame('2021-01-01', $sut->aDateTime->format('Y-m-d'));
     }
 
-    function testPopulateThrowsWhenNullIsAssignedToNonNullableDateTime()
+    #[RequiresPhp('>= 8.3.0')]
+    function testPopulateThrowsOnInvalidDateTimeString()
+    {
+        $sut = new class extends Entity {
+            public \DateTime $aDateTime;
+            public function __construct() {
+                $this->aDateTime = new \DateTime('2021-01-01');
+            }
+        };
+
+        $this->expectException(\InvalidArgumentException::class);
+        @$sut->Populate([
+            'aDateTime' => 'not-a-datetime'
+        ]);
+    }
+
+    function testPopulateThrowsOnNullAssignmentToNonNullableDateTime()
     {
         $sut = new class extends Entity {
             public \DateTime $aDateTime;
