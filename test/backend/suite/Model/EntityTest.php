@@ -512,6 +512,22 @@ class EntityTest extends TestCase
         $this->assertNull($sut->aDateTime);
     }
 
+    function testPopulateAssignsStringToNullableDateTimeWhenCurrentlyNull()
+    {
+        $sut = new class extends Entity {
+            public ?\DateTime $aDateTime;
+        };
+        $sut->aDateTime = null;
+
+        $data = [
+            'aDateTime' => '2025-07-22 14:35:00'
+        ];
+        $sut->Populate($data);
+
+        $this->assertInstanceOf(\DateTime::class, $sut->aDateTime);
+        $this->assertSame($data['aDateTime'], $sut->aDateTime->format('Y-m-d H:i:s'));
+    }
+
     #endregion Populate
 
     #region Save ---------------------------------------------------------------
@@ -652,7 +668,7 @@ class EntityTest extends TestCase
         );
     }
 
-    function testColumnsSkipsNonBindableProperties()
+    function testColumnsSkipsUnsupportedColumnTypes()
     {
         $sut = new class extends Entity {
             public array $anArray;
@@ -661,6 +677,41 @@ class EntityTest extends TestCase
         };
         $this->assertSame(
             ['id', 'aString'],
+            (\get_class($sut))::Columns()
+        );
+    }
+
+    function testColumnsWithUntypedAndUninitializedProperties()
+    {
+        $sut = new class extends Entity {
+            public $aNull;
+            public $aBool;
+            public $anInt;
+            public $aFloat;
+            public $aString;
+            public $aDateTime;
+        };
+        $this->assertSame(
+            ['id'],
+            (\get_class($sut))::Columns()
+        );
+    }
+
+    function testColumnsWithUntypedAndInitializedProperties()
+    {
+        $sut = new class extends Entity {
+            public $aNull = null;
+            public $aBool = true;
+            public $anInt = 42;
+            public $aFloat = 3.14;
+            public $aString = "I'm a string";
+            public $aDateTime;
+            public function __construct() {
+                $this->aDateTime = new \DateTime('2021-01-01');
+            }
+        };
+        $this->assertSame(
+            ['id', 'aBool', 'anInt', 'aFloat', 'aString', 'aDateTime'],
             (\get_class($sut))::Columns()
         );
     }
