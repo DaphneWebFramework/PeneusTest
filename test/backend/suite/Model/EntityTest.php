@@ -611,6 +611,41 @@ class EntityTest extends TestCase
 
     #endregion Delete
 
+    #region jsonSerialize ------------------------------------------------------
+
+    function testJsonSerializeIncludesOnlyEligibleProperties()
+    {
+        $sut = new class extends Entity {
+            public string $aString = 'Hello';
+            public array $anArray = ['not' => 'included'];
+            public \DateTime $aDateTime;
+            public function __construct() {
+                $this->aDateTime = new \DateTime('2025-07-22 14:35:00');
+            }
+        };
+
+        $json = \json_encode($sut);
+        $this->assertSame(
+            '{"aString":"Hello","aDateTime":"2025-07-22 14:35:00","id":0}',
+            $json
+        );
+    }
+
+    function testJsonSerializeEncodesNullForNullableDateTime()
+    {
+        $sut = new class extends Entity {
+            public ?\DateTime $aNullableDateTime = null;
+        };
+
+        $json = \json_encode($sut);
+        $this->assertSame(
+            '{"aNullableDateTime":null,"id":0}',
+            $json
+        );
+    }
+
+    #endregion jsonSerialize
+
     #region TableName ----------------------------------------------------------
 
     function testTableNameCanBeOverridden()
