@@ -538,8 +538,8 @@ class EntityTest extends TestCase
             'aDateTime' => '2025-07-22 14:35:00'
         ]);
         $this->assertSame(
-            '{"aBool":true,"anInt":42,"aFloat":3.14,"aString":"Hello, World!"'
-          . ',"aDateTime":"2025-07-22 14:35:00","id":1}'
+            '{"id":1,"aBool":true,"anInt":42,"aFloat":3.14,'
+          . '"aString":"Hello, World!","aDateTime":"2025-07-22 14:35:00"}'
           , \json_encode($sut)
         );
     }
@@ -555,7 +555,7 @@ class EntityTest extends TestCase
             }
         };
         $this->assertSame(
-            '{"aString":"Hello","aDateTime":"2025-07-22 14:35:00","id":0}',
+            '{"id":0,"aString":"Hello","aDateTime":"2025-07-22 14:35:00"}',
             \json_encode($sut)
         );
     }
@@ -566,7 +566,7 @@ class EntityTest extends TestCase
             public ?\DateTime $aNullableDateTime = null;
         };
         $this->assertSame(
-            '{"aNullableDateTime":null,"id":0}',
+            '{"id":0,"aNullableDateTime":null}',
             \json_encode($sut)
         );
     }
