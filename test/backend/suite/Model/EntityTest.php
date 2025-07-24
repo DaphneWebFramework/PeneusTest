@@ -300,10 +300,7 @@ class EntityTest extends TestCase
             'aNullableDateTime' => null
         ];
         $sut->Populate($data);
-        // todo: Currently coerces null to false for `?bool` due to lack of
-        // nullability info. This will be corrected once properties() yields
-        // nullability metadata.
-        //$this->assertNull($sut->aNullableBool);
+        $this->assertNull($sut->aNullableBool);
         $this->assertNull($sut->aNullableInt);
         $this->assertNull($sut->aNullableFloat);
         $this->assertNull($sut->aNullableString);
@@ -389,6 +386,19 @@ class EntityTest extends TestCase
         ]);
     }
 
+    function testPopulateThrowsOnNullAssignmentToNonNullableProperty()
+    {
+        $sut = new TestEntity();
+        $this->expectException(\InvalidArgumentException::class);
+        $sut->Populate([
+            'aBool' => null,
+            'anInt' => null,
+            'aFloat' => null,
+            'aString' => null,
+            'aDateTime' => null
+        ]);
+    }
+
     function testPopulateThrowsOnInvalidDateTimeString()
     {
         $sut = new class extends Entity {
@@ -401,28 +411,6 @@ class EntityTest extends TestCase
         @$sut->Populate([
             'aDateTime' => 'not-a-datetime'
         ]);
-    }
-
-    function testPopulateThrowsOnNullAssignmentToNonNullableDateTime()
-    {
-        $sut = new class extends Entity {
-            public \DateTime $aDateTime;
-        };
-        $this->expectException(\InvalidArgumentException::class);
-        @$sut->Populate([
-            'aDateTime' => null
-        ]);
-    }
-
-    function testPopulateAssignsNullToNullableDateTime()
-    {
-        $sut = new class extends Entity {
-            public ?\DateTime $aDateTime;
-        };
-        $sut->Populate([
-            'aDateTime' => null
-        ]);
-        $this->assertNull($sut->aDateTime);
     }
 
     function testPopulateAssignsStringToNullableDateTimeWhenCurrentlyNull()
