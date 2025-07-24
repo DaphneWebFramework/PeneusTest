@@ -626,9 +626,10 @@ class EntityTest extends TestCase
                 parent::__construct();
             }
         };
+        $class = \get_class($sut);
         $this->assertSame(
             ['id', 'aString'],
-            (\get_class($sut))::Columns()
+            $class::Columns()
         );
     }
 
@@ -639,13 +640,96 @@ class EntityTest extends TestCase
             public \stdClass $anObject;
             public string $aString;
         };
+        $class = \get_class($sut);
         $this->assertSame(
             ['id', 'aString'],
-            (\get_class($sut))::Columns()
+            $class::Columns()
         );
     }
 
     #endregion Columns
+
+    #region CreateTable --------------------------------------------------------
+
+    function testCreateTableFailsIfNoPropertiesAreDefined()
+    {
+        $sut = new class extends Entity {
+        };
+        $class = \get_class($sut);
+        $this->assertFalse($class::CreateTable());
+    }
+
+    function testCreateTableFailsIfQueryExecutionFails()
+    {
+        $sut = new TestEntity();
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: 'CREATE TABLE IF NOT EXISTS `testentity`'
+               . ' (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,'
+               . ' `aBool` BIT NOT NULL,'
+               . ' `anInt` INT NOT NULL,'
+               . ' `aFloat` DOUBLE NOT NULL,'
+               . ' `aString` TEXT NOT NULL,'
+               . ' `aDateTime` DATETIME NOT NULL)'
+               . ' ENGINE=InnoDB;',
+            result: null,
+            times: 1
+        );
+        $this->assertFalse(TestEntity::CreateTable());
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testCreateTableSucceedsIfQuerySucceeds()
+    {
+        $sut = new TestEntity();
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: 'CREATE TABLE IF NOT EXISTS `testentity`'
+               . ' (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,'
+               . ' `aBool` BIT NOT NULL,'
+               . ' `anInt` INT NOT NULL,'
+               . ' `aFloat` DOUBLE NOT NULL,'
+               . ' `aString` TEXT NOT NULL,'
+               . ' `aDateTime` DATETIME NOT NULL)'
+               . ' ENGINE=InnoDB;',
+            result: [],
+            times: 1
+        );
+        $this->assertTrue(TestEntity::CreateTable());
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testCreateTableHandlesNullableTypes()
+    {
+        $sut = new class extends Entity {
+            public ?bool $aNullableBool;
+            public ?int $aNullableInt;
+            public ?float $aNullableFloat;
+            public ?string $aNullableString;
+            public ?\DateTime $aNullableDateTime;
+            public static function TableName(): string {
+                return 'my_entity';
+            }
+        };
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: "CREATE TABLE IF NOT EXISTS `my_entity`"
+               . ' (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,'
+               . ' `aNullableBool` BIT NULL,'
+               . ' `aNullableInt` INT NULL,'
+               . ' `aNullableFloat` DOUBLE NULL,'
+               . ' `aNullableString` TEXT NULL,'
+               . ' `aNullableDateTime` DATETIME NULL)'
+               . ' ENGINE=InnoDB;',
+            result: [],
+            times: 1
+        );
+        $class = \get_class($sut);
+        $this->assertTrue($class::CreateTable());
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #endregion CreateTable
 
     #region FindById -----------------------------------------------------------
 
