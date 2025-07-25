@@ -360,7 +360,7 @@ class SendPasswordResetActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM account WHERE email = :email LIMIT 1',
+            sql: 'SELECT * FROM `account` WHERE email = :email LIMIT 1',
             bindings: ['email' => 'john@example.com'],
             result: null,
             times: 1
@@ -379,7 +379,7 @@ class SendPasswordResetActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM account WHERE email = :email LIMIT 1',
+            sql: 'SELECT * FROM `account` WHERE email = :email LIMIT 1',
             bindings: ['email' => 'john@example.com'],
             result: [[
                 'id' => 23,
@@ -422,7 +422,7 @@ class SendPasswordResetActionTest extends TestCase
         $resetCode = 'code1234';
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM passwordreset WHERE accountId = :accountId LIMIT 1',
+            sql: 'SELECT * FROM `passwordreset` WHERE accountId = :accountId LIMIT 1',
             bindings: ['accountId' => $accountId],
             result: [[
                 'id' => $passwordResetId,
@@ -433,7 +433,7 @@ class SendPasswordResetActionTest extends TestCase
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'UPDATE passwordreset SET'
+            sql: 'UPDATE `passwordreset` SET'
               . ' accountId = :accountId, resetCode = :resetCode, timeRequested = :timeRequested'
               . ' WHERE id = :id',
             bindings: [
@@ -460,13 +460,13 @@ class SendPasswordResetActionTest extends TestCase
         $resetCode = 'code1234';
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM passwordreset WHERE accountId = :accountId LIMIT 1',
+            sql: 'SELECT * FROM `passwordreset` WHERE accountId = :accountId LIMIT 1',
             bindings: ['accountId' => $accountId],
             result: null, // no existing record
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'INSERT INTO passwordreset'
+            sql: 'INSERT INTO `passwordreset`'
                . ' (accountId, resetCode, timeRequested)'
                . ' VALUES'
                . ' (:accountId, :resetCode, :timeRequested)',
@@ -493,13 +493,13 @@ class SendPasswordResetActionTest extends TestCase
         $resetCode = 'code1234';
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM passwordreset WHERE accountId = :accountId LIMIT 1',
+            sql: 'SELECT * FROM `passwordreset` WHERE accountId = :accountId LIMIT 1',
             bindings: ['accountId' => $accountId],
             result: null, // no existing record
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'INSERT INTO passwordreset'
+            sql: 'INSERT INTO `passwordreset`'
                . ' (accountId, resetCode, timeRequested)'
                . ' VALUES'
                . ' (:accountId, :resetCode, :timeRequested)',

@@ -398,7 +398,7 @@ class ActivateActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM pendingaccount WHERE activationCode = :activationCode LIMIT 1',
+            sql: 'SELECT * FROM `pendingaccount` WHERE activationCode = :activationCode LIMIT 1',
             bindings: ['activationCode' => 'code1234'],
             result: null,
             times: 1
@@ -417,7 +417,7 @@ class ActivateActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM pendingaccount WHERE activationCode = :activationCode LIMIT 1',
+            sql: 'SELECT * FROM `pendingaccount` WHERE activationCode = :activationCode LIMIT 1',
             bindings: ['activationCode' => 'code1234'],
             result: [[
                 'id' => 42,
@@ -456,7 +456,7 @@ class ActivateActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM account WHERE email = :email',
+            sql: 'SELECT COUNT(*) FROM `account` WHERE email = :email',
             bindings: ['email' => 'test@example.com'],
             result: [[$returnValue ? 1 : 0]],
             times: 1

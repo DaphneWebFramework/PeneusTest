@@ -34,7 +34,7 @@ class AccountRoleDeletionHookTest extends TestCase
         $account = new Account(['id' => 42]);
 
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM accountrole WHERE accountId = :accountId',
+            sql: 'SELECT * FROM `accountrole` WHERE accountId = :accountId',
             bindings: ['accountId' => 42],
             result: [],
             times: 1
@@ -52,7 +52,7 @@ class AccountRoleDeletionHookTest extends TestCase
         $account = new Account(['id' => 42]);
 
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM accountrole WHERE accountId = :accountId',
+            sql: 'SELECT * FROM `accountrole` WHERE accountId = :accountId',
             bindings: ['accountId' => 42],
             result: [[
                 'id' => 1,
@@ -67,14 +67,14 @@ class AccountRoleDeletionHookTest extends TestCase
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'DELETE FROM accountrole WHERE id = :id',
+            sql: 'DELETE FROM `accountrole` WHERE id = :id',
             bindings: ['id' => 1],
             result: [],
             lastAffectedRowCount: 1,
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'DELETE FROM accountrole WHERE id = :id',
+            sql: 'DELETE FROM `accountrole` WHERE id = :id',
             bindings: ['id' => 2],
             result: null,
             times: 1
@@ -93,7 +93,7 @@ class AccountRoleDeletionHookTest extends TestCase
         $account = new Account(['id' => 42]);
 
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM accountrole WHERE accountId = :accountId',
+            sql: 'SELECT * FROM `accountrole` WHERE accountId = :accountId',
             bindings: ['accountId' => 42],
             result: [[
                 'id' => 1,
@@ -105,14 +105,14 @@ class AccountRoleDeletionHookTest extends TestCase
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'DELETE FROM accountrole WHERE id = :id',
+            sql: 'DELETE FROM `accountrole` WHERE id = :id',
             bindings: ['id' => 1],
             result: [],
             lastAffectedRowCount: 1,
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'DELETE FROM accountrole WHERE id = :id',
+            sql: 'DELETE FROM `accountrole` WHERE id = :id',
             bindings: ['id' => 2],
             result: [],
             lastAffectedRowCount: 1,

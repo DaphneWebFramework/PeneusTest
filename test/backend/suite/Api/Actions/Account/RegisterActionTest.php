@@ -405,7 +405,7 @@ class RegisterActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM account WHERE email = :email',
+            sql: 'SELECT COUNT(*) FROM `account` WHERE email = :email',
             bindings: ['email' => 'test@example.com'],
             result: [[$returnValue ? 1 : 0]],
             times: 1
@@ -429,7 +429,7 @@ class RegisterActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM pendingaccount WHERE email = :email',
+            sql: 'SELECT COUNT(*) FROM `pendingaccount` WHERE email = :email',
             bindings: ['email' => 'test@example.com'],
             result: [[$returnValue ? 1 : 0]],
             times: 1
@@ -455,7 +455,7 @@ class RegisterActionTest extends TestCase
         $now = new \DateTime();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'INSERT INTO pendingaccount'
+            sql: 'INSERT INTO `pendingaccount`'
                . ' (email, passwordHash, displayName, activationCode, timeRegistered)'
                . ' VALUES'
                . ' (:email, :passwordHash, :displayName, :activationCode, :timeRegistered)',

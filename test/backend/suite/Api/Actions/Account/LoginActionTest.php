@@ -425,7 +425,7 @@ class LoginActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM account WHERE email = :email LIMIT 1',
+            sql: 'SELECT * FROM `account` WHERE email = :email LIMIT 1',
             bindings: ['email' => 'john@example.com'],
             result: null,
             times: 1
@@ -444,7 +444,7 @@ class LoginActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM account WHERE email = :email LIMIT 1',
+            sql: 'SELECT * FROM `account` WHERE email = :email LIMIT 1',
             bindings: ['email' => 'john@example.com'],
             result: [[
                 'id' => 23,
@@ -483,7 +483,7 @@ class LoginActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM accountrole WHERE accountId = :accountId LIMIT 1',
+            sql: 'SELECT * FROM `accountrole` WHERE accountId = :accountId LIMIT 1',
             bindings: ['accountId' => 42],
             result: null,
             times: 1
@@ -498,7 +498,7 @@ class LoginActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM accountrole WHERE accountId = :accountId LIMIT 1',
+            sql: 'SELECT * FROM `accountrole` WHERE accountId = :accountId LIMIT 1',
             bindings: ['accountId' => 42],
             result: [[
                 'accountId' => 42,
@@ -516,7 +516,7 @@ class LoginActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM accountrole WHERE accountId = :accountId LIMIT 1',
+            sql: 'SELECT * FROM `accountrole` WHERE accountId = :accountId LIMIT 1',
             bindings: ['accountId' => 42],
             result: [[
                 'accountId' => 42,

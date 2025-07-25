@@ -441,7 +441,7 @@ class AccountServiceTest extends TestCase
         $session = Session::Instance();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM account WHERE id = :id LIMIT 1',
+            sql: 'SELECT * FROM `account` WHERE id = :id LIMIT 1',
             bindings: ['id' => 42],
             result: null,
             times: 1
@@ -466,7 +466,7 @@ class AccountServiceTest extends TestCase
         $session = Session::Instance();
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM account WHERE id = :id LIMIT 1',
+            sql: 'SELECT * FROM `account` WHERE id = :id LIMIT 1',
             bindings: ['id' => 42],
             result: [[
                 'id' => 42,

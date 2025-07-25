@@ -328,7 +328,7 @@ class ListRecordsActionTest extends TestCase
                 'table' => 'account'
             ]);
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM account LIMIT 10 OFFSET 0',
+            sql: 'SELECT * FROM `account` LIMIT 10 OFFSET 0',
             result: [
                 [
                     'id' => 1,
@@ -350,7 +350,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM account',
+            sql: 'SELECT COUNT(*) FROM `account`',
             result: [[2]],
             times: 1
         );
@@ -391,7 +391,7 @@ class ListRecordsActionTest extends TestCase
                 'table' => 'accountrole'
             ]);
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM accountrole LIMIT 10 OFFSET 0',
+            sql: 'SELECT * FROM `accountrole` LIMIT 10 OFFSET 0',
             result: [
                 ['id' => 1, 'accountId' => 101, 'role' => 0],
                 ['id' => 2, 'accountId' => 102, 'role' => 10],
@@ -400,7 +400,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM accountrole',
+            sql: 'SELECT COUNT(*) FROM `accountrole`',
             result: [[3]],
             times: 1
         );
@@ -439,7 +439,7 @@ class ListRecordsActionTest extends TestCase
                 'table' => 'passwordreset'
             ]);
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM passwordreset LIMIT 10 OFFSET 0',
+            sql: 'SELECT * FROM `passwordreset` LIMIT 10 OFFSET 0',
             result: [
                 [
                     'id' => 1,
@@ -457,7 +457,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM passwordreset',
+            sql: 'SELECT COUNT(*) FROM `passwordreset`',
             result: [[2]],
             times: 1
         );
@@ -494,7 +494,7 @@ class ListRecordsActionTest extends TestCase
                 'table' => 'pendingaccount'
             ]);
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM pendingaccount LIMIT 10 OFFSET 0',
+            sql: 'SELECT * FROM `pendingaccount` LIMIT 10 OFFSET 0',
             result: [
                 [
                     'id' => 1,
@@ -516,7 +516,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM pendingaccount',
+            sql: 'SELECT COUNT(*) FROM `pendingaccount`',
             result: [[2]],
             times: 1
         );
@@ -559,14 +559,14 @@ class ListRecordsActionTest extends TestCase
                 'pagesize' => 5
             ]);
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM accountrole LIMIT 5 OFFSET 10', // (3 - 1) * 5
+            sql: 'SELECT * FROM `accountrole` LIMIT 5 OFFSET 10', // (3 - 1) * 5
             result: [
                 ['id' => 42, 'accountId' => 101, 'role' => 99]
             ],
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM accountrole',
+            sql: 'SELECT COUNT(*) FROM `accountrole`',
             result: [[1]],
             times: 1
         );
@@ -604,7 +604,7 @@ class ListRecordsActionTest extends TestCase
                 'search' => $searchTerm
             ]);
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM account WHERE '
+            sql: 'SELECT * FROM `account` WHERE '
                . '`id` LIKE :search OR '
                . '`email` LIKE :search OR '
                . '`passwordHash` LIKE :search OR '
@@ -624,7 +624,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM account WHERE '
+            sql: 'SELECT COUNT(*) FROM `account` WHERE '
                . '`id` LIKE :search OR '
                . '`email` LIKE :search OR '
                . '`passwordHash` LIKE :search OR '
@@ -688,14 +688,14 @@ class ListRecordsActionTest extends TestCase
                 'sortkey' => 'role'
             ]);
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM accountrole ORDER BY `role` LIMIT 10 OFFSET 0',
+            sql: 'SELECT * FROM `accountrole` ORDER BY `role` LIMIT 10 OFFSET 0',
             result: [
                 ['id' => 5, 'accountId' => 200, 'role' => 10]
             ],
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM accountrole',
+            sql: 'SELECT COUNT(*) FROM `accountrole`',
             result: [[1]],
             times: 1
         );
@@ -728,14 +728,14 @@ class ListRecordsActionTest extends TestCase
                 'sortdir' => 'desc'
             ]);
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM accountrole ORDER BY `role` DESC LIMIT 10 OFFSET 0',
+            sql: 'SELECT * FROM `accountrole` ORDER BY `role` DESC LIMIT 10 OFFSET 0',
             result: [
                 ['id' => 7, 'accountId' => 300, 'role' => 99]
             ],
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM accountrole',
+            sql: 'SELECT COUNT(*) FROM `accountrole`',
             result: [[1]],
             times: 1
         );
@@ -771,7 +771,7 @@ class ListRecordsActionTest extends TestCase
                 'sortdir' => 'asc'
             ]);
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM accountrole WHERE '
+            sql: 'SELECT * FROM `accountrole` WHERE '
                . '`id` LIKE :search OR '
                . '`accountId` LIKE :search OR '
                . '`role` LIKE :search '
@@ -784,7 +784,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM accountrole WHERE '
+            sql: 'SELECT COUNT(*) FROM `accountrole` WHERE '
                . '`id` LIKE :search OR '
                . '`accountId` LIKE :search OR '
                . '`role` LIKE :search',

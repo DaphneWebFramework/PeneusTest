@@ -481,7 +481,7 @@ class EntityTest extends TestCase
         $sut = new TestEntity(['id' => 1]);
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'DELETE FROM testentity WHERE id = :id',
+            sql: 'DELETE FROM `testentity` WHERE id = :id',
             bindings: ['id' => 1],
             result: null,
             times: 1
@@ -496,7 +496,7 @@ class EntityTest extends TestCase
         $sut = new TestEntity(['id' => 1]);
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'DELETE FROM testentity WHERE id = :id',
+            sql: 'DELETE FROM `testentity` WHERE id = :id',
             bindings: ['id' => 1],
             result: [],
             lastAffectedRowCount: 0,
@@ -512,7 +512,7 @@ class EntityTest extends TestCase
         $sut = new TestEntity(['id' => 1]);
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'DELETE FROM testentity WHERE id = :id',
+            sql: 'DELETE FROM `testentity` WHERE id = :id',
             bindings: ['id' => 1],
             result: [],
             lastAffectedRowCount: 1,
@@ -585,7 +585,7 @@ class EntityTest extends TestCase
         };
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'DELETE FROM custom_table_name WHERE id = :id',
+            sql: 'DELETE FROM `custom_table_name` WHERE id = :id',
             bindings: ['id' => 1],
             result: [],
             lastAffectedRowCount: 1,
@@ -737,7 +737,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM testentity WHERE id = :id LIMIT 1',
+            sql: 'SELECT * FROM `testentity` WHERE id = :id LIMIT 1',
             bindings: ['id' => 1],
             result: null,
             times: 1
@@ -750,7 +750,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM testentity WHERE id = :id LIMIT 1',
+            sql: 'SELECT * FROM `testentity` WHERE id = :id LIMIT 1',
             bindings: ['id' => 1],
             result: [],
             times: 1
@@ -763,7 +763,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM testentity WHERE id = :id LIMIT 1',
+            sql: 'SELECT * FROM `testentity` WHERE id = :id LIMIT 1',
             bindings: ['id' => 1],
             result: [[
                 'id' => 1,
@@ -794,7 +794,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM testentity LIMIT 1',
+            sql: 'SELECT * FROM `testentity` LIMIT 1',
             result: null,
             times: 1
         );
@@ -806,7 +806,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM testentity LIMIT 1',
+            sql: 'SELECT * FROM `testentity` LIMIT 1',
             result: [],
             times: 1
         );
@@ -818,7 +818,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM testentity WHERE anInt > :anInt ORDER BY aString DESC LIMIT 1',
+            sql: 'SELECT * FROM `testentity` WHERE anInt > :anInt ORDER BY aString DESC LIMIT 1',
             bindings: ['anInt' => 29],
             result: [[
                 'id' => 1,
@@ -853,7 +853,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM testentity',
+            sql: 'SELECT * FROM `testentity`',
             result: null,
             times: 1
         );
@@ -867,7 +867,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM testentity',
+            sql: 'SELECT * FROM `testentity`',
             result: [],
             times: 1
         );
@@ -881,7 +881,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM testentity'
+            sql: 'SELECT * FROM `testentity`'
                . ' WHERE aString LIKE :aString AND anInt >= :anInt'
                . ' ORDER BY aDateTime DESC LIMIT 10 OFFSET 5',
             bindings: ['aString' => 'A%', 'anInt' => 25],
@@ -936,7 +936,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM testentity',
+            sql: 'SELECT COUNT(*) FROM `testentity`',
             result: null,
             times: 1
         );
@@ -948,7 +948,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM testentity',
+            sql: 'SELECT COUNT(*) FROM `testentity`',
             result: [],
             times: 1
         );
@@ -960,7 +960,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM testentity',
+            sql: 'SELECT COUNT(*) FROM `testentity`',
             result: [[]],
             times: 1
         );
@@ -972,7 +972,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM testentity',
+            sql: 'SELECT COUNT(*) FROM `testentity`',
             result: [[123]],
             times: 1
         );
@@ -984,7 +984,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM testentity WHERE anInt > :anInt',
+            sql: 'SELECT COUNT(*) FROM `testentity` WHERE anInt > :anInt',
             bindings: ['anInt' => 30],
             result: [[7]],
             times: 1
@@ -1023,7 +1023,7 @@ class EntityTest extends TestCase
         ]);
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'INSERT INTO testentity'
+            sql: 'INSERT INTO `testentity`'
                . ' (aBool, anInt, aFloat, aString, aDateTime)'
                . ' VALUES (:aBool, :anInt, :aFloat, :aString, :aDateTime)',
             bindings: [
@@ -1051,7 +1051,7 @@ class EntityTest extends TestCase
         ]);
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'INSERT INTO testentity'
+            sql: 'INSERT INTO `testentity`'
                . ' (aBool, anInt, aFloat, aString, aDateTime)'
                . ' VALUES (:aBool, :anInt, :aFloat, :aString, :aDateTime)',
             bindings: [
@@ -1094,7 +1094,7 @@ class EntityTest extends TestCase
         ]);
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'UPDATE testentity'
+            sql: 'UPDATE `testentity`'
                . ' SET aBool = :aBool, anInt = :anInt, aFloat = :aFloat,'
                . ' aString = :aString, aDateTime = :aDateTime'
                . ' WHERE id = :id',
@@ -1125,7 +1125,7 @@ class EntityTest extends TestCase
         ]);
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'UPDATE testentity'
+            sql: 'UPDATE `testentity`'
                . ' SET aBool = :aBool, anInt = :anInt, aFloat = :aFloat,'
                . ' aString = :aString, aDateTime = :aDateTime'
                . ' WHERE id = :id',
@@ -1157,7 +1157,7 @@ class EntityTest extends TestCase
         ]);
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'UPDATE testentity'
+            sql: 'UPDATE `testentity`'
                . ' SET aBool = :aBool, anInt = :anInt, aFloat = :aFloat,'
                . ' aString = :aString, aDateTime = :aDateTime'
                . ' WHERE id = :id',
