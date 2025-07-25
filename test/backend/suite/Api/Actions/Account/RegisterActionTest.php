@@ -456,9 +456,8 @@ class RegisterActionTest extends TestCase
         $fakeDatabase = new FakeDatabase();
         $fakeDatabase->Expect(
             sql: 'INSERT INTO `pendingaccount`'
-               . ' (email, passwordHash, displayName, activationCode, timeRegistered)'
-               . ' VALUES'
-               . ' (:email, :passwordHash, :displayName, :activationCode, :timeRegistered)',
+               . ' (`email`, `passwordHash`, `displayName`, `activationCode`, `timeRegistered`)'
+               . ' VALUES (:email, :passwordHash, :displayName, :activationCode, :timeRegistered)',
             bindings: [
                 'email' => 'john@example.com',
                 'passwordHash' => 'hash1234',

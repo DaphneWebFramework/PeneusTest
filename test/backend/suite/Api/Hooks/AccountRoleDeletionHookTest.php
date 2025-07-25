@@ -67,14 +67,14 @@ class AccountRoleDeletionHookTest extends TestCase
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'DELETE FROM `accountrole` WHERE id = :id',
+            sql: 'DELETE FROM `accountrole` WHERE `id` = :id',
             bindings: ['id' => 1],
             result: [],
             lastAffectedRowCount: 1,
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'DELETE FROM `accountrole` WHERE id = :id',
+            sql: 'DELETE FROM `accountrole` WHERE `id` = :id',
             bindings: ['id' => 2],
             result: null,
             times: 1
@@ -105,14 +105,14 @@ class AccountRoleDeletionHookTest extends TestCase
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'DELETE FROM `accountrole` WHERE id = :id',
+            sql: 'DELETE FROM `accountrole` WHERE `id` = :id',
             bindings: ['id' => 1],
             result: [],
             lastAffectedRowCount: 1,
             times: 1
         );
         $fakeDatabase->Expect(
-            sql: 'DELETE FROM `accountrole` WHERE id = :id',
+            sql: 'DELETE FROM `accountrole` WHERE `id` = :id',
             bindings: ['id' => 2],
             result: [],
             lastAffectedRowCount: 1,

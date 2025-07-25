@@ -254,7 +254,7 @@ class EditRecordActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE id = :id LIMIT 1',
+            sql: 'SELECT * FROM `accountrole` WHERE `id` = :id LIMIT 1',
             bindings: ['id' => 42],
             result: null,
             times: 1
@@ -273,7 +273,7 @@ class EditRecordActionTest extends TestCase
         $sut = $this->systemUnderTest();
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE id = :id LIMIT 1',
+            sql: 'SELECT * FROM `accountrole` WHERE `id` = :id LIMIT 1',
             bindings: ['id' => 42],
             result: [[
                 'id' => 42,

@@ -434,8 +434,9 @@ class SendPasswordResetActionTest extends TestCase
         );
         $fakeDatabase->Expect(
             sql: 'UPDATE `passwordreset` SET'
-              . ' accountId = :accountId, resetCode = :resetCode, timeRequested = :timeRequested'
-              . ' WHERE id = :id',
+               . ' `accountId` = :accountId, `resetCode` = :resetCode,'
+               . ' `timeRequested` = :timeRequested'
+               . ' WHERE `id` = :id',
             bindings: [
                 'id' => $passwordResetId,
                 'accountId' => $accountId,
@@ -467,9 +468,8 @@ class SendPasswordResetActionTest extends TestCase
         );
         $fakeDatabase->Expect(
             sql: 'INSERT INTO `passwordreset`'
-               . ' (accountId, resetCode, timeRequested)'
-               . ' VALUES'
-               . ' (:accountId, :resetCode, :timeRequested)',
+               . ' (`accountId`, `resetCode`, `timeRequested`)'
+               . ' VALUES (:accountId, :resetCode, :timeRequested)',
             bindings: [
                 'accountId' => $accountId,
                 'resetCode' => $resetCode,
@@ -500,9 +500,8 @@ class SendPasswordResetActionTest extends TestCase
         );
         $fakeDatabase->Expect(
             sql: 'INSERT INTO `passwordreset`'
-               . ' (accountId, resetCode, timeRequested)'
-               . ' VALUES'
-               . ' (:accountId, :resetCode, :timeRequested)',
+               . ' (`accountId`, `resetCode`, `timeRequested`)'
+               . ' VALUES (:accountId, :resetCode, :timeRequested)',
             bindings: [
                 'accountId' => $accountId,
                 'resetCode' => $resetCode,
