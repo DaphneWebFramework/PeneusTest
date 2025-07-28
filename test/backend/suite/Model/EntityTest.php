@@ -664,7 +664,7 @@ class EntityTest extends TestCase
         $sut = new TestEntity();
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'CREATE TABLE IF NOT EXISTS `testentity`'
+            sql: 'CREATE TABLE `testentity`'
                . ' (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,'
                . ' `aBool` BIT NOT NULL,'
                . ' `anInt` INT NOT NULL,'
@@ -684,7 +684,7 @@ class EntityTest extends TestCase
         $sut = new TestEntity();
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'CREATE TABLE IF NOT EXISTS `testentity`'
+            sql: 'CREATE TABLE `testentity`'
                . ' (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,'
                . ' `aBool` BIT NOT NULL,'
                . ' `anInt` INT NOT NULL,'
@@ -713,7 +713,7 @@ class EntityTest extends TestCase
         };
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: "CREATE TABLE IF NOT EXISTS `my_entity`"
+            sql: "CREATE TABLE `my_entity`"
                . ' (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,'
                . ' `aNullableBool` BIT NULL,'
                . ' `aNullableInt` INT NULL,'
