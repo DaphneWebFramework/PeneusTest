@@ -318,7 +318,7 @@ class RendererTest extends TestCase
         $resource = Resource::Instance();
         $masterpagePath = new CPath(__DIR__ . '/test-masterpage.php');
 
-        \file_put_contents((string)$masterpagePath, <<<PHP
+        $masterpagePath->Call('\file_put_contents', <<<PHP
             <h1>This is a test masterpage.</h1>
             <?=\$this->Content()?>
             <footer>&copy; 2025</footer>
@@ -343,7 +343,7 @@ class RendererTest extends TestCase
             <footer>&copy; 2025</footer>
         HTML, $result);
 
-        \unlink((string)$masterpagePath);
+        $masterpagePath->Call('\unlink');
     }
 
     #endregion content
@@ -383,8 +383,8 @@ class RendererTest extends TestCase
 
         $sut->expects($this->any())
             ->method('resolveLibraryAssetUrl')
-            ->willReturnCallback(function($path, $extension) {
-                return "url/to/{$path}.{$extension}";
+            ->willReturnCallback(function(string $path, string $extension) {
+                return new CUrl("url/to/{$path}.{$extension}");
             });
 
         $this->assertSame(
@@ -406,8 +406,8 @@ class RendererTest extends TestCase
 
         $sut->expects($this->any())
             ->method('resolveLibraryAssetUrl')
-            ->willReturnCallback(function($path, $extension) {
-                return "url/to/{$path}.{$extension}";
+            ->willReturnCallback(function(string $path, string $extension) {
+                return new CUrl("url/to/{$path}.{$extension}");
             });
 
         $this->assertSame(
@@ -437,11 +437,11 @@ class RendererTest extends TestCase
             ->willReturn($this->pageManifest());
         $sut->expects($this->any())
             ->method('resolvePageAssetUrl')
-            ->willReturnCallback(function($pageId, $path, $extension) {
+            ->willReturnCallback(function(string $pageId, string $path, string $extension) {
                 if (\str_starts_with($path, 'http')) {
-                    return $path;
+                    return new CUrl($path);
                 }
-                return "url/to/pages/{$pageId}/{$path}.{$extension}";
+                return new CUrl("url/to/pages/{$pageId}/{$path}.{$extension}");
             });
 
         $this->assertSame(
@@ -469,11 +469,11 @@ class RendererTest extends TestCase
             ->willReturn($this->pageManifest());
         $sut->expects($this->any())
             ->method('resolvePageAssetUrl')
-            ->willReturnCallback(function($pageId, $path, $extension) {
+            ->willReturnCallback(function(string $pageId, string $path, string $extension) {
                 if (\str_starts_with($path, 'http')) {
-                    return $path;
+                    return new CUrl($path);
                 }
-                return "url/to/pages/{$pageId}/{$path}.{$extension}";
+                return new CUrl("url/to/pages/{$pageId}/{$path}.{$extension}");
             });
 
         $this->assertSame(
@@ -507,7 +507,7 @@ class RendererTest extends TestCase
         $resource->expects($this->never())
             ->method('FrontendLibraryFileUrl');
 
-        $this->assertSame(
+        $this->assertEquals(
             $path,
             AccessHelper::CallMethod($sut, 'resolveLibraryAssetUrl', [
                 $path,
@@ -551,7 +551,7 @@ class RendererTest extends TestCase
             ->with($expected)
             ->willReturn(new CUrl($resolvedUrl));
 
-        $this->assertSame(
+        $this->assertEquals(
             $resolvedUrl,
             AccessHelper::CallMethod(
                 $sut,
@@ -580,7 +580,7 @@ class RendererTest extends TestCase
         $resource->expects($this->never())
             ->method('PageFileUrl');
 
-        $this->assertSame(
+        $this->assertEquals(
             $path,
             AccessHelper::CallMethod($sut, 'resolvePageAssetUrl', [
                 'home',
@@ -615,7 +615,7 @@ class RendererTest extends TestCase
             ->with($pageId, $expected)
             ->willReturn(new CUrl($pageAssetUrl));
 
-        $this->assertSame(
+        $this->assertEquals(
             $pageAssetUrl,
             AccessHelper::CallMethod(
                 $sut,

@@ -96,8 +96,14 @@ class MetaCollectionTest extends TestCase
         $sut->Set('description', 'my description');
         $sut->Set('og:title', 'title', 'property');
 
-        $this->assertSame('my description', $sut->Items()->Get('name')->Get('description'));
-        $this->assertSame('title', $sut->Items()->Get('property')->Get('og:title'));
+        $this->assertSame(
+            'my description',
+            $sut->Items()->Get('name')->Get('description')
+        );
+        $this->assertSame(
+            'title',
+            $sut->Items()->Get('property')->Get('og:title')
+        );
     }
 
     function testSetReplacesExistingMetaOfSameType()
@@ -108,7 +114,28 @@ class MetaCollectionTest extends TestCase
         $sut->Set('description', 'original');
         $sut->Set('description', 'updated');
 
-        $this->assertSame('updated', $sut->Items()->Get('name')->Get('description'));
+        $this->assertSame(
+            'updated',
+            $sut->Items()->Get('name')->Get('description')
+        );
+    }
+
+    function testSetWithStringableContent()
+    {
+        $sut = $this->systemUnderTest('setDefaults');
+        $content = new class implements \Stringable {
+            public function __toString(): string {
+                return 'my description';
+            }
+        };
+
+        $sut->__construct();
+        $sut->Set('description', $content);
+
+        $this->assertSame(
+            'my description',
+            $sut->Items()->Get('name')->Get('description')
+        );
     }
 
     #endregion Set

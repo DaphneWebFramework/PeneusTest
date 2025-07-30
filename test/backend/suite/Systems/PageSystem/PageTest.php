@@ -472,6 +472,18 @@ class PageTest extends TestCase
         $this->assertSame($sut, $sut->SetMeta('og:title', 'my title', 'property'));
     }
 
+    function testSetMetaWithStringableContent()
+    {
+        $sut = $this->systemUnderTest();
+        $content = $this->createStub(\Stringable::class);
+
+        $this->metaCollection->expects($this->once())
+            ->method('Set')
+            ->with('description', $content, 'name');
+
+        $this->assertSame($sut, $sut->SetMeta('description', $content));
+    }
+
     #endregion SetMeta
 
     #region RemoveMeta ---------------------------------------------------------
