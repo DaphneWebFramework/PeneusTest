@@ -297,7 +297,8 @@ class RendererTest extends TestCase
             ->with('basic')
             ->willReturn($masterpagePath);
         $masterpagePath->expects($this->once())
-            ->method('IsFile')
+            ->method('Call')
+            ->with('\is_file')
             ->willReturn(false);
         $sut->expects($this->never())
             ->method('_echo');
