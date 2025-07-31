@@ -672,6 +672,23 @@ class EntityTest extends TestCase
 
     #endregion Columns
 
+    #region TableExists --------------------------------------------------------
+
+    #[DataProvider('tableExistsDataProvider')]
+    function testTableExists(bool $expected, ?array $queryResult)
+    {
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: "SHOW TABLES LIKE 'testentity'",
+            result: $queryResult,
+            times: 1
+        );
+        $this->assertSame($expected, TestEntity::TableExists());
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #endregion TableExists
+
     #region CreateTable --------------------------------------------------------
 
     function testCreateTableFailsIfNoPropertiesAreDefined()
@@ -1198,9 +1215,25 @@ class EntityTest extends TestCase
 
     #region Data Providers -----------------------------------------------------
 
+    /**
+     * @return array
+     *   $expected (boolean), $queryResult (?array)
+     */
+    static function tableExistsDataProvider()
+    {
+        return [
+            [false, null],
+            [false, []],
+            [true, [['Tables_in_mydatabase (testentity)' => 'testentity']]]
+        ];
+    }
+
+    /**
+     * @return array
+     *   $expected (boolean), $queryResult (array|null)
+     */
     static function queryResultProvider()
     {
-        // $expected, $queryResult
         return [
             'success' => [ true, [] ],
             'failure' => [ false, null ]
