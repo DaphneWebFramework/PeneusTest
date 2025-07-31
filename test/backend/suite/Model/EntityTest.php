@@ -699,6 +699,28 @@ class EntityTest extends TestCase
         $this->assertFalse($class::CreateTable());
     }
 
+    function testCreateTableEscapesBackticksInTableName()
+    {
+        $sut = new class extends Entity {
+            public string $aString;
+            public static function TableName(): string {
+                return 'users`; DROP TABLE user_roles; --';
+            }
+        };
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: "CREATE TABLE `users``; DROP TABLE user_roles; --`"
+               . ' (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,'
+               . ' `aString` TEXT NOT NULL)'
+               . ' ENGINE=InnoDB;',
+            result: null,
+            times: 1
+        );
+        $class = \get_class($sut);
+        $this->assertFalse($class::CreateTable());
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
     function testCreateTableHandlesNullableTypes()
     {
         $sut = new class extends Entity {
