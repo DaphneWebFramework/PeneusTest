@@ -672,6 +672,100 @@ class EntityTest extends TestCase
 
     #endregion Columns
 
+    #region Metadata ------------------------------------------------------------
+
+    function testMetadataReturnsIdInFirstPosition()
+    {
+        $this->assertSame(
+            ['id', 'aBool', 'anInt', 'aFloat', 'aString', 'aDateTime'],
+            \array_column(TestEntity::Metadata(), 'name')
+        );
+    }
+
+    function testMetadataSkipsInaccessibleProperties()
+    {
+        $sut = new class extends Entity {
+            public string $aString;
+            protected string $aProtected;
+            private string $aPrivate;
+            public readonly string $aPublicReadonly;
+            protected readonly string $aProtectedReadonly;
+            private readonly string $aPrivateReadonly;
+            static public string $aStaticPublic;
+            static protected string $aStaticProtected;
+            static private string $aStaticPrivate;
+            public function __construct() {
+                $this->aPublicReadonly = '';
+                $this->aProtectedReadonly = '';
+                $this->aPrivateReadonly = '';
+                parent::__construct();
+            }
+        };
+        $class = \get_class($sut);
+        $this->assertSame(
+            ['id', 'aString'],
+            \array_column($class::Metadata(), 'name')
+        );
+    }
+
+    function testMetadataSkipsPropertiesWithUnsupportedTypes()
+    {
+        $sut = new class extends Entity {
+            public array $anArray;
+            public \stdClass $anObject;
+            public string $aString;
+        };
+        $class = \get_class($sut);
+        $this->assertSame(
+            ['id', 'aString'],
+            \array_column($class::Metadata(), 'name')
+        );
+    }
+
+    function testMetadataIncludesCorrectSqlTypes()
+    {
+        $sut = new class extends Entity {
+            public bool $aBool;
+            public int $anInt;
+            public float $aFloat;
+            public string $aString;
+            public \DateTime $aDateTime;
+        };
+        $class = \get_class($sut);
+        $expected = [
+            'id' => 'INT',
+            'aBool' => 'BIT',
+            'anInt' => 'INT',
+            'aFloat' => 'DOUBLE',
+            'aString' => 'TEXT',
+            'aDateTime' => 'DATETIME'
+        ];
+        foreach ($class::Metadata() as $column) {
+            $this->assertSame($expected[$column['name']], $column['type']);
+        }
+    }
+
+    function testMetadataDetectsNullableProperties()
+    {
+        $sut = new class extends Entity {
+            public ?string $aNullableString;
+            public int $anInt;
+            public ?\DateTime $aNullableDateTime;
+        };
+        $class = \get_class($sut);
+        $expected = [
+            'id' => false,
+            'aNullableString' => true,
+            'anInt' => false,
+            'aNullableDateTime' => true
+        ];
+        foreach ($class::Metadata() as $column) {
+            $this->assertSame($expected[$column['name']], $column['nullable']);
+        }
+    }
+
+    #endregion Metadata
+
     #region TableExists --------------------------------------------------------
 
     #[DataProvider('tableExistsDataProvider')]
