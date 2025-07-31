@@ -620,58 +620,6 @@ class EntityTest extends TestCase
 
     #endregion TableName
 
-    #region Columns ------------------------------------------------------------
-
-    function testColumnsReturnsIdInFirstPosition()
-    {
-        $this->assertSame(
-            ['id', 'aBool', 'anInt', 'aFloat', 'aString', 'aDateTime'],
-            TestEntity::Columns()
-        );
-    }
-
-    function testColumnsSkipsInaccessibleProperties()
-    {
-        $sut = new class extends Entity {
-            public string $aString;
-            protected string $aProtected;
-            private string $aPrivate;
-            public readonly string $aPublicReadonly;
-            protected readonly string $aProtectedReadonly;
-            private readonly string $aPrivateReadonly;
-            static public string $aStaticPublic;
-            static protected string $aStaticProtected;
-            static private string $aStaticPrivate;
-            public function __construct() {
-                $this->aPublicReadonly = '';
-                $this->aProtectedReadonly = '';
-                $this->aPrivateReadonly = '';
-                parent::__construct();
-            }
-        };
-        $class = \get_class($sut);
-        $this->assertSame(
-            ['id', 'aString'],
-            $class::Columns()
-        );
-    }
-
-    function testColumnsSkipsPropertiesWithUnsupportedTypes()
-    {
-        $sut = new class extends Entity {
-            public array $anArray;
-            public \stdClass $anObject;
-            public string $aString;
-        };
-        $class = \get_class($sut);
-        $this->assertSame(
-            ['id', 'aString'],
-            $class::Columns()
-        );
-    }
-
-    #endregion Columns
-
     #region Metadata ------------------------------------------------------------
 
     function testMetadataReturnsIdInFirstPosition()
