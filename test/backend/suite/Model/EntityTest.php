@@ -2,11 +2,13 @@
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
+use \PHPUnit\Framework\Attributes\DataProvider;
 
 use \Peneus\Model\Entity;
 
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
+use \Peneus\Model\ViewEntity;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
@@ -16,6 +18,12 @@ class TestEntity extends Entity {
     public float $aFloat;
     public string $aString;
     public \DateTime $aDateTime;
+}
+
+class TestViewEntity extends ViewEntity {
+    public static function ViewDefinition(): string {
+        return 'SELECT 1';
+    }
 }
 
 #[CoversClass(Entity::class)]
@@ -573,6 +581,21 @@ class EntityTest extends TestCase
 
     #endregion jsonSerialize
 
+    #region IsView ----------------------------------------------------------------
+
+    function testIsViewReturnsFalseForRegularEntity()
+    {
+        $this->assertFalse(TestEntity::IsView());
+    }
+
+    function testIsViewReturnsTrueForViewEntity()
+    {
+
+        $this->assertTrue(TestViewEntity::IsView());
+    }
+
+    #endregion IsView
+
     #region TableName ----------------------------------------------------------
 
     function testTableNameCanBeOverridden()
@@ -659,46 +682,6 @@ class EntityTest extends TestCase
         $this->assertFalse($class::CreateTable());
     }
 
-    function testCreateTableFailsIfQueryExecutionFails()
-    {
-        $sut = new TestEntity();
-        $fakeDatabase = Database::Instance();
-        $fakeDatabase->Expect(
-            sql: 'CREATE TABLE `testentity`'
-               . ' (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,'
-               . ' `aBool` BIT NOT NULL,'
-               . ' `anInt` INT NOT NULL,'
-               . ' `aFloat` DOUBLE NOT NULL,'
-               . ' `aString` TEXT NOT NULL,'
-               . ' `aDateTime` DATETIME NOT NULL)'
-               . ' ENGINE=InnoDB;',
-            result: null,
-            times: 1
-        );
-        $this->assertFalse(TestEntity::CreateTable());
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testCreateTableSucceedsIfQuerySucceeds()
-    {
-        $sut = new TestEntity();
-        $fakeDatabase = Database::Instance();
-        $fakeDatabase->Expect(
-            sql: 'CREATE TABLE `testentity`'
-               . ' (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,'
-               . ' `aBool` BIT NOT NULL,'
-               . ' `anInt` INT NOT NULL,'
-               . ' `aFloat` DOUBLE NOT NULL,'
-               . ' `aString` TEXT NOT NULL,'
-               . ' `aDateTime` DATETIME NOT NULL)'
-               . ' ENGINE=InnoDB;',
-            result: [],
-            times: 1
-        );
-        $this->assertTrue(TestEntity::CreateTable());
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
     function testCreateTableHandlesNullableTypes()
     {
         $sut = new class extends Entity {
@@ -726,6 +709,39 @@ class EntityTest extends TestCase
         );
         $class = \get_class($sut);
         $this->assertTrue($class::CreateTable());
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #[DataProvider('queryResultProvider')]
+    function testCreateTableWithRegularEntity($expected, $queryResult)
+    {
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: 'CREATE TABLE `testentity`'
+               . ' (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,'
+               . ' `aBool` BIT NOT NULL,'
+               . ' `anInt` INT NOT NULL,'
+               . ' `aFloat` DOUBLE NOT NULL,'
+               . ' `aString` TEXT NOT NULL,'
+               . ' `aDateTime` DATETIME NOT NULL)'
+               . ' ENGINE=InnoDB;',
+            result: $queryResult,
+            times: 1
+        );
+        $this->assertSame($expected, TestEntity::CreateTable());
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #[DataProvider('queryResultProvider')]
+    function testCreateTableWithViewEntity($expected, $queryResult)
+    {
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: 'CREATE OR REPLACE VIEW `testviewentity` AS SELECT 1;',
+            result: $queryResult,
+            times: 1
+        );
+        $this->assertSame($expected, TestViewEntity::CreateTable());
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
@@ -1179,4 +1195,17 @@ class EntityTest extends TestCase
     }
 
     #endregion update
+
+    #region Data Providers -----------------------------------------------------
+
+    static function queryResultProvider()
+    {
+        // $expected, $queryResult
+        return [
+            'success' => [ true, [] ],
+            'failure' => [ false, null ]
+        ];
+    }
+
+    #endregion Data Providers
 }
