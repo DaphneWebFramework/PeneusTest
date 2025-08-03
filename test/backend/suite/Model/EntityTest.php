@@ -741,7 +741,7 @@ class EntityTest extends TestCase
         $this->assertFalse($class::CreateTable());
     }
 
-    function testCreateTableEscapesBackticksInTableName()
+    function testCreateTableEscapesBackticksInTableNameWithRegularEntity()
     {
         $sut = new class extends Entity {
             public string $aString;
@@ -751,10 +751,31 @@ class EntityTest extends TestCase
         };
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: "CREATE TABLE `users``; DROP TABLE user_roles; --`"
+            sql: 'CREATE TABLE `users``; DROP TABLE user_roles; --`'
                . ' (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,'
                . ' `aString` TEXT NOT NULL)'
-               . ' ENGINE=InnoDB;',
+               . ' ENGINE=InnoDB',
+            result: null,
+            times: 1
+        );
+        $class = \get_class($sut);
+        $this->assertFalse($class::CreateTable());
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testCreateTableEscapesBackticksInTableNameWithViewEntity()
+    {
+        $sut = new class extends ViewEntity {
+            public static function TableName(): string {
+                return 'users`; DROP TABLE user_roles; --';
+            }
+            public static function ViewDefinition(): string {
+                return 'SELECT 1';
+            }
+        };
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: 'CREATE OR REPLACE VIEW `users``; DROP TABLE user_roles; --` AS SELECT 1',
             result: null,
             times: 1
         );
@@ -777,14 +798,14 @@ class EntityTest extends TestCase
         };
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: "CREATE TABLE `my_entity`"
+            sql: 'CREATE TABLE `my_entity`'
                . ' (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,'
                . ' `aNullableBool` BIT NULL,'
                . ' `aNullableInt` INT NULL,'
                . ' `aNullableFloat` DOUBLE NULL,'
                . ' `aNullableString` TEXT NULL,'
                . ' `aNullableDateTime` DATETIME NULL)'
-               . ' ENGINE=InnoDB;',
+               . ' ENGINE=InnoDB',
             result: [],
             times: 1
         );
@@ -805,7 +826,7 @@ class EntityTest extends TestCase
                . ' `aFloat` DOUBLE NOT NULL,'
                . ' `aString` TEXT NOT NULL,'
                . ' `aDateTime` DATETIME NOT NULL)'
-               . ' ENGINE=InnoDB;',
+               . ' ENGINE=InnoDB',
             result: $queryResult,
             times: 1
         );
@@ -818,7 +839,7 @@ class EntityTest extends TestCase
     {
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
-            sql: 'CREATE OR REPLACE VIEW `testviewentity` AS SELECT 1;',
+            sql: 'CREATE OR REPLACE VIEW `testviewentity` AS SELECT 1',
             result: $queryResult,
             times: 1
         );
@@ -827,6 +848,75 @@ class EntityTest extends TestCase
     }
 
     #endregion CreateTable
+
+    #region DropTable ----------------------------------------------------------
+
+    function testDropTableEscapesBackticksInTableNameWithRegularEntity()
+    {
+        $sut = new class extends Entity {
+            public static function TableName(): string {
+                return 'users`; DROP TABLE user_roles; --';
+            }
+        };
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: 'DROP TABLE `users``; DROP TABLE user_roles; --`',
+            result: null,
+            times: 1
+        );
+        $class = \get_class($sut);
+        $this->assertFalse($class::DropTable());
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testDropTableEscapesBackticksInTableNameWithViewEntity()
+    {
+        $sut = new class extends ViewEntity {
+            public static function TableName(): string {
+                return 'users`; DROP TABLE user_roles; --';
+            }
+            public static function ViewDefinition(): string {
+                return 'SELECT 1';
+            }
+        };
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: 'DROP VIEW `users``; DROP TABLE user_roles; --`',
+            result: null,
+            times: 1
+        );
+        $class = \get_class($sut);
+        $this->assertFalse($class::DropTable());
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #[DataProvider('queryResultProvider')]
+    function testDropTableWithRegularEntity($expected, $queryResult)
+    {
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: 'DROP TABLE `testentity`',
+            result: $queryResult,
+            times: 1
+        );
+        $this->assertSame($expected, TestEntity::DropTable());
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #[DataProvider('queryResultProvider')]
+    function testDropTableWithViewEntity($expected, $queryResult)
+    {
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: 'DROP VIEW `testviewentity`',
+            result: $queryResult,
+            times: 1
+        );
+        $this->assertSame($expected, TestViewEntity::DropTable());
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #endregion DropTable
 
     #region FindById -----------------------------------------------------------
 
