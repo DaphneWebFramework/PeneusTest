@@ -24,7 +24,7 @@ class ChangeActionTest extends TestCase
         $this->originalLanguageService =
             LanguageService::ReplaceInstance($this->createMock(LanguageService::class));
         $this->originalConfig =
-            Config::ReplaceInstance($this->config());
+            Config::ReplaceInstance($this->createConfig());
     }
 
     protected function tearDown(): void
@@ -34,7 +34,7 @@ class ChangeActionTest extends TestCase
         Config::ReplaceInstance($this->originalConfig);
     }
 
-    private function config(): Config
+    private function createConfig(): Config
     {
         $mock = $this->createMock(Config::class);
         $mock->method('Option')->with('Language')->willReturn('en');

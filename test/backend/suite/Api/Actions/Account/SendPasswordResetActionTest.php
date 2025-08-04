@@ -41,7 +41,7 @@ class SendPasswordResetActionTest extends TestCase
         $this->originalCookieService =
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
         $this->originalConfig =
-            Config::ReplaceInstance($this->config());
+            Config::ReplaceInstance($this->createConfig());
         $this->originalResource =
             Resource::ReplaceInstance($this->createMock(Resource::class));
     }
@@ -56,7 +56,7 @@ class SendPasswordResetActionTest extends TestCase
         Resource::ReplaceInstance($this->originalResource);
     }
 
-    private function config()
+    private function createConfig(): Config
     {
         $mock = $this->createMock(Config::class);
         $mock->method('Option')->with('Language')->willReturn('en');

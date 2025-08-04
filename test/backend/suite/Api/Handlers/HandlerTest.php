@@ -15,7 +15,7 @@ class HandlerTest extends TestCase
     protected function setUp(): void
     {
         $this->originalConfig =
-            Config::ReplaceInstance($this->config());
+            Config::ReplaceInstance($this->createConfig());
     }
 
     protected function tearDown(): void
@@ -23,7 +23,7 @@ class HandlerTest extends TestCase
         Config::ReplaceInstance($this->originalConfig);
     }
 
-    private function config()
+    private function createConfig(): Config
     {
         $mock = $this->createMock(Config::class);
         $mock->method('Option')->with('Language')->willReturn('en');

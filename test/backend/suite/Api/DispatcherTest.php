@@ -31,7 +31,7 @@ class DispatcherTest extends TestCase
         $this->originalHandlerRegistry =
             HandlerRegistry::ReplaceInstance($this->createMock(HandlerRegistry::class));
         $this->originalConfig =
-            Config::ReplaceInstance($this->config());
+            Config::ReplaceInstance($this->createConfig());
     }
 
     protected function tearDown(): void
@@ -42,7 +42,7 @@ class DispatcherTest extends TestCase
         Config::ReplaceInstance($this->originalConfig);
     }
 
-    private function config($language = 'en', $isDebug = true): Config
+    private function createConfig($language = 'en', $isDebug = true): Config
     {
         $mock = $this->createMock(Config::class);
         $mock->method('Option')->willReturnMap([
@@ -393,7 +393,7 @@ class DispatcherTest extends TestCase
     {
         $sut = new Dispatcher();
         $response = $this->createMock(Response::class);
-        Config::ReplaceInstance($this->config(isDebug: false)); // Set live mode
+        Config::ReplaceInstance($this->createConfig(isDebug: false)); // Set live mode
 
         $response->expects($this->once())
             ->method('SetStatusCode')

@@ -31,7 +31,7 @@ class ChangePasswordActionTest extends TestCase
         $this->originalSecurityService =
             SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
         $this->originalConfig =
-            Config::ReplaceInstance($this->config());
+            Config::ReplaceInstance($this->createConfig());
     }
 
     protected function tearDown(): void
@@ -42,7 +42,7 @@ class ChangePasswordActionTest extends TestCase
         Config::ReplaceInstance($this->originalConfig);
     }
 
-    private function config()
+    private function createConfig(): Config
     {
         $mock = $this->createMock(Config::class);
         $mock->method('Option')->with('Language')->willReturn('en');
