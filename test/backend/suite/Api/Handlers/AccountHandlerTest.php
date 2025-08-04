@@ -112,7 +112,7 @@ class AccountHandlerTest extends TestCase
         $this->assertInstanceOf(SessionGuard::class, $guards[0]);
     }
 
-    public function testCreateActionWithUnknownAction()
+    function testCreateActionWithUnknownAction()
     {
         $handler = new AccountHandler;
         $action = AccessHelper::CallMethod($handler, 'createAction', ['unknown']);
