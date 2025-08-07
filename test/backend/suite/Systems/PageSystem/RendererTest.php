@@ -184,7 +184,7 @@ class RendererTest extends TestCase
                 	{{LibraryStylesheetLinks}}
                 	{{PageStylesheetLinks}}
                 </head>
-                <body>
+                <body class="{{BodyClass}}">
                 	{{Content}}
                 	{{LibraryJavascriptLinks}}
                 	{{PageJavascriptLinks}}
@@ -200,6 +200,10 @@ class RendererTest extends TestCase
         $page->expects($this->once())
             ->method('Title')
             ->willReturn('Home | MyWebsite');
+        $page->expects($this->once())
+            ->method('Property')
+            ->with('bodyClass', '')
+            ->willReturn('fade');
         $page->expects($this->once())
             ->method('IncludedLibraries')
             ->willReturn($libraries);
@@ -239,7 +243,7 @@ class RendererTest extends TestCase
                 	<link rel="stylesheet" href="url/to/bootstrap-4.6.2/css/bootstrap.css">
                 	<link rel="stylesheet" href="url/to/pages/home/style.css">
                 </head>
-                <body>
+                <body class="fade">
                 	Welcome to MyWebsite!
                 	<script src="url/to/bootstrap-4.6.2/js/bootstrap.bundle.js"></script>
                 	<script src="url/to/pages/home/script.js"></script>
