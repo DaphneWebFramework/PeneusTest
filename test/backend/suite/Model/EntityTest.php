@@ -581,6 +581,66 @@ class EntityTest extends TestCase
 
     #endregion jsonSerialize
 
+    #region Without ------------------------------------------------------------
+
+    function testWithoutExcludesSpecifiedProperties()
+    {
+        $sut = new TestEntity([
+            'id' => 1,
+            'aBool' => true,
+            'anInt' => 42,
+            'aFloat' => 3.14,
+            'aString' => 'Hello',
+            'aDateTime' => '2025-07-22 14:35:00'
+        ]);
+        $expected = [
+            'id' => 1,
+            'aBool' => true,
+            'anInt' => 42,
+            'aDateTime' => '2025-07-22 14:35:00'
+        ];
+        $actual = $sut->Without('aString', 'aFloat');
+        $this->assertSame($expected, $actual);
+    }
+
+    function testWithoutReturnsFullSerializationIfNoPropertiesAreExcluded()
+    {
+        $sut = new TestEntity([
+            'id' => 2,
+            'aBool' => false,
+            'anInt' => 7,
+            'aFloat' => 1.23,
+            'aString' => 'Yo',
+            'aDateTime' => '2025-07-22 14:35:00'
+        ]);
+        $expected = $sut->jsonSerialize();
+        $actual = $sut->Without();
+        $this->assertSame($expected, $actual);
+    }
+
+    function testWithoutSilentlyIgnoresUnknownProperties()
+    {
+        $sut = new TestEntity([
+            'id' => 3,
+            'aBool' => false,
+            'anInt' => 99,
+            'aFloat' => 2.5,
+            'aString' => 'Test',
+            'aDateTime' => '2025-07-22 14:35:00'
+        ]);
+        $expected = [
+            'id' => 3,
+            'anInt' => 99,
+            'aFloat' => 2.5,
+            'aString' => 'Test',
+            'aDateTime' => '2025-07-22 14:35:00'
+        ];
+        $actual = $sut->Without('unknown', 'aBool');
+        $this->assertSame($expected, $actual);
+    }
+
+    #endregion Without
+
     #region IsView ----------------------------------------------------------------
 
     function testIsViewReturnsFalseForRegularEntity()
