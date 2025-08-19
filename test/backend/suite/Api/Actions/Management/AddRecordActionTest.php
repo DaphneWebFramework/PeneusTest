@@ -166,7 +166,8 @@ class AddRecordActionTest extends TestCase
             ->willReturn(false);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Failed to add record to table 'accountrole'.");
+        $this->expectExceptionMessage(
+            "Failed to add record to table 'accountrole'.");
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -215,7 +216,8 @@ class AddRecordActionTest extends TestCase
             #region Account
             'account: email missing' => [
                 'table' => 'account',
-                'data' => [],
+                'data' => [
+                ],
                 'exceptionMessage' => "Required field 'email' is missing."
             ],
             'account: email invalid' => [
@@ -303,7 +305,8 @@ class AddRecordActionTest extends TestCase
             #region AccountRole
             'accountRole: accountId missing' => [
                 'table' => 'accountrole',
-                'data' => [],
+                'data' => [
+                ],
                 'exceptionMessage' => "Required field 'accountId' is missing."
             ],
             'accountRole: accountId not an integer' => [
@@ -339,7 +342,8 @@ class AddRecordActionTest extends TestCase
             #region PendingAccount
             'pendingAccount: email missing' => [
                 'table' => 'pendingaccount',
-                'data' => [],
+                'data' => [
+                ],
                 'exceptionMessage' => "Required field 'email' is missing."
             ],
             'pendingAccount: email invalid' => [
@@ -428,7 +432,8 @@ class AddRecordActionTest extends TestCase
             #region PasswordReset
             'passwordReset: accountId missing' => [
                 'table' => 'passwordreset',
-                'data' => [],
+                'data' => [
+                ],
                 'exceptionMessage' => "Required field 'accountId' is missing."
             ],
             'passwordReset: accountId not an integer' => [

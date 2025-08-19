@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProvider;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Management\DeleteRecordAction;
@@ -112,79 +113,28 @@ class DeleteRecordActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfIdIsMissing()
-    {
+    #[DataProvider('invalidModelDataProvider')]
+    function testOnExecuteThrowsForInvalidModelData(
+        string $table,
+        array $data,
+        string $exceptionMessage
+    ) {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $formParams = $this->createMock(CArray::class);
 
         $request->expects($this->once())
             ->method('QueryParams')
             ->willReturn($queryParams);
         $queryParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn(['table' => 'accountrole']);
+            ->willReturn(['table' => $table]);
         $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([]);
+            ->method('JsonBody')
+            ->willReturn($data);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Required field 'id' is missing.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    #[DataProviderExternal(DataHelper::class, 'NonIntegerExcludingNumericStringProvider')]
-    function testOnExecuteThrowsIfIdIsNotInteger($value)
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['table' => 'accountrole']);
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['id' => $value]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'id' must be an integer.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfIdIsLessThanOne()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['table' => 'accountrole']);
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['id' => 0]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'id' must have a minimum value of 1.");
+        $this->expectExceptionMessage($exceptionMessage);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -193,7 +143,9 @@ class DeleteRecordActionTest extends TestCase
         $sut = $this->systemUnderTest('findEntity');
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $formParams = $this->createMock(CArray::class);
+        $data = [
+            'id' => 42
+        ];
 
         $request->expects($this->once())
             ->method('QueryParams')
@@ -202,27 +154,27 @@ class DeleteRecordActionTest extends TestCase
             ->method('ToArray')
             ->willReturn(['table' => 'accountrole']);
         $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['id' => 42]);
+            ->method('JsonBody')
+            ->willReturn($data);
         $sut->expects($this->once())
             ->method('findEntity')
             ->with(AccountRole::class, 42)
             ->willReturn(null);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Record with ID 42 not found in table 'accountrole'.");
+        $this->expectExceptionMessage(
+            "Record with ID 42 not found in table 'accountrole'.");
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfDeleteFails()
+    function testOnExecuteThrowsIfEntityDeleteFails()
     {
         $sut = $this->systemUnderTest('findEntity');
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $formParams = $this->createMock(CArray::class);
+        $data = [
+            'id' => 42
+        ];
         $entity = $this->createMock(AccountRole::class);
 
         $request->expects($this->once())
@@ -232,11 +184,8 @@ class DeleteRecordActionTest extends TestCase
             ->method('ToArray')
             ->willReturn(['table' => 'accountrole']);
         $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['id' => 42]);
+            ->method('JsonBody')
+            ->willReturn($data);
         $sut->expects($this->once())
             ->method('findEntity')
             ->with(AccountRole::class, 42)
@@ -246,16 +195,19 @@ class DeleteRecordActionTest extends TestCase
             ->willReturn(false);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Failed to delete record from table 'accountrole'.");
+        $this->expectExceptionMessage(
+            "Failed to delete record with ID 42 from table 'accountrole'.");
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteReturnsNullOnSuccess()
+    function testOnExecuteReturnsNullWhenEntityDeleteSucceeds()
     {
         $sut = $this->systemUnderTest('findEntity');
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $formParams = $this->createMock(CArray::class);
+        $data = [
+            'id' => 42
+        ];
         $entity = $this->createMock(AccountRole::class);
 
         $request->expects($this->once())
@@ -265,11 +217,8 @@ class DeleteRecordActionTest extends TestCase
             ->method('ToArray')
             ->willReturn(['table' => 'accountrole']);
         $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['id' => 42]);
+            ->method('JsonBody')
+            ->willReturn($data);
         $sut->expects($this->once())
             ->method('findEntity')
             ->with(AccountRole::class, 42)
@@ -332,4 +281,33 @@ class DeleteRecordActionTest extends TestCase
     }
 
     #endregion findEntity
+
+    #region Data Providers -----------------------------------------------------
+
+    static function invalidModelDataProvider()
+    {
+        return [
+            'id missing' => [
+                'table' => 'account',
+                'data' => [],
+                'exceptionMessage' => "Required field 'id' is missing."
+            ],
+            'id not an integer' => [
+                'table' => 'account',
+                'data' => [
+                    'id' => 'not-an-integer'
+                ],
+                'exceptionMessage' => "Field 'id' must be an integer."
+            ],
+            'id less than one' => [
+                'table' => 'account',
+                'data' => [
+                    'id' => 0
+                ],
+                'exceptionMessage' => "Field 'id' must have a minimum value of 1."
+            ],
+        ];
+    }
+
+    #endregion Data Providers
 }

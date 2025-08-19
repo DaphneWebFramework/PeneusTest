@@ -169,7 +169,8 @@ class EditRecordActionTest extends TestCase
             ->willReturn(null);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Record with ID 42 not found in table 'accountrole'.");
+        $this->expectExceptionMessage(
+            "Record with ID 42 not found in table 'accountrole'.");
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -206,7 +207,8 @@ class EditRecordActionTest extends TestCase
             ->willReturn(false);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Failed to edit record with ID 42 in table 'accountrole'.");
+        $this->expectExceptionMessage(
+            "Failed to edit record with ID 42 in table 'accountrole'.");
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
