@@ -151,11 +151,12 @@ class RendererTest extends TestCase
         $sut = $this->systemUnderTest(
             'openFile',
             'content',
+            'appUrl',
             'libraryStylesheetLinks',
             'pageStylesheetLinks',
             'libraryJavascriptLinks',
             'pageJavascriptLinks',
-            'renderMetaTags',
+            'metaTags',
             '_echo'
         );
         $resource = Resource::Instance();
@@ -181,6 +182,7 @@ class RendererTest extends TestCase
                 	<meta charset="utf-8">
                 	<title>{{Title}}</title>
                 	{{MetaTags}}
+                	<link rel="shortcut icon" href="{{AppUrl}}/favicon.ico">
                 	{{LibraryStylesheetLinks}}
                 	{{PageStylesheetLinks}}
                 </head>
@@ -193,6 +195,12 @@ class RendererTest extends TestCase
             HTML);
         $file->expects($this->once())
             ->method('Close');
+        $page->expects($this->once())
+            ->method('IncludedLibraries')
+            ->willReturn($libraries);
+        $sut->expects($this->once())
+            ->method('appUrl')
+            ->willReturn('url/to');
         $config->expects($this->once())
             ->method('OptionOrDefault')
             ->with('Language', '')
@@ -200,15 +208,8 @@ class RendererTest extends TestCase
         $page->expects($this->once())
             ->method('Title')
             ->willReturn('Home | MyWebsite');
-        $page->expects($this->once())
-            ->method('Property')
-            ->with('bodyClass', '')
-            ->willReturn('fade');
-        $page->expects($this->once())
-            ->method('IncludedLibraries')
-            ->willReturn($libraries);
         $sut->expects($this->once())
-            ->method('renderMetaTags')
+            ->method('metaTags')
             ->with($page->MetaItems())
             ->willReturn("\t" . '<meta name="description" content="my description">');
         $sut->expects($this->once())
@@ -219,6 +220,10 @@ class RendererTest extends TestCase
             ->method('pageStylesheetLinks')
             ->with($page)
             ->willReturn("\t" . '<link rel="stylesheet" href="url/to/pages/home/style.css">');
+        $page->expects($this->once())
+            ->method('Property')
+            ->with('bodyClass', '')
+            ->willReturn('fade');
         $sut->expects($this->once())
             ->method('content')
             ->with($page)
@@ -240,6 +245,7 @@ class RendererTest extends TestCase
                 	<meta charset="utf-8">
                 	<title>Home | MyWebsite</title>
                 	<meta name="description" content="my description">
+                	<link rel="shortcut icon" href="url/to/favicon.ico">
                 	<link rel="stylesheet" href="url/to/bootstrap-4.6.2/css/bootstrap.css">
                 	<link rel="stylesheet" href="url/to/pages/home/style.css">
                 </head>
@@ -353,9 +359,34 @@ class RendererTest extends TestCase
 
     #endregion content
 
-    #region renderMetaTags -----------------------------------------------------
+    #region appUrl -------------------------------------------------------------
 
-    function testRenderMetaTags()
+    function testAppUrl()
+    {
+        $sut = $this->systemUnderTest();
+        $resource = Resource::Instance();
+        $appUrl = $this->createMock(CUrl::class);
+        $appUrlTrimmed = $this->createMock(CUrl::class);
+
+        $resource->expects($this->once())
+            ->method('__call') // Because AppUrl is located in Harmonia\Resource
+            ->with('AppUrl')
+            ->willReturn($appUrl);
+        $appUrl->expects($this->once())
+            ->method('TrimTrailingSlashes')
+            ->willReturn($appUrlTrimmed);
+        $appUrlTrimmed->expects($this->once())
+            ->method('__toString')
+            ->willReturn('url/to');
+
+        $this->assertEquals('url/to', AccessHelper::CallMethod($sut, 'AppUrl'));
+    }
+
+    #endregion appUrl
+
+    #region metaTags -----------------------------------------------------------
+
+    function testMetaTags()
     {
         $sut = $this->systemUnderTest();
         $metaItems = new CArray([
@@ -374,11 +405,11 @@ class RendererTest extends TestCase
           . "\t" . '<meta name="viewport" content="my viewport">' . "\n"
           . "\t" . '<meta property="og:locale" content="my locale">' . "\n"
           . "\t" . '<meta property="og:type" content="website">'
-          , AccessHelper::CallMethod($sut, 'renderMetaTags', [$metaItems])
+          , AccessHelper::CallMethod($sut, 'metaTags', [$metaItems])
         );
     }
 
-    #endregion renderMetaTags
+    #endregion metaTags
 
     #region libraryStylesheetLinks ---------------------------------------------
 
