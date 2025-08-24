@@ -235,7 +235,7 @@ class ListEntityMappingsActionTest extends TestCase
 
     function testFindModulesReturnsOnlyDirectoryPaths()
     {
-        $sut = $this->systemUnderTest('joinPath');
+        $sut = $this->systemUnderTest();
         $resource = Resource::Instance();
         $backendPath = $this->createMock(CPath::class);
         $moduleNames = ['Module1', 'Module2'];
@@ -252,9 +252,9 @@ class ListEntityMappingsActionTest extends TestCase
             ->method('Call')
             ->with('\scandir')
             ->willReturn($moduleNames);
-        $sut->expects($invokedCount = $this->exactly(2))
-            ->method('joinPath')
-            ->willReturnCallback(function($backendPath, $moduleName)
+        $backendPath->expects($invokedCount = $this->exactly(2))
+            ->method('Extend')
+            ->willReturnCallback(function($moduleName)
                 use($invokedCount, $moduleNames, $modulePaths)
             {
                 switch ($invokedCount->numberOfInvocations()) {
@@ -288,13 +288,13 @@ class ListEntityMappingsActionTest extends TestCase
 
     function testFindEntitiesReturnsEmptyArrayWhenModelDirIsMissing()
     {
-        $sut = $this->systemUnderTest('joinPath');
-        $modulePath = $this->createStub(CPath::class);
+        $sut = $this->systemUnderTest();
+        $modulePath = $this->createMock(CPath::class);
         $modelPath = $this->createMock(CPath::class);
 
-        $sut->expects($this->once())
-            ->method('joinPath')
-            ->with($modulePath, 'Model')
+        $modulePath->expects($this->once())
+            ->method('Extend')
+            ->with('Model')
             ->willReturn($modelPath);
         $modelPath->expects($this->once())
             ->method('Call')
@@ -308,14 +308,14 @@ class ListEntityMappingsActionTest extends TestCase
 
     function testFindEntitiesReturnsEmptyArrayWhenNoPhpFilesFound()
     {
-        $sut = $this->systemUnderTest('joinPath');
-        $modulePath = $this->createStub(CPath::class);
+        $sut = $this->systemUnderTest();
+        $modulePath = $this->createMock(CPath::class);
         $modelPath = $this->createMock(CPath::class);
         $fileSystem = CFileSystem::Instance();
 
-        $sut->expects($this->once())
-            ->method('joinPath')
-            ->with($modulePath, 'Model')
+        $modulePath->expects($this->once())
+            ->method('Extend')
+            ->with('Model')
             ->willReturn($modelPath);
         $modelPath->expects($this->once())
             ->method('Call')
@@ -335,15 +335,15 @@ class ListEntityMappingsActionTest extends TestCase
 
     function testFindEntitiesReturnsEntityPathsWhenPhpFilesAreFound()
     {
-        $sut = $this->systemUnderTest('joinPath');
-        $modulePath = $this->createStub(CPath::class);
+        $sut = $this->systemUnderTest();
+        $modulePath = $this->createMock(CPath::class);
         $modelPath = $this->createMock(CPath::class);
         $fileSystem = CFileSystem::Instance();
         $entityPaths = ['Model/Foo.php', 'Model/Sub/Bar.php'];
 
-        $sut->expects($this->once())
-            ->method('joinPath')
-            ->with($modulePath, 'Model')
+        $modulePath->expects($this->once())
+            ->method('Extend')
+            ->with('Model')
             ->willReturn($modelPath);
         $modelPath->expects($this->once())
             ->method('Call')
