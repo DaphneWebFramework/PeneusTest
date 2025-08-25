@@ -29,6 +29,18 @@ class HeaderTokenGuardTest extends TestCase
         CookieService::ReplaceInstance($this->originalCookieService);
     }
 
+    #region CSRF_HEADER_NAME ---------------------------------------------------
+
+    function testHeaderNameIsLowercase()
+    {
+        $this->assertSame(
+            HeaderTokenGuard::CSRF_HEADER_NAME,
+            \strtolower(HeaderTokenGuard::CSRF_HEADER_NAME)
+        );
+    }
+
+    #endregion CSRF_HEADER_NAME
+
     #region __construct --------------------------------------------------------
 
     function testConstructor()
