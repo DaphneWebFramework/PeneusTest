@@ -6,12 +6,15 @@ use \Peneus\Api\Actions\Account\SignInWithGoogleAction;
 
 use \Harmonia\Config;
 use \Harmonia\Core\CArray;
+use \Harmonia\Core\CUrl;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
+use \Harmonia\Services\CookieService;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Harmonia\Systems\ValidationSystem\DataAccessor;
 use \Peneus\Model\Account;
+use \Peneus\Resource;
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper;
 
@@ -20,8 +23,10 @@ class SignInWithGoogleActionTest extends TestCase
 {
     private ?Database $originalDatabase = null;
     private ?AccountService $originalAccountService = null;
+    private ?CookieService $originalCookieService = null;
     private ?Request $originalRequest = null;
     private ?Config $originalConfig = null;
+    private ?Resource $originalResource = null;
 
     protected function setUp(): void
     {
@@ -29,18 +34,24 @@ class SignInWithGoogleActionTest extends TestCase
             Database::ReplaceInstance($this->createMock(Database::class));
         $this->originalAccountService =
             AccountService::ReplaceInstance($this->createMock(AccountService::class));
+        $this->originalCookieService =
+            CookieService::ReplaceInstance($this->createMock(CookieService::class));
         $this->originalRequest =
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalConfig =
             Config::ReplaceInstance($this->createMock(Config::class));
+        $this->originalResource =
+            Resource::ReplaceInstance($this->createMock(Resource::class));
     }
 
     protected function tearDown(): void
     {
         Database::ReplaceInstance($this->originalDatabase);
         AccountService::ReplaceInstance($this->originalAccountService);
+        CookieService::ReplaceInstance($this->originalCookieService);
         Request::ReplaceInstance($this->originalRequest);
         Config::ReplaceInstance($this->originalConfig);
+        Resource::ReplaceInstance($this->originalResource);
     }
 
     private function systemUnderTest(string ...$mockedMethods): SignInWithGoogleAction
@@ -1045,4 +1056,38 @@ class SignInWithGoogleActionTest extends TestCase
     }
 
     #endregion createAccount
+
+    #region deleteCsrfCookie ---------------------------------------------------
+
+    function testDeleteCsrfCookie()
+    {
+        $sut = $this->systemUnderTest();
+        $cookieService = CookieService::Instance();
+
+        $cookieService->expects($this->once())
+            ->method('DeleteCsrfCookie');
+
+        AccessHelper::CallMethod($sut, 'deleteCsrfCookie');
+    }
+
+    #endregion deleteCsrfCookie
+
+    #region homePageUrl --------------------------------------------------------
+
+    function testHomePageUrl()
+    {
+        $sut = $this->systemUnderTest();
+        $resource = Resource::Instance();
+        $url = 'url/to/home';
+
+        $resource->expects($this->once())
+            ->method('PageUrl')
+            ->with('home')
+            ->willReturn(new CUrl($url));
+
+        $result = AccessHelper::CallMethod($sut, 'homePageUrl');
+        $this->assertSame($url, $result);
+    }
+
+    #endregion homePageUrl
 }
