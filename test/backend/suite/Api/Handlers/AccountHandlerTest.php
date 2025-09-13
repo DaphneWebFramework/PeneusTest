@@ -13,7 +13,9 @@ use \Peneus\Api\Actions\Account\LogoutAction;
 use \Peneus\Api\Actions\Account\RegisterAction;
 use \Peneus\Api\Actions\Account\ResetPasswordAction;
 use \Peneus\Api\Actions\Account\SendPasswordResetAction;
+use \Peneus\Api\Actions\Account\SignInWithGoogleAction;
 use \Peneus\Api\Guards\FormTokenGuard;
+use \Peneus\Api\Guards\HeaderTokenGuard;
 use \Peneus\Api\Guards\SessionGuard;
 use \TestToolkit\AccessHelper;
 
@@ -21,6 +23,16 @@ use \TestToolkit\AccessHelper;
 class AccountHandlerTest extends TestCase
 {
     #region createAction -------------------------------------------------------
+
+    function testCreateActionWithSignInWithGoogle()
+    {
+        $handler = new AccountHandler;
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['sign-in-with-google']);
+        $this->assertInstanceOf(SignInWithGoogleAction::class, $action);
+        $guards = AccessHelper::GetProperty($action, 'guards');
+        $this->assertCount(1, $guards);
+        $this->assertInstanceOf(HeaderTokenGuard::class, $guards[0]);
+    }
 
     function testCreateActionWithRegister()
     {
