@@ -6,7 +6,6 @@ use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Management\EditRecordAction;
 
-use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Services\SecurityService;
@@ -25,7 +24,6 @@ class EditRecordActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
-    private ?Config $originalConfig = null;
 
     protected function setUp(): void
     {
@@ -33,22 +31,12 @@ class EditRecordActionTest extends TestCase
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalDatabase =
             Database::ReplaceInstance(new FakeDatabase());
-        $this->originalConfig =
-            Config::ReplaceInstance($this->createConfig());
     }
 
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
-        Config::ReplaceInstance($this->originalConfig);
-    }
-
-    private function createConfig(): Config
-    {
-        $mock = $this->createMock(Config::class);
-        $mock->method('Option')->with('Language')->willReturn('en');
-        return $mock;
     }
 
     private function systemUnderTest(string ...$mockedMethods): EditRecordAction

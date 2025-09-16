@@ -41,7 +41,7 @@ class SendPasswordResetActionTest extends TestCase
         $this->originalCookieService =
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
         $this->originalConfig =
-            Config::ReplaceInstance($this->createConfig());
+            Config::ReplaceInstance($this->createMock(Config::class));
         $this->originalResource =
             Resource::ReplaceInstance($this->createMock(Resource::class));
     }
@@ -54,13 +54,6 @@ class SendPasswordResetActionTest extends TestCase
         CookieService::ReplaceInstance($this->originalCookieService);
         Config::ReplaceInstance($this->originalConfig);
         Resource::ReplaceInstance($this->originalResource);
-    }
-
-    private function createConfig(): Config
-    {
-        $mock = $this->createMock(Config::class);
-        $mock->method('Option')->with('Language')->willReturn('en');
-        return $mock;
     }
 
     private function systemUnderTest(string ...$mockedMethods): SendPasswordResetAction
@@ -526,8 +519,13 @@ class SendPasswordResetActionTest extends TestCase
     function testSendActivationEmailDelegatesToTrait($returnValue)
     {
         $sut = $this->systemUnderTest('sendTransactionalEmail');
+        $config = Config::Instance();
         $resource = Resource::Instance();
 
+        $config->expects($this->once())
+            ->method('OptionOrDefault')
+            ->with('AppName', '')
+            ->willReturn('Example');
         $resource->expects($this->once())
             ->method('PageUrl')
             ->with('reset-password')
@@ -539,10 +537,16 @@ class SendPasswordResetActionTest extends TestCase
                 'John Doe',
                 'url/to/page/code1234',
                 [
-                    'masthead' => 'email_reset_password_masthead',
-                    'intro' => 'email_reset_password_intro',
-                    'buttonText' => 'email_reset_password_button_text',
-                    'securityNotice' => 'email_reset_password_security_notice'
+                    'heroText' =>
+                        "Reset your password",
+                    'introText' =>
+                        "Follow the link below to choose a new password.",
+                    'buttonText' =>
+                        "Reset My Password",
+                    'disclaimerText' =>
+                        "You received this email because a password reset was"
+                      . " requested for your account on Example. If you did"
+                      . " not request this, you can safely ignore this email."
                 ]
             )
             ->willReturn($returnValue);

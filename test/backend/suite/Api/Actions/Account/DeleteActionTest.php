@@ -4,7 +4,6 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\Actions\Account\DeleteAction;
 
-use \Harmonia\Config;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Peneus\Api\Hooks\IAccountDeletionHook;
@@ -16,7 +15,6 @@ use \TestToolkit\AccessHelper;
 class DeleteActionTest extends TestCase
 {
     private ?Database $originalDatabase = null;
-    private ?Config $originalConfig = null;
     private ?AccountService $originalAccountService = null;
 
     protected function setUp(): void
@@ -25,22 +23,12 @@ class DeleteActionTest extends TestCase
             Database::ReplaceInstance($this->createMock(Database::class));
         $this->originalAccountService =
             AccountService::ReplaceInstance($this->createMock(AccountService::class));
-        $this->originalConfig =
-            Config::ReplaceInstance($this->createConfig());
     }
 
     protected function tearDown(): void
     {
         Database::ReplaceInstance($this->originalDatabase);
         AccountService::ReplaceInstance($this->originalAccountService);
-        Config::ReplaceInstance($this->originalConfig);
-    }
-
-    private function createConfig(): Config
-    {
-        $mock = $this->createMock(Config::class);
-        $mock->method('Option')->with('Language')->willReturn('en');
-        return $mock;
     }
 
     private function systemUnderTest(string ...$mockedMethods): DeleteAction

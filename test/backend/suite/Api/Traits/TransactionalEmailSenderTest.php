@@ -11,7 +11,6 @@ use \Harmonia\Core\CPath;
 use \Harmonia\Logger;
 use \Peneus\Resource;
 use \Peneus\Systems\MailerSystem\Mailer;
-use \Peneus\Translation;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
@@ -23,7 +22,6 @@ class TransactionalEmailSenderTest extends TestCase
     private ?Config $originalConfig = null;
     private ?Resource $originalResource = null;
     private ?Logger $originalLogger = null;
-    private ?Translation $originalTranslation = null;
 
     protected function setUp(): void
     {
@@ -33,8 +31,6 @@ class TransactionalEmailSenderTest extends TestCase
             Resource::ReplaceInstance($this->createMock(Resource::class));
         $this->originalLogger =
             Logger::ReplaceInstance($this->createMock(Logger::class));
-        $this->originalTranslation =
-            Translation::ReplaceInstance($this->createMock(Translation::class));
     }
 
     protected function tearDown(): void
@@ -42,7 +38,6 @@ class TransactionalEmailSenderTest extends TestCase
         Config::ReplaceInstance($this->originalConfig);
         Resource::ReplaceInstance($this->originalResource);
         Logger::ReplaceInstance($this->originalLogger);
-        Translation::ReplaceInstance($this->originalTranslation);
     }
 
     private function systemUnderTest(string ...$mockedMethods): _TransactionalEmailSender
@@ -119,7 +114,6 @@ class TransactionalEmailSenderTest extends TestCase
         $path = new CPath('path/to/template.html');
         $file = $this->createMock(CFile::class);
         $config = Config::Instance();
-        $translation = Translation::Instance();
         $mailer = $this->createMock(Mailer::class);
 
         $resource->expects($this->once())
@@ -136,14 +130,14 @@ class TransactionalEmailSenderTest extends TestCase
                 <!DOCTYPE html>
                 <html lang="{{Language}}">
                 <head><title>{{Title}}</title></head>
-                <h1>{{MastheadText}}</h1>
-                <h2>{{GreetingText}}</h2>
+                <h1>{{HeroText}}</h1>
+                <h2>Hi {{UserName}},</h2>
                 <p>{{IntroText}}</p>
                 <a href="{{ActionUrl}}">{{ButtonText}}</a>
-                <p>{{SecurityNoticeText}}</p>
+                <p>{{DisclaimerText}}</p>
                 <footer>
-                <p>{{ContactUsText}} <a href="mailto:{{SupportEmail}}">{{SupportEmail}}</a></p>
-                <p>{{CopyrightText}}</p>
+                <p>Need help? Contact us at <a href="mailto:{{SupportEmail}}">{{SupportEmail}}</a></p>
+                <p>© {{CurrentYear}} {{AppName}}. All rights reserved.</p>
                 </footer>
                 </body>
                 </html>
@@ -153,32 +147,10 @@ class TransactionalEmailSenderTest extends TestCase
         $config->expects($this->exactly(3))
             ->method('OptionOrDefault')
             ->willReturnMap([
-                ['Language'     , 'en' , 'en'],
-                ['AppName'      , ''   , 'Example'],
-                ['SupportEmail' , ''   , 'support@example.com']
+                ['AppName'     , ''  , 'Example'],
+                ['Language'    , 'en', 'en'],
+                ['SupportEmail', ''  , 'support@example.com']
             ]);
-        $translation->expects($this->any())
-            ->method('Get')
-            ->willReturnCallback(function(string $key, mixed ...$args): string {
-                return match ([$key, ...$args]) {
-                    ['email_activate_account_masthead'] =>
-                        'Welcome!',
-                    ['email_common_greeting', 'John Doe'] =>
-                        'Hi John Doe,',
-                    ['email_activate_account_intro'] =>
-                        "You're almost there! Just click the button below to activate your account.",
-                    ['email_activate_account_button_text'] =>
-                        'Activate My Account',
-                    ['email_activate_account_security_notice', 'Example'] =>
-                        'You received this email because your email address was used to register on Example.',
-                    ['email_common_contact_us'] =>
-                        'Need help? Contact us at',
-                    ['email_common_copyright', '2020', 'Example'] =>
-                        '© 2020 Example. All rights reserved.',
-                    default =>
-                        $this->fail("Unexpected translation key: {$key}")
-                };
-            });
         $sut->expects($this->once())
             ->method('currentYear')
             ->willReturn('2020');
@@ -191,15 +163,15 @@ class TransactionalEmailSenderTest extends TestCase
             ->willReturnSelf();
         $mailer->expects($this->once())
             ->method('SetSubject')
-            ->with('Welcome!')
+            ->with('Welcome to Example!')
             ->willReturnSelf();
         $mailer->expects($this->once())
             ->method('SetBody')
             ->with(<<<HTML
                 <!DOCTYPE html>
                 <html lang="en">
-                <head><title>Welcome!</title></head>
-                <h1>Welcome!</h1>
+                <head><title>Welcome to Example!</title></head>
+                <h1>Welcome to Example!</h1>
                 <h2>Hi John Doe,</h2>
                 <p>You're almost there! Just click the button below to activate your account.</p>
                 <a href="url/to/page/code123">Activate My Account</a>
@@ -218,14 +190,22 @@ class TransactionalEmailSenderTest extends TestCase
 
         $this->assertSame($returnValue, AccessHelper::CallMethod(
             $sut,
-            'sendTransactionalEmail', [
+            'sendTransactionalEmail',
+            [
                 'john@example.com',
                 'John Doe',
-                'url/to/page/code123', [
-                    'masthead' => 'email_activate_account_masthead',
-                    'intro' => 'email_activate_account_intro',
-                    'buttonText' => 'email_activate_account_button_text',
-                    'securityNotice' => 'email_activate_account_security_notice'
+                'url/to/page/code123',
+                [
+                    'heroText' =>
+                        "Welcome to Example!",
+                    'introText' =>
+                        "You're almost there! Just click the button below to"
+                      . " activate your account.",
+                    'buttonText' =>
+                        "Activate My Account",
+                    'disclaimerText' =>
+                        "You received this email because your email address"
+                      . " was used to register on Example."
                 ]
             ]
         ));

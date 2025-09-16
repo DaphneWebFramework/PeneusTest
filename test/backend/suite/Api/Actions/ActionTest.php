@@ -4,7 +4,6 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\Actions\Action;
 
-use \Harmonia\Config;
 use \Peneus\Api\Guards\IGuard;
 
 class DummyAction extends Action {
@@ -14,26 +13,6 @@ class DummyAction extends Action {
 #[CoversClass(Action::class)]
 class ActionTest extends TestCase
 {
-    private ?Config $originalConfig = null;
-
-    protected function setUp(): void
-    {
-        $this->originalConfig =
-            Config::ReplaceInstance($this->createConfig());
-    }
-
-    protected function tearDown(): void
-    {
-        Config::ReplaceInstance($this->originalConfig);
-    }
-
-    private function createConfig(): Config
-    {
-        $mock = $this->createMock(Config::class);
-        $mock->method('Option')->with('Language')->willReturn('en');
-        return $mock;
-    }
-
     #region Execute ------------------------------------------------------------
 
     function testExecuteWithoutGuards()

@@ -4,32 +4,11 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\Handlers\Handler;
 
-use \Harmonia\Config;
 use \Peneus\Api\Actions\Action;
 
 #[CoversClass(Handler::class)]
 class HandlerTest extends TestCase
 {
-    private ?Config $originalConfig = null;
-
-    protected function setUp(): void
-    {
-        $this->originalConfig =
-            Config::ReplaceInstance($this->createConfig());
-    }
-
-    protected function tearDown(): void
-    {
-        Config::ReplaceInstance($this->originalConfig);
-    }
-
-    private function createConfig(): Config
-    {
-        $mock = $this->createMock(Config::class);
-        $mock->method('Option')->with('Language')->willReturn('en');
-        return $mock;
-    }
-
     private function systemUnderTest(): Handler
     {
         return $this->getMockBuilder(Handler::class)

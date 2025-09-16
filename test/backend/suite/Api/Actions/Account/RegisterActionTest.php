@@ -40,7 +40,7 @@ class RegisterActionTest extends TestCase
         $this->originalCookieService =
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
         $this->originalConfig =
-            Config::ReplaceInstance($this->createConfig());
+            Config::ReplaceInstance($this->createMock(Config::class));
         $this->originalResource =
             Resource::ReplaceInstance($this->createMock(Resource::class));
     }
@@ -53,13 +53,6 @@ class RegisterActionTest extends TestCase
         CookieService::ReplaceInstance($this->originalCookieService);
         Config::ReplaceInstance($this->originalConfig);
         Resource::ReplaceInstance($this->originalResource);
-    }
-
-    private function createConfig(): Config
-    {
-        $mock = $this->createMock(Config::class);
-        $mock->method('Option')->with('Language')->willReturn('en');
-        return $mock;
     }
 
     private function systemUnderTest(string ...$mockedMethods): RegisterAction
@@ -491,8 +484,13 @@ class RegisterActionTest extends TestCase
     function testSendActivationEmailDelegatesToTrait($returnValue)
     {
         $sut = $this->systemUnderTest('sendTransactionalEmail');
+        $config = Config::Instance();
         $resource = Resource::Instance();
 
+        $config->expects($this->once())
+            ->method('OptionOrDefault')
+            ->with('AppName', '')
+            ->willReturn('Example');
         $resource->expects($this->once())
             ->method('PageUrl')
             ->with('activate-account')
@@ -504,10 +502,17 @@ class RegisterActionTest extends TestCase
                 'John Doe',
                 'url/to/page/code1234',
                 [
-                    'masthead' => 'email_activate_account_masthead',
-                    'intro' => 'email_activate_account_intro',
-                    'buttonText' => 'email_activate_account_button_text',
-                    'securityNotice' => 'email_activate_account_security_notice'
+                    'heroText' =>
+                        "Welcome to Example!",
+                    'introText' =>
+                        "You're almost there! Just click the button below to"
+                      . " activate your account.",
+                    'buttonText' =>
+                        "Activate My Account",
+                    'disclaimerText' =>
+                        "You received this email because your email address was"
+                      . " used to register on Example. If this wasn't you, you"
+                      . " can safely ignore this email."
                 ]
             )
             ->willReturn($returnValue);
@@ -569,9 +574,9 @@ class RegisterActionTest extends TestCase
                     'password' => 'pass1234',
                     'displayName' => '<invalid-display-name>'
                 ],
-                'exceptionMessage' => 'Display name is invalid. It must start '
-                    . 'with a letter or number and may only contain letters, '
-                    . 'numbers, spaces, dots, hyphens, and apostrophes.'
+                'exceptionMessage' => 'Display name is invalid. It must start'
+                    . ' with a letter or number and may only contain letters,'
+                    . ' numbers, spaces, dots, hyphens, and apostrophes.'
             ],
         ];
     }

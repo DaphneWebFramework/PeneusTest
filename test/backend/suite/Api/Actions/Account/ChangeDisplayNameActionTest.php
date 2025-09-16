@@ -5,7 +5,6 @@ use \PHPUnit\Framework\Attributes\DataProvider;
 
 use \Peneus\Api\Actions\Account\ChangeDisplayNameAction;
 
-use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
@@ -18,7 +17,6 @@ class ChangeDisplayNameActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
     private ?AccountService $originalAccountService = null;
-    private ?Config $originalConfig = null;
 
     protected function setUp(): void
     {
@@ -26,22 +24,12 @@ class ChangeDisplayNameActionTest extends TestCase
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalAccountService =
             AccountService::ReplaceInstance($this->createMock(AccountService::class));
-        $this->originalConfig =
-            Config::ReplaceInstance($this->createConfig());
     }
 
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
         AccountService::ReplaceInstance($this->originalAccountService);
-        Config::ReplaceInstance($this->originalConfig);
-    }
-
-    private function createConfig(): Config
-    {
-        $mock = $this->createMock(Config::class);
-        $mock->method('Option')->with('Language')->willReturn('en');
-        return $mock;
     }
 
     private function systemUnderTest(): ChangeDisplayNameAction
@@ -166,9 +154,9 @@ class ChangeDisplayNameActionTest extends TestCase
             ],
             'displayName invalid' => [
                 'data' => [ 'displayName' => '<invalid-display-name>' ],
-                'exceptionMessage' => 'Display name is invalid. It must start '
-                    . 'with a letter or number and may only contain letters, '
-                    . 'numbers, spaces, dots, hyphens, and apostrophes.'
+                'exceptionMessage' => 'Display name is invalid. It must start'
+                    . ' with a letter or number and may only contain letters,'
+                    . ' numbers, spaces, dots, hyphens, and apostrophes.'
             ],
         ];
     }

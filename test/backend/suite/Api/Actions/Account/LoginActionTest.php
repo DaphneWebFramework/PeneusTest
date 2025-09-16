@@ -6,7 +6,6 @@ use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Account\LoginAction;
 
-use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
@@ -32,7 +31,6 @@ class LoginActionTest extends TestCase
     private ?SecurityService $originalSecurityService = null;
     private ?CookieService $originalCookieService = null;
     private ?AccountService $originalAccountService = null;
-    private ?Config $originalConfig = null;
 
     protected function setUp(): void
     {
@@ -48,8 +46,6 @@ class LoginActionTest extends TestCase
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
         $this->originalAccountService =
             AccountService::ReplaceInstance($this->createMock(AccountService::class));
-        $this->originalConfig =
-            Config::ReplaceInstance($this->createConfig());
     }
 
     protected function tearDown(): void
@@ -60,14 +56,6 @@ class LoginActionTest extends TestCase
         SecurityService::ReplaceInstance($this->originalSecurityService);
         CookieService::ReplaceInstance($this->originalCookieService);
         AccountService::ReplaceInstance($this->originalAccountService);
-        Config::ReplaceInstance($this->originalConfig);
-    }
-
-    private function createConfig(): Config
-    {
-        $mock = $this->createMock(Config::class);
-        $mock->method('Option')->with('Language')->willReturn('en');
-        return $mock;
     }
 
     private function systemUnderTest(string ...$mockedMethods): LoginAction

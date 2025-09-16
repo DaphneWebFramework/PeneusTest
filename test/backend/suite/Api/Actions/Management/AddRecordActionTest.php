@@ -6,7 +6,6 @@ use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Management\AddRecordAction;
 
-use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Services\SecurityService;
@@ -22,27 +21,16 @@ use \TestToolkit\DataHelper;
 class AddRecordActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
-    private ?Config $originalConfig = null;
 
     protected function setUp(): void
     {
         $this->originalRequest =
             Request::ReplaceInstance($this->createMock(Request::class));
-        $this->originalConfig =
-            Config::ReplaceInstance($this->createConfig());
     }
 
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
-        Config::ReplaceInstance($this->originalConfig);
-    }
-
-    private function createConfig(): Config
-    {
-        $mock = $this->createMock(Config::class);
-        $mock->method('Option')->with('Language')->willReturn('en');
-        return $mock;
     }
 
     private function systemUnderTest(string ...$mockedMethods): AddRecordAction

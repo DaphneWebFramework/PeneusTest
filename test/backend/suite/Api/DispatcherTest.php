@@ -31,7 +31,7 @@ class DispatcherTest extends TestCase
         $this->originalHandlerRegistry =
             HandlerRegistry::ReplaceInstance($this->createMock(HandlerRegistry::class));
         $this->originalConfig =
-            Config::ReplaceInstance($this->createConfig());
+            Config::ReplaceInstance($this->createMock(Config::class));
     }
 
     protected function tearDown(): void
@@ -40,16 +40,6 @@ class DispatcherTest extends TestCase
         Request::ReplaceInstance($this->originalRequest);
         HandlerRegistry::ReplaceInstance($this->originalHandlerRegistry);
         Config::ReplaceInstance($this->originalConfig);
-    }
-
-    private function createConfig($language = 'en', $isDebug = true): Config
-    {
-        $mock = $this->createMock(Config::class);
-        $mock->method('Option')->willReturnMap([
-            ['Language', $language],
-            ['IsDebug', $isDebug]
-        ]);
-        return $mock;
     }
 
     #region DispatchRequest ----------------------------------------------------
@@ -368,8 +358,13 @@ class DispatcherTest extends TestCase
     function testOnShutdownWithErrorInDebugMode()
     {
         $sut = new Dispatcher();
+        $config = Config::Instance();
         $response = $this->createMock(Response::class);
 
+        $config->expects($this->once())
+            ->method('Option')
+            ->with('IsDebug')
+            ->willReturn(true);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::InternalServerError)
@@ -392,9 +387,13 @@ class DispatcherTest extends TestCase
     function testOnShutdownWithErrorInLiveMode()
     {
         $sut = new Dispatcher();
+        $config = Config::Instance();
         $response = $this->createMock(Response::class);
-        Config::ReplaceInstance($this->createConfig(isDebug: false)); // Set live mode
 
+        $config->expects($this->once())
+            ->method('Option')
+            ->with('IsDebug')
+            ->willReturn(false);
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::InternalServerError)

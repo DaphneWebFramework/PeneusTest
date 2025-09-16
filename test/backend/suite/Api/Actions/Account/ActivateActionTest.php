@@ -6,7 +6,6 @@ use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Account\ActivateAction;
 
-use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Core\CUrl;
 use \Harmonia\Http\Request;
@@ -27,7 +26,6 @@ class ActivateActionTest extends TestCase
     private ?Database $originalDatabase = null;
     private ?CookieService $originalCookieService = null;
     private ?Resource $originalResource = null;
-    private ?Config $originalConfig = null;
 
     protected function setUp(): void
     {
@@ -39,8 +37,6 @@ class ActivateActionTest extends TestCase
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
         $this->originalResource =
             Resource::ReplaceInstance($this->createMock(Resource::class));
-        $this->originalConfig =
-            Config::ReplaceInstance($this->createConfig());
     }
 
     protected function tearDown(): void
@@ -49,14 +45,6 @@ class ActivateActionTest extends TestCase
         Database::ReplaceInstance($this->originalDatabase);
         CookieService::ReplaceInstance($this->originalCookieService);
         Resource::ReplaceInstance($this->originalResource);
-        Config::ReplaceInstance($this->originalConfig);
-    }
-
-    private function createConfig(): Config
-    {
-        $mock = $this->createMock(Config::class);
-        $mock->method('Option')->with('Language')->willReturn('en');
-        return $mock;
     }
 
     private function systemUnderTest(string ...$mockedMethods): ActivateAction

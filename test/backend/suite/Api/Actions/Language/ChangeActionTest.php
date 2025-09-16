@@ -4,7 +4,6 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\Actions\Language\ChangeAction;
 
-use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Peneus\Services\LanguageService;
@@ -15,7 +14,6 @@ class ChangeActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
     private ?LanguageService $originalLanguageService = null;
-    private ?Config $originalConfig = null;
 
     protected function setUp(): void
     {
@@ -23,22 +21,12 @@ class ChangeActionTest extends TestCase
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalLanguageService =
             LanguageService::ReplaceInstance($this->createMock(LanguageService::class));
-        $this->originalConfig =
-            Config::ReplaceInstance($this->createConfig());
     }
 
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
         LanguageService::ReplaceInstance($this->originalLanguageService);
-        Config::ReplaceInstance($this->originalConfig);
-    }
-
-    private function createConfig(): Config
-    {
-        $mock = $this->createMock(Config::class);
-        $mock->method('Option')->with('Language')->willReturn('en');
-        return $mock;
     }
 
     private function systemUnderTest(): ChangeAction
