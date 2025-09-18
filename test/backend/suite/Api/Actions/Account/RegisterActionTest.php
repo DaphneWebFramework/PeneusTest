@@ -100,7 +100,7 @@ class RegisterActionTest extends TestCase
             ->willReturn([
                 'email' => 'john@example.com',
                 'password' => 'pass1234',
-                'displayName' => 'John Doe'
+                'displayName' => 'John'
             ]);
         $sut->expects($this->once())
             ->method('isEmailAlreadyRegistered')
@@ -131,7 +131,7 @@ class RegisterActionTest extends TestCase
             ->willReturn([
                 'email' => 'john@example.com',
                 'password' => 'pass1234',
-                'displayName' => 'John Doe'
+                'displayName' => 'John'
             ]);
         $sut->expects($this->once())
             ->method('isEmailAlreadyRegistered')
@@ -170,7 +170,7 @@ class RegisterActionTest extends TestCase
             ->willReturn([
                 'email' => 'john@example.com',
                 'password' => 'pass1234',
-                'displayName' => 'John Doe'
+                'displayName' => 'John'
             ]);
         $sut->expects($this->once())
             ->method('isEmailAlreadyRegistered')
@@ -185,7 +185,7 @@ class RegisterActionTest extends TestCase
             ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('createPendingAccount')
-            ->with('john@example.com', 'pass1234', 'John Doe', 'code1234')
+            ->with('john@example.com', 'pass1234', 'John', 'code1234')
             ->willReturn(false);
         $sut->expects($this->never())
             ->method('sendActivationEmail');
@@ -227,7 +227,7 @@ class RegisterActionTest extends TestCase
             ->willReturn([
                 'email' => 'john@example.com',
                 'password' => 'pass1234',
-                'displayName' => 'John Doe'
+                'displayName' => 'John'
             ]);
         $sut->expects($this->once())
             ->method('isEmailAlreadyRegistered')
@@ -242,11 +242,11 @@ class RegisterActionTest extends TestCase
             ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('createPendingAccount')
-            ->with('john@example.com', 'pass1234', 'John Doe', 'code1234')
+            ->with('john@example.com', 'pass1234', 'John', 'code1234')
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('sendActivationEmail')
-            ->with('john@example.com', 'John Doe', 'code1234')
+            ->with('john@example.com', 'John', 'code1234')
             ->willReturn(false);
         $database->expects($this->once())
             ->method('WithTransaction')
@@ -287,7 +287,7 @@ class RegisterActionTest extends TestCase
             ->willReturn([
                 'email' => 'john@example.com',
                 'password' => 'pass1234',
-                'displayName' => 'John Doe'
+                'displayName' => 'John'
             ]);
         $sut->expects($this->once())
             ->method('isEmailAlreadyRegistered')
@@ -302,11 +302,11 @@ class RegisterActionTest extends TestCase
             ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('createPendingAccount')
-            ->with('john@example.com', 'pass1234', 'John Doe', 'code1234')
+            ->with('john@example.com', 'pass1234', 'John', 'code1234')
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('sendActivationEmail')
-            ->with('john@example.com', 'John Doe', 'code1234')
+            ->with('john@example.com', 'John', 'code1234')
             ->willReturn(true);
         $cookieService->expects($this->once())
             ->method('DeleteCsrfCookie')
@@ -349,7 +349,7 @@ class RegisterActionTest extends TestCase
             ->willReturn([
                 'email' => 'john@example.com',
                 'password' => 'pass1234',
-                'displayName' => 'John Doe'
+                'displayName' => 'John'
             ]);
         $sut->expects($this->once())
             ->method('isEmailAlreadyRegistered')
@@ -364,11 +364,11 @@ class RegisterActionTest extends TestCase
             ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('createPendingAccount')
-            ->with('john@example.com', 'pass1234', 'John Doe', 'code1234')
+            ->with('john@example.com', 'pass1234', 'John', 'code1234')
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('sendActivationEmail')
-            ->with('john@example.com', 'John Doe', 'code1234')
+            ->with('john@example.com', 'John', 'code1234')
             ->willReturn(true);
         $cookieService->expects($this->once())
             ->method('DeleteCsrfCookie');
@@ -454,7 +454,7 @@ class RegisterActionTest extends TestCase
             bindings: [
                 'email' => 'john@example.com',
                 'passwordHash' => 'hash1234',
-                'displayName' => 'John Doe',
+                'displayName' => 'John',
                 'activationCode' => 'code1234',
                 'timeRegistered' => $now->format('Y-m-d H:i:s')
             ],
@@ -472,7 +472,7 @@ class RegisterActionTest extends TestCase
         $this->assertSame($returnValue, AccessHelper::CallMethod(
             $sut,
             'createPendingAccount',
-            ['john@example.com', 'pass1234', 'John Doe', 'code1234', $now]
+            ['john@example.com', 'pass1234', 'John', 'code1234', $now]
         ));
     }
 
@@ -499,7 +499,7 @@ class RegisterActionTest extends TestCase
             ->method('sendTransactionalEmail')
             ->with(
                 'john@example.com',
-                'John Doe',
+                'John',
                 'url/to/page/code1234',
                 [
                     'heroText' =>
@@ -520,7 +520,7 @@ class RegisterActionTest extends TestCase
         $this->assertSame($returnValue, AccessHelper::CallMethod(
             $sut,
             'sendActivationEmail',
-            ['john@example.com', 'John Doe', 'code1234']
+            ['john@example.com', 'John', 'code1234']
         ));
     }
 

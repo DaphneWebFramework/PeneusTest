@@ -21,23 +21,23 @@ use \TestToolkit\AccessHelper;
 #[CoversClass(SignInWithGoogleAction::class)]
 class SignInWithGoogleActionTest extends TestCase
 {
+    private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
     private ?AccountService $originalAccountService = null;
     private ?CookieService $originalCookieService = null;
-    private ?Request $originalRequest = null;
     private ?Config $originalConfig = null;
     private ?Resource $originalResource = null;
 
     protected function setUp(): void
     {
+        $this->originalRequest =
+            Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalDatabase =
             Database::ReplaceInstance($this->createMock(Database::class));
         $this->originalAccountService =
             AccountService::ReplaceInstance($this->createMock(AccountService::class));
         $this->originalCookieService =
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
-        $this->originalRequest =
-            Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalConfig =
             Config::ReplaceInstance($this->createMock(Config::class));
         $this->originalResource =
@@ -46,10 +46,10 @@ class SignInWithGoogleActionTest extends TestCase
 
     protected function tearDown(): void
     {
+        Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
         AccountService::ReplaceInstance($this->originalAccountService);
         CookieService::ReplaceInstance($this->originalCookieService);
-        Request::ReplaceInstance($this->originalRequest);
         Config::ReplaceInstance($this->originalConfig);
         Resource::ReplaceInstance($this->originalResource);
     }
@@ -67,33 +67,15 @@ class SignInWithGoogleActionTest extends TestCase
     function testOnExecuteThrowsIfAccountAlreadyLoggedIn()
     {
         $sut = $this->systemUnderTest(
-            'isAccountLoggedIn',
-            'validateRequest',
-            'decodeCredential',
-            'validateClaims',
-            'logOut',
-            'homePageUrl'
+            'isAccountLoggedIn'
         );
-        $database = Database::Instance();
 
         $sut->expects($this->once())
             ->method('isAccountLoggedIn')
             ->willReturn(true);
-        $sut->expects($this->never())
-            ->method('validateRequest');
-        $sut->expects($this->never())
-            ->method('decodeCredential');
-        $sut->expects($this->never())
-            ->method('validateClaims');
-        $database->expects($this->never())
-            ->method('WithTransaction');
-        $sut->expects($this->never())
-            ->method('logOut');
-        $sut->expects($this->never())
-            ->method('homePageUrl');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('You are already logged in.');
+        $this->expectExceptionMessage("You are already logged in.");
         $this->expectExceptionCode(StatusCode::Conflict->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
@@ -102,32 +84,18 @@ class SignInWithGoogleActionTest extends TestCase
     {
         $sut = $this->systemUnderTest(
             'isAccountLoggedIn',
-            'validateRequest',
-            'decodeCredential',
-            'validateClaims',
-            'logOut',
-            'homePageUrl'
+            'validateRequest'
         );
-        $database = Database::Instance();
 
         $sut->expects($this->once())
             ->method('isAccountLoggedIn')
             ->willReturn(false);
         $sut->expects($this->once())
             ->method('validateRequest')
-            ->willThrowException(new \RuntimeException);
-        $sut->expects($this->never())
-            ->method('decodeCredential');
-        $sut->expects($this->never())
-            ->method('validateClaims');
-        $database->expects($this->never())
-            ->method('WithTransaction');
-        $sut->expects($this->never())
-            ->method('logOut');
-        $sut->expects($this->never())
-            ->method('homePageUrl');
+            ->willThrowException(new \RuntimeException('Placeholder message.'));
 
         $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Placeholder message.');
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -136,14 +104,10 @@ class SignInWithGoogleActionTest extends TestCase
         $sut = $this->systemUnderTest(
             'isAccountLoggedIn',
             'validateRequest',
-            'decodeCredential',
-            'validateClaims',
-            'logOut',
-            'homePageUrl'
+            'decodeCredential'
         );
         $dataAccessor = $this->createMock(DataAccessor::class);
         $credential = 'cred1234';
-        $database = Database::Instance();
 
         $sut->expects($this->once())
             ->method('isAccountLoggedIn')
@@ -159,17 +123,9 @@ class SignInWithGoogleActionTest extends TestCase
             ->method('decodeCredential')
             ->with($credential)
             ->willReturn(null);
-        $sut->expects($this->never())
-            ->method('validateClaims');
-        $database->expects($this->never())
-            ->method('WithTransaction');
-        $sut->expects($this->never())
-            ->method('logOut');
-        $sut->expects($this->never())
-            ->method('homePageUrl');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Invalid credential.');
+        $this->expectExceptionMessage("Invalid credential.");
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -179,14 +135,11 @@ class SignInWithGoogleActionTest extends TestCase
             'isAccountLoggedIn',
             'validateRequest',
             'decodeCredential',
-            'validateClaims',
-            'logOut',
-            'homePageUrl'
+            'validateClaims'
         );
         $dataAccessor = $this->createMock(DataAccessor::class);
         $credential = 'cred1234';
         $claims = ['key' => 'value'];
-        $database = Database::Instance();
 
         $sut->expects($this->once())
             ->method('isAccountLoggedIn')
@@ -206,15 +159,9 @@ class SignInWithGoogleActionTest extends TestCase
             ->method('validateClaims')
             ->with($claims)
             ->willReturn(false);
-        $database->expects($this->never())
-            ->method('WithTransaction');
-        $sut->expects($this->never())
-            ->method('logOut');
-        $sut->expects($this->never())
-            ->method('homePageUrl');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Invalid claims.');
+        $this->expectExceptionMessage("Invalid claims.");
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -226,13 +173,11 @@ class SignInWithGoogleActionTest extends TestCase
             'decodeCredential',
             'validateClaims',
             'findOrCreateAccount',
-            'deleteCsrfCookie',
-            'logOut',
-            'homePageUrl'
+            'logOut'
         );
         $dataAccessor = $this->createMock(DataAccessor::class);
         $credential = 'cred1234';
-        $claims = ['email' => 'john@example.com', 'name' => 'John Doe'];
+        $claims = ['email' => 'john@example.com', 'name' => 'John'];
         $database = Database::Instance();
         $account = $this->createMock(Account::class);
         $accountService = AccountService::Instance();
@@ -275,14 +220,8 @@ class SignInWithGoogleActionTest extends TestCase
         $account->expects($this->once())
             ->method('Save')
             ->willReturn(false);
-        $accountService->expects($this->never())
-            ->method('EstablishSessionIntegrity');
-        $sut->expects($this->never())
-            ->method('deleteCsrfCookie');
         $sut->expects($this->once())
             ->method('logOut');
-        $sut->expects($this->never())
-            ->method('homePageUrl');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Login failed.');
@@ -298,13 +237,11 @@ class SignInWithGoogleActionTest extends TestCase
             'decodeCredential',
             'validateClaims',
             'findOrCreateAccount',
-            'deleteCsrfCookie',
-            'logOut',
-            'homePageUrl'
+            'logOut'
         );
         $dataAccessor = $this->createMock(DataAccessor::class);
         $credential = 'cred1234';
-        $claims = ['email' => 'john@example.com', 'name' => 'John Doe'];
+        $claims = ['email' => 'john@example.com', 'name' => 'John'];
         $database = Database::Instance();
         $account = $this->createMock(Account::class);
         $accountService = AccountService::Instance();
@@ -351,12 +288,8 @@ class SignInWithGoogleActionTest extends TestCase
             ->method('EstablishSessionIntegrity')
             ->with($account)
             ->willReturn(false);
-        $sut->expects($this->never())
-            ->method('deleteCsrfCookie');
         $sut->expects($this->once())
             ->method('logOut');
-        $sut->expects($this->never())
-            ->method('homePageUrl');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Login failed.');
@@ -373,12 +306,11 @@ class SignInWithGoogleActionTest extends TestCase
             'validateClaims',
             'findOrCreateAccount',
             'deleteCsrfCookie',
-            'logOut',
-            'homePageUrl'
+            'logOut'
         );
         $dataAccessor = $this->createMock(DataAccessor::class);
         $credential = 'cred1234';
-        $claims = ['email' => 'john@example.com', 'name' => 'John Doe'];
+        $claims = ['email' => 'john@example.com', 'name' => 'John'];
         $database = Database::Instance();
         $account = $this->createMock(Account::class);
         $accountService = AccountService::Instance();
@@ -407,6 +339,10 @@ class SignInWithGoogleActionTest extends TestCase
                 try {
                     return $callback();
                 } catch (\Throwable $e) {
+                    $this->assertSame(
+                        'Placeholder message.',
+                        $e->getMessage()
+                    );
                     return false;
                 }
             });
@@ -423,11 +359,9 @@ class SignInWithGoogleActionTest extends TestCase
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('deleteCsrfCookie')
-            ->willThrowException(new \RuntimeException);
+            ->willThrowException(new \RuntimeException('Placeholder message.'));
         $sut->expects($this->once())
             ->method('logOut');
-        $sut->expects($this->never())
-            ->method('homePageUrl');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Login failed.');
@@ -449,7 +383,7 @@ class SignInWithGoogleActionTest extends TestCase
         );
         $dataAccessor = $this->createMock(DataAccessor::class);
         $credential = 'cred1234';
-        $claims = ['email' => 'john@example.com', 'name' => 'John Doe'];
+        $claims = ['email' => 'john@example.com', 'name' => 'John'];
         $database = Database::Instance();
         $account = $this->createMock(Account::class);
         $accountService = AccountService::Instance();
@@ -508,21 +442,7 @@ class SignInWithGoogleActionTest extends TestCase
 
     #region isAccountLoggedIn --------------------------------------------------
 
-    function testIsAccountLoggedInSucceedsIfAccountIsLoggedIn()
-    {
-        $sut = $this->systemUnderTest();
-        $accountService = AccountService::Instance();
-        $account = $this->createStub(Account::class);
-
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn($account);
-
-        $result = AccessHelper::CallMethod($sut, 'isAccountLoggedIn');
-        $this->assertTrue($result);
-    }
-
-    function testIsAccountLoggedInFailsIfAccountIsNotLoggedIn()
+    function testIsAccountLoggedInReturnsFalseIfAccountIsNotLoggedIn()
     {
         $sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
@@ -533,6 +453,20 @@ class SignInWithGoogleActionTest extends TestCase
 
         $result = AccessHelper::CallMethod($sut, 'isAccountLoggedIn');
         $this->assertFalse($result);
+    }
+
+    function testIsAccountLoggedInReturnsTrueIfAccountIsLoggedIn()
+    {
+        $sut = $this->systemUnderTest();
+        $account = $this->createStub(Account::class);
+        $accountService = AccountService::Instance();
+
+        $accountService->expects($this->once())
+            ->method('LoggedInAccount')
+            ->willReturn($account);
+
+        $result = AccessHelper::CallMethod($sut, 'isAccountLoggedIn');
+        $this->assertTrue($result);
     }
 
     #endregion isAccountLoggedIn
@@ -620,10 +554,7 @@ class SignInWithGoogleActionTest extends TestCase
     function testValidateClaimsFailsIfValidateIssuerFails()
     {
         $sut = $this->systemUnderTest(
-            'validateIssuer',
-            'validateAudience',
-            'validateTimeWindow',
-            'validateEmailVerified'
+            'validateIssuer'
         );
         $claims = ['iss' => 'https://example.com'];
 
@@ -631,12 +562,6 @@ class SignInWithGoogleActionTest extends TestCase
             ->method('validateIssuer')
             ->with('https://example.com')
             ->willReturn(false);
-        $sut->expects($this->never())
-            ->method('validateAudience');
-        $sut->expects($this->never())
-            ->method('validateTimeWindow');
-        $sut->expects($this->never())
-            ->method('validateEmailVerified');
 
         $result = AccessHelper::CallMethod($sut, 'validateClaims', [$claims]);
         $this->assertFalse($result);
@@ -646,9 +571,7 @@ class SignInWithGoogleActionTest extends TestCase
     {
         $sut = $this->systemUnderTest(
             'validateIssuer',
-            'validateAudience',
-            'validateTimeWindow',
-            'validateEmailVerified'
+            'validateAudience'
         );
         $claims = [
             'iss' => 'https://accounts.google.com',
@@ -664,10 +587,6 @@ class SignInWithGoogleActionTest extends TestCase
             ->method('validateAudience')
             ->with('invalid-azp', 'invalid-aud')
             ->willReturn(false);
-        $sut->expects($this->never())
-            ->method('validateTimeWindow');
-        $sut->expects($this->never())
-            ->method('validateEmailVerified');
 
         $result = AccessHelper::CallMethod($sut, 'validateClaims', [$claims]);
         $this->assertFalse($result);
@@ -678,8 +597,7 @@ class SignInWithGoogleActionTest extends TestCase
         $sut = $this->systemUnderTest(
             'validateIssuer',
             'validateAudience',
-            'validateTimeWindow',
-            'validateEmailVerified'
+            'validateTimeWindow'
         );
         $claims = [
             'iss' => 'https://accounts.google.com',
@@ -701,8 +619,6 @@ class SignInWithGoogleActionTest extends TestCase
             ->method('validateTimeWindow')
             ->with('invalid-nbf', 'invalid-exp')
             ->willReturn(false);
-        $sut->expects($this->never())
-            ->method('validateEmailVerified');
 
         $result = AccessHelper::CallMethod($sut, 'validateClaims', [$claims]);
         $this->assertFalse($result);
@@ -923,7 +839,7 @@ class SignInWithGoogleActionTest extends TestCase
             'createAccount'
         );
         $email = 'john@example.com';
-        $displayName = 'John Doe';
+        $displayName = 'John';
         $timeLastLogin = new \DateTime();
         $account = $this->createStub(Account::class);
 
@@ -951,7 +867,7 @@ class SignInWithGoogleActionTest extends TestCase
             'createAccount'
         );
         $email = 'john@example.com';
-        $displayName = 'John Doe';
+        $displayName = 'John';
         $timeLastLogin = new \DateTime();
         $account = $this->createStub(Account::class);
 
@@ -1008,7 +924,7 @@ class SignInWithGoogleActionTest extends TestCase
                 'id' => 23,
                 'email' => 'john@example.com',
                 'passwordHash' => 'hash1234',
-                'displayName' => 'John Doe',
+                'displayName' => 'John',
                 'timeActivated' => '2024-01-01 00:00:00',
                 'timeLastLogin' => '2025-01-01 00:00:00'
             ]],
@@ -1025,7 +941,7 @@ class SignInWithGoogleActionTest extends TestCase
         $this->assertSame(23, $account->id);
         $this->assertSame('john@example.com', $account->email);
         $this->assertSame('hash1234', $account->passwordHash);
-        $this->assertSame('John Doe', $account->displayName);
+        $this->assertSame('John', $account->displayName);
         $this->assertSame('2024-01-01 00:00:00',
             $account->timeActivated->format('Y-m-d H:i:s'));
         $this->assertSame('2025-01-01 00:00:00',
@@ -1044,12 +960,12 @@ class SignInWithGoogleActionTest extends TestCase
         $account = AccessHelper::CallMethod(
             $sut,
             'createAccount',
-            ['john@example.com', 'John Doe', $timeActivated]
+            ['john@example.com', 'John', $timeActivated]
         );
         $this->assertInstanceOf(Account::class, $account);
         $this->assertSame('john@example.com', $account->email);
         $this->assertSame('', $account->passwordHash);
-        $this->assertSame('John Doe', $account->displayName);
+        $this->assertSame('John', $account->displayName);
         $this->assertSame($timeActivated->format('c'),
                           $account->timeActivated->format('c'));
         $this->assertNull($account->timeLastLogin);

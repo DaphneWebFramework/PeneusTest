@@ -254,7 +254,7 @@ class AddRecordActionTest extends TestCase
                 'data' => [
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
-                    'displayName' => 'John Doe'
+                    'displayName' => 'John'
                 ],
                 'exceptionMessage' => "Required field 'timeActivated' is missing."
             ],
@@ -263,7 +263,7 @@ class AddRecordActionTest extends TestCase
                 'data' => [
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
-                    'displayName' => 'John Doe',
+                    'displayName' => 'John',
                     'timeActivated' => '01-01-2025'
                 ],
                 'exceptionMessage' => "Field 'timeActivated' must match the datetime format: Y-m-d H:i:s"
@@ -273,7 +273,7 @@ class AddRecordActionTest extends TestCase
                 'data' => [
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
-                    'displayName' => 'John Doe',
+                    'displayName' => 'John',
                     'timeActivated' => '2025-01-01 00:00:00'
                 ],
                 'exceptionMessage' => "Required field 'timeLastLogin' is missing."
@@ -283,7 +283,7 @@ class AddRecordActionTest extends TestCase
                 'data' => [
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
-                    'displayName' => 'John Doe',
+                    'displayName' => 'John',
                     'timeActivated' => '2025-01-01 00:00:00',
                     'timeLastLogin' => 'not-a-datetime'
                 ],
@@ -380,7 +380,7 @@ class AddRecordActionTest extends TestCase
                 'data' => [
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
-                    'displayName' => 'John Doe'
+                    'displayName' => 'John'
                 ],
                 'exceptionMessage' => "Required field 'activationCode' is missing."
             ],
@@ -389,7 +389,7 @@ class AddRecordActionTest extends TestCase
                 'data' => [
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
-                    'displayName' => 'John Doe',
+                    'displayName' => 'John',
                     'activationCode' => 'invalid-code'
                 ],
                 'exceptionMessage' => "Field 'activationCode' must match the required pattern: "
@@ -400,7 +400,7 @@ class AddRecordActionTest extends TestCase
                 'data' => [
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
-                    'displayName' => 'John Doe',
+                    'displayName' => 'John',
                     'activationCode' => \str_repeat('a', 64),
                 ],
                 'exceptionMessage' => "Required field 'timeRegistered' is missing."
@@ -410,7 +410,7 @@ class AddRecordActionTest extends TestCase
                 'data' => [
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
-                    'displayName' => 'John Doe',
+                    'displayName' => 'John',
                     'activationCode' => \str_repeat('a', 64),
                     'timeRegistered' => 'not-a-datetime'
                 ],

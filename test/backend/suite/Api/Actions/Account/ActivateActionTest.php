@@ -411,7 +411,7 @@ class ActivateActionTest extends TestCase
                 'id' => 42,
                 'email' => 'john@example.com',
                 'passwordHash' => 'hash1234',
-                'displayName' => 'John Doe',
+                'displayName' => 'John',
                 'activationCode' => 'code1234',
                 'timeRegistered' => '2025-01-01 10:00:00'
             ]],
@@ -428,7 +428,7 @@ class ActivateActionTest extends TestCase
         $this->assertSame(42, $pendingAccount->id);
         $this->assertSame('john@example.com', $pendingAccount->email);
         $this->assertSame('hash1234', $pendingAccount->passwordHash);
-        $this->assertSame('John Doe', $pendingAccount->displayName);
+        $this->assertSame('John', $pendingAccount->displayName);
         $this->assertSame('code1234', $pendingAccount->activationCode);
         $this->assertSame('2025-01-01 10:00:00',
             $pendingAccount->timeRegistered->format('Y-m-d H:i:s'));
@@ -469,7 +469,7 @@ class ActivateActionTest extends TestCase
         $pendingAccount = new PendingAccount([
             'email' => 'john@example.com',
             'passwordHash' => 'hash1234',
-            'displayName' => 'John Doe',
+            'displayName' => 'John',
             'activationCode' => 'code1234',
             'timeRegistered' => '2024-12-31 23:59:59'
         ]);
@@ -482,7 +482,7 @@ class ActivateActionTest extends TestCase
         $this->assertInstanceOf(Account::class, $account);
         $this->assertSame('john@example.com', $account->email);
         $this->assertSame('hash1234', $account->passwordHash);
-        $this->assertSame('John Doe', $account->displayName);
+        $this->assertSame('John', $account->displayName);
         $this->assertSame($now->format('c'), $account->timeActivated->format('c'));
         $this->assertNull($account->timeLastLogin);
     }
