@@ -5,14 +5,12 @@ use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Services\AccountService;
 
-use \Harmonia\Core\CArray;
-use \Harmonia\Http\Request;
 use \Harmonia\Services\CookieService;
-use \Harmonia\Services\Security\CsrfToken;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Session;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
+use \Peneus\Api\Guards\TokenGuard;
 use \Peneus\Api\Hooks\IAccountDeletionHook;
 use \Peneus\Model\Account;
 use \Peneus\Model\Role;
@@ -23,21 +21,18 @@ use \TestToolkit\DataHelper;
 class AccountServiceTest extends TestCase
 {
     private ?CookieService $originalCookieService = null;
-    private ?Session $originalSession = null;
-    private ?Request $originalRequest = null;
     private ?SecurityService $originalSecurityService = null;
+    private ?Session $originalSession = null;
     private ?Database $originalDatabase = null;
 
     protected function setUp(): void
     {
         $this->originalCookieService =
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
-        $this->originalSession =
-            Session::ReplaceInstance($this->createMock(Session::class));
-        $this->originalRequest =
-            Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalSecurityService =
             SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
+        $this->originalSession =
+            Session::ReplaceInstance($this->createMock(Session::class));
         $this->originalDatabase =
             Database::ReplaceInstance(new FakeDatabase());
     }
@@ -45,9 +40,8 @@ class AccountServiceTest extends TestCase
     protected function tearDown(): void
     {
         CookieService::ReplaceInstance($this->originalCookieService);
-        Session::ReplaceInstance($this->originalSession);
-        Request::ReplaceInstance($this->originalRequest);
         SecurityService::ReplaceInstance($this->originalSecurityService);
+        Session::ReplaceInstance($this->originalSession);
         Database::ReplaceInstance($this->originalDatabase);
     }
 
@@ -338,42 +332,20 @@ class AccountServiceTest extends TestCase
 
     function testVerifySessionIntegrityReturnsFalseIfIntegrityTokenIsMissing()
     {
-        $sut = $this->systemUnderTest();
+        $sut = $this->systemUnderTest(
+            'IntegrityCookieName',
+            'createTokenGuard'
+        );
         $session = Session::Instance();
 
         $session->expects($this->once())
             ->method('Get')
             ->with(AccountService::INTEGRITY_TOKEN_SESSION_KEY)
             ->willReturn(null);
-
-        $this->assertFalse(AccessHelper::CallMethod(
-            $sut,
-            'verifySessionIntegrity',
-            [$session]
-        ));
-    }
-
-    function testVerifySessionIntegrityReturnsFalseIfIntegrityCookieIsMissing()
-    {
-        $sut = $this->systemUnderTest('IntegrityCookieName');
-        $session = Session::Instance();
-        $requestCookies = $this->createMock(CArray::class);
-        $request = Request::Instance();
-
-        $session->expects($this->once())
-            ->method('Get')
-            ->with(AccountService::INTEGRITY_TOKEN_SESSION_KEY)
-            ->willReturn('integrity-token-value');
-        $sut->expects($this->once())
-            ->method('IntegrityCookieName')
-            ->willReturn('MYAPP_INTEGRITY');
-        $request->expects($this->once())
-            ->method('Cookies')
-            ->willReturn($requestCookies);
-        $requestCookies->expects($this->once())
-            ->method('Get')
-            ->with('MYAPP_INTEGRITY')
-            ->willReturn(null);
+        $sut->expects($this->never())
+            ->method('IntegrityCookieName');
+        $sut->expects($this->never())
+            ->method('createTokenGuard');
 
         $this->assertFalse(AccessHelper::CallMethod(
             $sut,
@@ -383,13 +355,14 @@ class AccountServiceTest extends TestCase
     }
 
     #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
-    function testVerifySessionIntegrityReturnsWhateverVerifyCsrfTokenReturns($returnValue)
+    function testVerifySessionIntegrityReturnsTokenGuardVerifyResult($returnValue)
     {
-        $sut = $this->systemUnderTest('IntegrityCookieName');
+        $sut = $this->systemUnderTest(
+            'IntegrityCookieName',
+            'createTokenGuard'
+        );
         $session = Session::Instance();
-        $requestCookies = $this->createMock(CArray::class);
-        $request = Request::Instance();
-        $securityService = SecurityService::Instance();
+        $tokenGuard = $this->createMock(TokenGuard::class);
 
         $session->expects($this->once())
             ->method('Get')
@@ -398,19 +371,12 @@ class AccountServiceTest extends TestCase
         $sut->expects($this->once())
             ->method('IntegrityCookieName')
             ->willReturn('MYAPP_INTEGRITY');
-        $request->expects($this->once())
-            ->method('Cookies')
-            ->willReturn($requestCookies);
-        $requestCookies->expects($this->once())
-            ->method('Get')
-            ->with('MYAPP_INTEGRITY')
-            ->willReturn('integrity-cookie-value');
-        $securityService->expects($this->once())
-            ->method('VerifyCsrfToken')
-            ->with($this->callback(function(CsrfToken $csrfToken) {
-                return $csrfToken->Token() === 'integrity-token-value'
-                    && $csrfToken->CookieValue() === 'integrity-cookie-value';
-            }))
+        $sut->expects($this->once())
+            ->method('createTokenGuard')
+            ->with('integrity-token-value', 'MYAPP_INTEGRITY')
+            ->willReturn($tokenGuard);
+        $tokenGuard->expects($this->once())
+            ->method('Verify')
             ->willReturn($returnValue);
 
         $this->assertSame($returnValue, AccessHelper::CallMethod(
