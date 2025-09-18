@@ -226,7 +226,6 @@ class SignInWithGoogleActionTest extends TestCase
             'decodeCredential',
             'validateClaims',
             'findOrCreateAccount',
-            'establishSessionIntegrity',
             'deleteCsrfCookie',
             'logOut',
             'homePageUrl'
@@ -236,6 +235,7 @@ class SignInWithGoogleActionTest extends TestCase
         $claims = ['email' => 'john@example.com', 'name' => 'John Doe'];
         $database = Database::Instance();
         $account = $this->createMock(Account::class);
+        $accountService = AccountService::Instance();
 
         $sut->expects($this->once())
             ->method('isAccountLoggedIn')
@@ -275,8 +275,8 @@ class SignInWithGoogleActionTest extends TestCase
         $account->expects($this->once())
             ->method('Save')
             ->willReturn(false);
-        $sut->expects($this->never())
-            ->method('establishSessionIntegrity');
+        $accountService->expects($this->never())
+            ->method('EstablishSessionIntegrity');
         $sut->expects($this->never())
             ->method('deleteCsrfCookie');
         $sut->expects($this->once())
@@ -298,7 +298,6 @@ class SignInWithGoogleActionTest extends TestCase
             'decodeCredential',
             'validateClaims',
             'findOrCreateAccount',
-            'establishSessionIntegrity',
             'deleteCsrfCookie',
             'logOut',
             'homePageUrl'
@@ -308,6 +307,7 @@ class SignInWithGoogleActionTest extends TestCase
         $claims = ['email' => 'john@example.com', 'name' => 'John Doe'];
         $database = Database::Instance();
         $account = $this->createMock(Account::class);
+        $accountService = AccountService::Instance();
 
         $sut->expects($this->once())
             ->method('isAccountLoggedIn')
@@ -347,8 +347,8 @@ class SignInWithGoogleActionTest extends TestCase
         $account->expects($this->once())
             ->method('Save')
             ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('establishSessionIntegrity')
+        $accountService->expects($this->once())
+            ->method('EstablishSessionIntegrity')
             ->with($account)
             ->willReturn(false);
         $sut->expects($this->never())
@@ -372,7 +372,6 @@ class SignInWithGoogleActionTest extends TestCase
             'decodeCredential',
             'validateClaims',
             'findOrCreateAccount',
-            'establishSessionIntegrity',
             'deleteCsrfCookie',
             'logOut',
             'homePageUrl'
@@ -382,6 +381,7 @@ class SignInWithGoogleActionTest extends TestCase
         $claims = ['email' => 'john@example.com', 'name' => 'John Doe'];
         $database = Database::Instance();
         $account = $this->createMock(Account::class);
+        $accountService = AccountService::Instance();
 
         $sut->expects($this->once())
             ->method('isAccountLoggedIn')
@@ -417,8 +417,8 @@ class SignInWithGoogleActionTest extends TestCase
         $account->expects($this->once())
             ->method('Save')
             ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('establishSessionIntegrity')
+        $accountService->expects($this->once())
+            ->method('EstablishSessionIntegrity')
             ->with($account)
             ->willReturn(true);
         $sut->expects($this->once())
@@ -443,7 +443,6 @@ class SignInWithGoogleActionTest extends TestCase
             'decodeCredential',
             'validateClaims',
             'findOrCreateAccount',
-            'establishSessionIntegrity',
             'deleteCsrfCookie',
             'logOut',
             'homePageUrl'
@@ -453,6 +452,7 @@ class SignInWithGoogleActionTest extends TestCase
         $claims = ['email' => 'john@example.com', 'name' => 'John Doe'];
         $database = Database::Instance();
         $account = $this->createMock(Account::class);
+        $accountService = AccountService::Instance();
         $homePageUrl = 'url/to/home';
 
         $sut->expects($this->once())
@@ -485,8 +485,8 @@ class SignInWithGoogleActionTest extends TestCase
         $account->expects($this->once())
             ->method('Save')
             ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('establishSessionIntegrity')
+        $accountService->expects($this->once())
+            ->method('EstablishSessionIntegrity')
             ->with($account)
             ->willReturn(true);
         $sut->expects($this->once())

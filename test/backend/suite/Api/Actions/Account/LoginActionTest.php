@@ -227,12 +227,12 @@ class LoginActionTest extends TestCase
             'findAccount',
             'verifyPassword',
             'updateLastLoginTime',
-            'establishSessionIntegrity',
             'createLogoutAction'
         );
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $account = $this->createStub(Account::class);
+        $accountService = AccountService::Instance();
         $database = Database::Instance();
         $logoutAction = $this->createMock(LogoutAction::class);
 
@@ -257,8 +257,8 @@ class LoginActionTest extends TestCase
             ->method('updateLastLoginTime')
             ->with($account)
             ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('establishSessionIntegrity')
+        $accountService->expects($this->once())
+            ->method('EstablishSessionIntegrity')
             ->with($account)
             ->willReturn(false);
         $database->expects($this->once())
@@ -292,12 +292,12 @@ class LoginActionTest extends TestCase
             'findAccount',
             'verifyPassword',
             'updateLastLoginTime',
-            'establishSessionIntegrity',
             'createLogoutAction'
         );
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $account = $this->createStub(Account::class);
+        $accountService = AccountService::Instance();
         $database = Database::Instance();
         $logoutAction = $this->createMock(LogoutAction::class);
         $cookieService = CookieService::Instance();
@@ -323,8 +323,8 @@ class LoginActionTest extends TestCase
             ->method('updateLastLoginTime')
             ->with($account)
             ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('establishSessionIntegrity')
+        $accountService->expects($this->once())
+            ->method('EstablishSessionIntegrity')
             ->with($account)
             ->willReturn(true);
         $cookieService->expects($this->once())
@@ -357,12 +357,12 @@ class LoginActionTest extends TestCase
             'findAccount',
             'verifyPassword',
             'updateLastLoginTime',
-            'establishSessionIntegrity',
             'createLogoutAction'
         );
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $account = $this->createStub(Account::class);
+        $accountService = AccountService::Instance();
         $database = Database::Instance();
         $cookieService = CookieService::Instance();
 
@@ -387,8 +387,8 @@ class LoginActionTest extends TestCase
             ->method('updateLastLoginTime')
             ->with($account)
             ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('establishSessionIntegrity')
+        $accountService->expects($this->once())
+            ->method('EstablishSessionIntegrity')
             ->with($account)
             ->willReturn(true);
         $cookieService->expects($this->once())
@@ -464,63 +464,6 @@ class LoginActionTest extends TestCase
 
     #endregion findAccount
 
-    #region findAccountRole ----------------------------------------------------
-
-    function testFindAccountRoleReturnsNullWhenNotFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE accountId = :accountId LIMIT 1',
-            bindings: ['accountId' => 42],
-            result: null,
-            times: 1
-        );
-        Database::ReplaceInstance($fakeDatabase);
-
-        $this->assertNull(AccessHelper::CallMethod($sut, 'findAccountRole', [42]));
-    }
-
-    function testFindAccountRoleReturnsNullForInvalidEnumValue()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE accountId = :accountId LIMIT 1',
-            bindings: ['accountId' => 42],
-            result: [[
-                'accountId' => 42,
-                'role' => 999 // invalid
-            ]],
-            times: 1
-        );
-        Database::ReplaceInstance($fakeDatabase);
-
-        $this->assertNull(AccessHelper::CallMethod($sut, 'findAccountRole', [42]));
-    }
-
-    function testFindAccountRoleReturnsEntityWhenFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE accountId = :accountId LIMIT 1',
-            bindings: ['accountId' => 42],
-            result: [[
-                'accountId' => 42,
-                'role' => Role::Editor->value
-            ]],
-            times: 1
-        );
-        Database::ReplaceInstance($fakeDatabase);
-
-        $role = AccessHelper::CallMethod($sut, 'findAccountRole', [42]);
-        $this->assertInstanceOf(Role::class, $role);
-        $this->assertSame(Role::Editor, $role);
-    }
-
-    #endregion findAccountRole
-
     #region verifyPassword -----------------------------------------------------
 
     #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
@@ -573,269 +516,6 @@ class LoginActionTest extends TestCase
     }
 
     #endregion updateLastLoginTime
-
-    #region establishSessionIntegrity ------------------------------------------
-
-    function testEstablishSessionIntegrityFailsIfSessionStartThrows()
-    {
-        $sut = $this->systemUnderTest();
-        $securityService = SecurityService::Instance();
-        $session = Session::Instance();
-
-        $securityService->expects($this->once())
-            ->method('GenerateCsrfToken');
-        $session->expects($this->once())
-            ->method('Start')
-            ->willThrowException(new \RuntimeException);
-
-        $this->assertFalse(AccessHelper::CallMethod(
-            $sut,
-            'establishSessionIntegrity',
-            [new Account]
-        ));
-    }
-
-    function testEstablishSessionIntegrityFailsIfSessionClearThrows()
-    {
-        $sut = $this->systemUnderTest();
-        $securityService = SecurityService::Instance();
-        $session = Session::Instance();
-
-        $securityService->expects($this->once())
-            ->method('GenerateCsrfToken');
-        $session->expects($this->once())
-            ->method('Start')
-            ->willReturn($session);
-        $session->expects($this->once())
-            ->method('Clear')
-            ->willThrowException(new \RuntimeException);
-
-        $this->assertFalse(AccessHelper::CallMethod(
-            $sut,
-            'establishSessionIntegrity',
-            [new Account]
-        ));
-    }
-
-    function testEstablishSessionIntegrityFailsIfSessionRenewIdThrows()
-    {
-        $sut = $this->systemUnderTest();
-        $securityService = SecurityService::Instance();
-        $session = Session::Instance();
-
-        $securityService->expects($this->once())
-            ->method('GenerateCsrfToken');
-        $session->expects($this->once())
-            ->method('Start')
-            ->willReturn($session);
-        $session->expects($this->once())
-            ->method('Clear')
-            ->willReturn($session);
-        $session->expects($this->once())
-            ->method('RenewId')
-            ->willThrowException(new \RuntimeException);
-
-        $this->assertFalse(AccessHelper::CallMethod(
-            $sut,
-            'establishSessionIntegrity',
-            [new Account]
-        ));
-    }
-
-    function testEstablishSessionIntegrityFailsIfSessionCloseThrows()
-    {
-        $sut = $this->systemUnderTest('findAccountRole');
-        $securityService = SecurityService::Instance();
-        $session = Session::Instance();
-
-        $securityService->expects($this->once())
-            ->method('GenerateCsrfToken');
-        $session->expects($this->once())
-            ->method('Start')
-            ->willReturn($session);
-        $session->expects($this->once())
-            ->method('Clear')
-            ->willReturn($session);
-        $session->expects($this->once())
-            ->method('RenewId')
-            ->willReturn($session);
-        $session->expects($this->exactly(2))
-            ->method('Set')
-            ->willReturn($session);
-        $sut->expects($this->once())
-            ->method('findAccountRole');
-        $session->expects($this->once())
-            ->method('Close')
-            ->willThrowException(new \RuntimeException);
-
-        $this->assertFalse(AccessHelper::CallMethod(
-            $sut,
-            'establishSessionIntegrity',
-            [new Account]
-        ));
-    }
-
-    function testEstablishSessionIntegrityFailsIfSetCookieThrows()
-    {
-        $sut = $this->systemUnderTest('findAccountRole');
-        $securityService = SecurityService::Instance();
-        $session = Session::Instance();
-        $cookieService = CookieService::Instance();
-
-        $securityService->expects($this->once())
-            ->method('GenerateCsrfToken');
-        $session->expects($this->once())
-            ->method('Start')
-            ->willReturn($session);
-        $session->expects($this->once())
-            ->method('Clear')
-            ->willReturn($session);
-        $session->expects($this->once())
-            ->method('RenewId')
-            ->willReturn($session);
-        $session->expects($this->exactly(2))
-            ->method('Set')
-            ->willReturn($session);
-        $sut->expects($this->once())
-            ->method('findAccountRole');
-        $session->expects($this->once())
-            ->method('Close');
-        $cookieService->expects($this->once())
-            ->method('SetCookie')
-            ->willThrowException(new \RuntimeException);
-
-        $this->assertFalse(AccessHelper::CallMethod(
-            $sut,
-            'establishSessionIntegrity',
-            [new Account]
-        ));
-    }
-
-    function testEstablishSessionIntegritySucceedsWithoutAccountRole()
-    {
-        $sut = $this->systemUnderTest('findAccountRole');
-        $securityService = SecurityService::Instance();
-        $csrfToken = $this->createMock(CsrfToken::class);
-        $session = Session::Instance();
-        $accountService = AccountService::Instance();
-        $cookieService = CookieService::Instance();
-        $account = new Account(['id' => 23]);
-
-        $securityService->expects($this->once())
-            ->method('GenerateCsrfToken')
-            ->willReturn($csrfToken);
-        $session->expects($this->once())
-            ->method('Start')
-            ->willReturn($session);
-        $session->expects($this->once())
-            ->method('Clear')
-            ->willReturn($session);
-        $session->expects($this->once())
-            ->method('RenewId')
-            ->willReturn($session);
-        $csrfToken->expects($this->once())
-            ->method('Token')
-            ->willReturn('integrity-token');
-        $session->expects($this->exactly(2))
-            ->method('Set')
-            ->with($this->callback(function(...$args) {
-                [$key, $value] = $args;
-                return match ($key) {
-                    AccountService::INTEGRITY_TOKEN_SESSION_KEY =>
-                        $value === 'integrity-token',
-                    AccountService::ACCOUNT_ID_SESSION_KEY =>
-                        $value === 23,
-                    default => false
-                };
-            }))
-            ->willReturn($session);
-        $sut->expects($this->once())
-            ->method('findAccountRole')
-            ->with(23)
-            ->willReturn(null); // no role explicitly set in the database
-        $session->expects($this->once())
-            ->method('Close');
-        $accountService->expects($this->once())
-            ->method('IntegrityCookieName')
-            ->willReturn('integrity-cookie-name');
-        $csrfToken->expects($this->once())
-            ->method('CookieValue')
-            ->willReturn('integrity-cookie-value');
-        $cookieService->expects($this->once())
-            ->method('SetCookie')
-            ->with('integrity-cookie-name', 'integrity-cookie-value');
-
-        $this->assertTrue(AccessHelper::CallMethod(
-            $sut,
-            'establishSessionIntegrity',
-            [$account]
-        ));
-    }
-
-    function testEstablishSessionIntegritySucceedsWithAccountRole()
-    {
-        $sut = $this->systemUnderTest('findAccountRole');
-        $securityService = SecurityService::Instance();
-        $csrfToken = $this->createMock(CsrfToken::class);
-        $session = Session::Instance();
-        $accountService = AccountService::Instance();
-        $cookieService = CookieService::Instance();
-        $account = new Account(['id' => 23]);
-
-        $securityService->expects($this->once())
-            ->method('GenerateCsrfToken')
-            ->willReturn($csrfToken);
-        $session->expects($this->once())
-            ->method('Start')
-            ->willReturn($session);
-        $session->expects($this->once())
-            ->method('Clear')
-            ->willReturn($session);
-        $session->expects($this->once())
-            ->method('RenewId')
-            ->willReturn($session);
-        $csrfToken->expects($this->once())
-            ->method('Token')
-            ->willReturn('integrity-token');
-        $session->expects($this->exactly(3))
-            ->method('Set')
-            ->with($this->callback(function(...$args) {
-                [$key, $value] = $args;
-                return match ($key) {
-                    AccountService::INTEGRITY_TOKEN_SESSION_KEY =>
-                        $value === 'integrity-token',
-                    AccountService::ACCOUNT_ID_SESSION_KEY =>
-                        $value === 23,
-                    AccountService::ACCOUNT_ROLE_SESSION_KEY =>
-                        $value === Role::Editor->value,
-                    default => false
-                };
-            }))
-            ->willReturn($session);
-        $sut->expects($this->once())
-            ->method('findAccountRole')
-            ->with(23)
-            ->willReturn(Role::Editor);
-        $session->expects($this->once())
-            ->method('Close');
-        $accountService->expects($this->once())
-            ->method('IntegrityCookieName')
-            ->willReturn('integrity-cookie-name');
-        $csrfToken->expects($this->once())
-            ->method('CookieValue')
-            ->willReturn('integrity-cookie-value');
-        $cookieService->expects($this->once())
-            ->method('SetCookie')
-            ->with('integrity-cookie-name', 'integrity-cookie-value');
-
-        $this->assertTrue(AccessHelper::CallMethod(
-            $sut,
-            'establishSessionIntegrity',
-            [$account]
-        ));
-    }
-
-    #endregion establishSessionIntegrity
 
     #region createLogoutAction -------------------------------------------------
 
