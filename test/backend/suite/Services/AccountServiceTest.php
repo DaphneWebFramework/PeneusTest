@@ -26,6 +26,7 @@ class AccountServiceTest extends TestCase
     private ?Session $originalSession = null;
     private ?Request $originalRequest = null;
     private ?SecurityService $originalSecurityService = null;
+    private ?Database $originalDatabase = null;
 
     protected function setUp(): void
     {
@@ -37,6 +38,8 @@ class AccountServiceTest extends TestCase
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalSecurityService =
             SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
+        $this->originalDatabase =
+            Database::ReplaceInstance(new FakeDatabase());
     }
 
     protected function tearDown(): void
@@ -45,6 +48,7 @@ class AccountServiceTest extends TestCase
         Session::ReplaceInstance($this->originalSession);
         Request::ReplaceInstance($this->originalRequest);
         SecurityService::ReplaceInstance($this->originalSecurityService);
+        Database::ReplaceInstance($this->originalDatabase);
     }
 
     private function systemUnderTest(string ...$mockedMethods): AccountService
@@ -299,6 +303,7 @@ class AccountServiceTest extends TestCase
             $sut,
             'deletionHooks'
         );
+
         $this->assertCount(1, $hooks);
         $this->assertSame($hook, $hooks[0]);
     }
@@ -321,6 +326,7 @@ class AccountServiceTest extends TestCase
         );
 
         $hooks = $sut->DeletionHooks();
+
         $this->assertCount(2, $hooks);
         $this->assertSame($hook1, $hooks[0]);
         $this->assertSame($hook2, $hooks[1]);
@@ -439,32 +445,38 @@ class AccountServiceTest extends TestCase
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
-        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase = Database::Instance();
+
+        $session->expects($this->once())
+            ->method('Get')
+            ->with(AccountService::ACCOUNT_ID_SESSION_KEY)
+            ->willReturn(42);
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
             bindings: ['id' => 42],
             result: null,
             times: 1
         );
-        Database::ReplaceInstance($fakeDatabase);
-
-        $session->expects($this->once())
-            ->method('Get')
-            ->with(AccountService::ACCOUNT_ID_SESSION_KEY)
-            ->willReturn(42);
 
         $this->assertNull(AccessHelper::CallMethod(
             $sut,
             'retrieveLoggedInAccount',
             [$session]
         ));
+
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     function testRetrieveLoggedInAccountReturnsEntityWhenFound()
     {
         $sut = $this->systemUnderTest();
         $session = Session::Instance();
-        $fakeDatabase = new FakeDatabase();
+        $fakeDatabase = Database::Instance();
+
+        $session->expects($this->once())
+            ->method('Get')
+            ->with(AccountService::ACCOUNT_ID_SESSION_KEY)
+            ->willReturn(42);
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
             bindings: ['id' => 42],
@@ -478,14 +490,13 @@ class AccountServiceTest extends TestCase
             ]],
             times: 1
         );
-        Database::ReplaceInstance($fakeDatabase);
 
-        $session->expects($this->once())
-            ->method('Get')
-            ->with(AccountService::ACCOUNT_ID_SESSION_KEY)
-            ->willReturn(42);
+        $account = AccessHelper::CallMethod(
+            $sut,
+            'retrieveLoggedInAccount',
+            [$session]
+        );
 
-        $account = AccessHelper::CallMethod($sut, 'retrieveLoggedInAccount', [$session]);
         $this->assertInstanceOf(Account::class, $account);
         $this->assertSame(42, $account->id);
         $this->assertSame('john@example.com', $account->email);
@@ -493,6 +504,7 @@ class AccountServiceTest extends TestCase
         $this->assertSame('John', $account->displayName);
         $this->assertSame('2024-01-01 00:00:00', $account->timeActivated->format('Y-m-d H:i:s'));
         $this->assertSame('2025-01-01 00:00:00', $account->timeLastLogin->format('Y-m-d H:i:s'));
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     #endregion retrieveLoggedInAccount
