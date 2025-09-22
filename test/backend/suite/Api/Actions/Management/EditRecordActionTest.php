@@ -564,7 +564,7 @@ class EditRecordActionTest extends TestCase
                     'activationCode' => 'invalid-code'
                 ],
                 'exceptionMessage' => "Field 'activationCode' must match the required pattern: "
-                    . SecurityService::TOKEN_PATTERN
+                    . SecurityService::Instance()->TokenPattern()
             ],
             'pendingAccount: timeRegistered missing' => [
                 'table' => 'pendingaccount',
@@ -649,7 +649,7 @@ class EditRecordActionTest extends TestCase
                     'resetCode' => 'invalid-token'
                 ],
                 'exceptionMessage' => "Field 'resetCode' must match the required pattern: "
-                    . SecurityService::TOKEN_PATTERN
+                    . SecurityService::Instance()->TokenPattern()
             ],
             'passwordReset: timeRequested missing' => [
                 'table' => 'passwordreset',

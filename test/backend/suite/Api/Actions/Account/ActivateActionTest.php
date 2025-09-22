@@ -11,8 +11,10 @@ use \Harmonia\Core\CUrl;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
+use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
+use \Harmonia\Systems\ValidationSystem\DataAccessor;
 use \Peneus\Model\Account;
 use \Peneus\Model\PendingAccount;
 use \Peneus\Resource;
@@ -24,6 +26,7 @@ class ActivateActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
+    private ?SecurityService $originalSecurityService = null;
     private ?CookieService $originalCookieService = null;
     private ?Resource $originalResource = null;
 
@@ -33,6 +36,8 @@ class ActivateActionTest extends TestCase
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalDatabase =
             Database::ReplaceInstance($this->createMock(Database::class));
+        $this->originalSecurityService =
+            SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
         $this->originalCookieService =
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
         $this->originalResource =
@@ -43,6 +48,7 @@ class ActivateActionTest extends TestCase
     {
         Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
+        SecurityService::ReplaceInstance($this->originalSecurityService);
         CookieService::ReplaceInstance($this->originalCookieService);
         Resource::ReplaceInstance($this->originalResource);
     }
@@ -57,42 +63,37 @@ class ActivateActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    #[DataProvider('invalidModelDataProvider')]
-    function testOnExecuteThrowsForInvalidModelData(
-        array $data,
-        string $exceptionMessage
-    ) {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
+    function testOnExecuteThrowsIfValidateRequestFails()
+    {
+        $sut = $this->systemUnderTest(
+            'validateRequest'
+        );
 
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($data);
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willThrowException(new \RuntimeException('Placeholder message.'));
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
+        $this->expectExceptionMessage('Placeholder message.');
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfPendingAccountNotFound()
     {
-        $sut = $this->systemUnderTest('findPendingAccount');
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest(
+            'validateRequest',
+            'findPendingAccount'
+        );
+        $dataAccessor = $this->createMock(DataAccessor::class);
         $activationCode = \str_repeat('a', 64); // valid format
 
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'activationCode' => $activationCode
-            ]);
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willReturn($dataAccessor);
+        $dataAccessor->expects($this->once())
+            ->method('GetField')
+            ->with('activationCode')
+            ->willReturn($activationCode);
         $sut->expects($this->once())
             ->method('findPendingAccount')
             ->with($activationCode)
@@ -108,23 +109,22 @@ class ActivateActionTest extends TestCase
     function testOnExecuteThrowsIfEmailAlreadyRegistered()
     {
         $sut = $this->systemUnderTest(
+            'validateRequest',
             'findPendingAccount',
             'isEmailAlreadyRegistered'
         );
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
+        $dataAccessor = $this->createMock(DataAccessor::class);
         $activationCode = \str_repeat('a', 64);
         $pendingAccount = $this->createStub(PendingAccount::class);
         $pendingAccount->email = 'john@example.com';
 
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'activationCode' => $activationCode
-            ]);
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willReturn($dataAccessor);
+        $dataAccessor->expects($this->once())
+            ->method('GetField')
+            ->with('activationCode')
+            ->willReturn($activationCode);
         $sut->expects($this->once())
             ->method('findPendingAccount')
             ->with($activationCode)
@@ -143,26 +143,25 @@ class ActivateActionTest extends TestCase
     function testOnExecuteThrowsIfSavingAccountFails()
     {
         $sut = $this->systemUnderTest(
+            'validateRequest',
             'findPendingAccount',
             'isEmailAlreadyRegistered',
             'createAccountFromPendingAccount'
         );
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
+        $dataAccessor = $this->createMock(DataAccessor::class);
         $activationCode = \str_repeat('a', 64);
         $pendingAccount = $this->createStub(PendingAccount::class);
         $pendingAccount->email = 'john@example.com';
         $account = $this->createMock(Account::class);
         $database = Database::Instance();
 
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'activationCode' => $activationCode
-            ]);
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willReturn($dataAccessor);
+        $dataAccessor->expects($this->once())
+            ->method('GetField')
+            ->with('activationCode')
+            ->willReturn($activationCode);
         $sut->expects($this->once())
             ->method('findPendingAccount')
             ->with($activationCode)
@@ -184,7 +183,10 @@ class ActivateActionTest extends TestCase
                 try {
                     return $callback();
                 } catch (\Throwable $e) {
-                    $this->assertSame('Failed to save account.', $e->getMessage());
+                    $this->assertSame(
+                        'Failed to save account.',
+                        $e->getMessage()
+                    );
                     return false;
                 }
             });
@@ -198,26 +200,25 @@ class ActivateActionTest extends TestCase
     function testOnExecuteThrowsIfDeletingPendingAccountFails()
     {
         $sut = $this->systemUnderTest(
+            'validateRequest',
             'findPendingAccount',
             'isEmailAlreadyRegistered',
             'createAccountFromPendingAccount'
         );
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
+        $dataAccessor = $this->createMock(DataAccessor::class);
         $activationCode = \str_repeat('a', 64);
         $pendingAccount = $this->createMock(PendingAccount::class);
         $pendingAccount->email = 'john@example.com';
         $account = $this->createMock(Account::class);
         $database = Database::Instance();
 
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'activationCode' => $activationCode
-            ]);
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willReturn($dataAccessor);
+        $dataAccessor->expects($this->once())
+            ->method('GetField')
+            ->with('activationCode')
+            ->willReturn($activationCode);
         $sut->expects($this->once())
             ->method('findPendingAccount')
             ->with($activationCode)
@@ -242,7 +243,10 @@ class ActivateActionTest extends TestCase
                 try {
                     return $callback();
                 } catch (\Throwable $e) {
-                    $this->assertSame('Failed to delete pending account.', $e->getMessage());
+                    $this->assertSame(
+                        'Failed to delete pending account.',
+                        $e->getMessage()
+                    );
                     return false;
                 }
             });
@@ -256,12 +260,12 @@ class ActivateActionTest extends TestCase
     function testOnExecuteThrowsIfDeleteCsrfCookieFails()
     {
         $sut = $this->systemUnderTest(
+            'validateRequest',
             'findPendingAccount',
             'isEmailAlreadyRegistered',
             'createAccountFromPendingAccount'
         );
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
+        $dataAccessor = $this->createMock(DataAccessor::class);
         $activationCode = \str_repeat('a', 64);
         $pendingAccount = $this->createMock(PendingAccount::class);
         $pendingAccount->email = 'john@example.com';
@@ -269,14 +273,13 @@ class ActivateActionTest extends TestCase
         $cookieService = CookieService::Instance();
         $database = Database::Instance();
 
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'activationCode' => $activationCode
-            ]);
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willReturn($dataAccessor);
+        $dataAccessor->expects($this->once())
+            ->method('GetField')
+            ->with('activationCode')
+            ->willReturn($activationCode);
         $sut->expects($this->once())
             ->method('findPendingAccount')
             ->with($activationCode)
@@ -317,12 +320,12 @@ class ActivateActionTest extends TestCase
     function testOnExecuteSucceeds()
     {
         $sut = $this->systemUnderTest(
+            'validateRequest',
             'findPendingAccount',
             'isEmailAlreadyRegistered',
             'createAccountFromPendingAccount'
         );
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
+        $dataAccessor = $this->createMock(DataAccessor::class);
         $activationCode = \str_repeat('a', 64);
         $pendingAccount = $this->createMock(PendingAccount::class);
         $pendingAccount->email = 'john@example.com';
@@ -332,14 +335,13 @@ class ActivateActionTest extends TestCase
         $resource = Resource::Instance();
         $redirectUrl = new CUrl('/url/to/login');
 
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'activationCode' => $activationCode
-            ]);
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willReturn($dataAccessor);
+        $dataAccessor->expects($this->once())
+            ->method('GetField')
+            ->with('activationCode')
+            ->willReturn($activationCode);
         $sut->expects($this->once())
             ->method('findPendingAccount')
             ->with($activationCode)
@@ -378,6 +380,35 @@ class ActivateActionTest extends TestCase
     }
 
     #endregion onExecute
+
+    #region validateRequest ----------------------------------------------------
+
+    #[DataProvider('invalidRequestDataProvider')]
+    function testValidateRequestThrowsForInvalidRequestData(
+        array $data,
+        string $exceptionMessage
+    ) {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $securityService = SecurityService::Instance();
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($data);
+        $securityService->expects($this->once())
+            ->method('TokenPattern')
+            ->willReturn('/^[a-f0-9]{64}$/');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage($exceptionMessage);
+        AccessHelper::CallMethod($sut, 'validateRequest');
+    }
+
+    #endregion validateRequest
 
     #region findPendingAccount -------------------------------------------------
 
@@ -491,7 +522,7 @@ class ActivateActionTest extends TestCase
 
     #region Data Providers -----------------------------------------------------
 
-    static function invalidModelDataProvider()
+    static function invalidRequestDataProvider()
     {
         return [
             'activationCode missing' => [
