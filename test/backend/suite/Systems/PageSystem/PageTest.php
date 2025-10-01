@@ -8,7 +8,6 @@ use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Core\CSequentialArray;
 use \Harmonia\Services\CookieService;
-use \Harmonia\Services\Security\CsrfToken;
 use \Harmonia\Services\SecurityService;
 use \Peneus\Api\Guards\FormTokenGuard;
 use \Peneus\Model\Account;
@@ -648,20 +647,13 @@ class PageTest extends TestCase
         $sut = $this->systemUnderTest();
         $securityService = SecurityService::Instance();
         $cookieService = CookieService::Instance();
-        $csrfToken = $this->createMock(CsrfToken::class);
 
         $securityService->expects($this->once())
-            ->method('GenerateCsrfToken')
-            ->willReturn($csrfToken);
-        $csrfToken->expects($this->once())
-            ->method('CookieValue')
-            ->willReturn('cookie-value');
+            ->method('GenerateCsrfPair')
+            ->willReturn(['token-value', 'cookie-value']);
         $cookieService->expects($this->once())
             ->method('SetCsrfCookie')
             ->with('cookie-value');
-        $csrfToken->expects($this->once())
-            ->method('Token')
-            ->willReturn('token-value');
 
         $this->assertSame('token-value', $sut->CsrfTokenValue());
     }

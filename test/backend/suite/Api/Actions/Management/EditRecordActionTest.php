@@ -250,11 +250,12 @@ class EditRecordActionTest extends TestCase
             times: 1
         );
 
-        $this->assertNull(AccessHelper::CallMethod(
+        $entity = AccessHelper::CallMethod(
             $sut,
             'findEntity',
             [AccountRole::class, 42]
-        ));
+        );
+        $this->assertNull($entity);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
@@ -273,15 +274,15 @@ class EditRecordActionTest extends TestCase
             times: 1
         );
 
-        $result = AccessHelper::CallMethod(
+        $entity = AccessHelper::CallMethod(
             $sut,
             'findEntity',
             [AccountRole::class, 42]
         );
-        $this->assertInstanceOf(AccountRole::class, $result);
-        $this->assertSame(42, $result->id);
-        $this->assertSame(99, $result->accountId);
-        $this->assertSame(10, $result->role);
+        $this->assertInstanceOf(AccountRole::class, $entity);
+        $this->assertSame(42, $entity->id);
+        $this->assertSame(99, $entity->accountId);
+        $this->assertSame(10, $entity->role);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
@@ -564,7 +565,7 @@ class EditRecordActionTest extends TestCase
                     'activationCode' => 'invalid-code'
                 ],
                 'exceptionMessage' => "Field 'activationCode' must match the required pattern: "
-                    . SecurityService::Instance()->TokenPattern()
+                    . SecurityService::TOKEN_DEFAULT_PATTERN
             ],
             'pendingAccount: timeRegistered missing' => [
                 'table' => 'pendingaccount',
@@ -649,7 +650,7 @@ class EditRecordActionTest extends TestCase
                     'resetCode' => 'invalid-token'
                 ],
                 'exceptionMessage' => "Field 'resetCode' must match the required pattern: "
-                    . SecurityService::Instance()->TokenPattern()
+                    . SecurityService::TOKEN_DEFAULT_PATTERN
             ],
             'passwordReset: timeRequested missing' => [
                 'table' => 'passwordreset',

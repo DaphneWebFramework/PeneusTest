@@ -61,7 +61,7 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::BadRequest)
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('SetBody')
             ->with('{"message":"Handler not specified."}');
@@ -91,7 +91,7 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::BadRequest)
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('SetBody')
             ->with('{"message":"Action not specified."}');
@@ -126,7 +126,7 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::NotFound)
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('SetBody')
             ->with('{"message":"Handler not found: handler1"}');
@@ -242,7 +242,7 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('SetHeader')
             ->with('Content-Type', 'application/json')
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('SetBody')
             ->with('{"question":"What is the meaning of life?","answer":42}');
@@ -281,12 +281,12 @@ class DispatcherTest extends TestCase
             ->willThrowException(new \Exception('Sample error message.'));
         $response->expects($this->once())
             ->method('SetStatusCode')
-            ->with(StatusCode::BadRequest) // Default (400)
-            ->willReturn($response); // Chain
+            ->with(StatusCode::InternalServerError) // Default (500)
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('SetHeader')
             ->with('Content-Type', 'application/json')
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('SetBody')
             ->with('{"message":"Sample error message."}');
@@ -326,11 +326,11 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::PayloadTooLarge) // 413
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('SetHeader')
             ->with('Content-Type', 'application/json')
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('SetBody')
             ->with('{"message":"File is too large."}');
@@ -368,15 +368,15 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::InternalServerError)
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('SetHeader')
             ->with('Content-Type', 'application/json')
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('SetBody')
             ->with('{"message":"E_NOTICE: Something went wrong in \'file.php\' on line 123."}')
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('Send');
 
@@ -397,15 +397,15 @@ class DispatcherTest extends TestCase
         $response->expects($this->once())
             ->method('SetStatusCode')
             ->with(StatusCode::InternalServerError)
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('SetHeader')
             ->with('Content-Type', 'application/json')
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('SetBody')
             ->with('{"message":"An unexpected error occurred."}')
-            ->willReturn($response); // Chain
+            ->willReturnSelf();
         $response->expects($this->once())
             ->method('Send');
 

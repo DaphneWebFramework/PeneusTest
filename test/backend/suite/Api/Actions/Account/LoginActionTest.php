@@ -2,7 +2,6 @@
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
-use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Account\LoginAction;
 
@@ -10,24 +9,18 @@ use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
-use \Harmonia\Services\Security\CsrfToken;
 use \Harmonia\Services\SecurityService;
-use \Harmonia\Session;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
-use \Harmonia\Systems\ValidationSystem\DataAccessor;
 use \Peneus\Model\Account;
-use \Peneus\Model\Role;
 use \Peneus\Services\AccountService;
-use \TestToolkit\AccessHelper;
-use \TestToolkit\DataHelper;
+use \TestToolkit\AccessHelper as AH;
 
 #[CoversClass(LoginAction::class)]
 class LoginActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
-    private ?Session $originalSession = null;
     private ?AccountService $originalAccountService = null;
     private ?SecurityService $originalSecurityService = null;
     private ?CookieService $originalCookieService = null;
@@ -38,8 +31,6 @@ class LoginActionTest extends TestCase
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalDatabase =
             Database::ReplaceInstance($this->createMock(Database::class));
-        $this->originalSession =
-            Session::ReplaceInstance($this->createMock(Session::class));
         $this->originalAccountService =
             AccountService::ReplaceInstance($this->createMock(AccountService::class));
         $this->originalSecurityService =
@@ -52,7 +43,6 @@ class LoginActionTest extends TestCase
     {
         Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
-        Session::ReplaceInstance($this->originalSession);
         AccountService::ReplaceInstance($this->originalAccountService);
         SecurityService::ReplaceInstance($this->originalSecurityService);
         CookieService::ReplaceInstance($this->originalCookieService);
@@ -61,380 +51,159 @@ class LoginActionTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): LoginAction
     {
         return $this->getMockBuilder(LoginAction::class)
-            ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfAccountAlreadyLoggedIn()
+    function testOnExecuteThrowsIfUserIsLoggedIn()
     {
-        $sut = $this->systemUnderTest(
-            'isAccountLoggedIn'
-        );
+        $sut = $this->systemUnderTest('ensureNotLoggedIn');
 
         $sut->expects($this->once())
-            ->method('isAccountLoggedIn')
-            ->willReturn(true);
+            ->method('ensureNotLoggedIn')
+            ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("You are already logged in.");
-        $this->expectExceptionCode(StatusCode::Conflict->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('Expected message.');
+        AH::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfValidateRequestFails()
+    function testOnExecuteThrowsIfRequestValidationFails()
     {
         $sut = $this->systemUnderTest(
-            'isAccountLoggedIn',
+            'ensureNotLoggedIn',
             'validateRequest'
         );
 
         $sut->expects($this->once())
-            ->method('isAccountLoggedIn')
-            ->willReturn(false);
+            ->method('ensureNotLoggedIn');
         $sut->expects($this->once())
             ->method('validateRequest')
-            ->willThrowException(new \RuntimeException('Placeholder message.'));
+            ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Placeholder message.');
-        AccessHelper::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('Expected message.');
+        AH::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfAccountNotFound()
+    function testOnExecuteThrowsIfAccountAuthenticationFails()
     {
         $sut = $this->systemUnderTest(
-            'isAccountLoggedIn',
+            'ensureNotLoggedIn',
             'validateRequest',
-            'findAccount'
+            'findAndAuthenticateAccount'
         );
-        $dataAccessor = $this->createMock(DataAccessor::class);
 
         $sut->expects($this->once())
-            ->method('isAccountLoggedIn')
-            ->willReturn(false);
+            ->method('ensureNotLoggedIn');
         $sut->expects($this->once())
             ->method('validateRequest')
-            ->willReturn($dataAccessor);
-        $dataAccessor->expects($this->exactly(2))
-            ->method('GetField')
-            ->willReturnMap([
-                ['email', 'john@example.com'],
-                ['password', 'pass1234']
+            ->willReturn((object)[
+                'email' => 'john@example.com',
+                'password' => 'pass1234',
+                'keepLoggedIn' => false
             ]);
         $sut->expects($this->once())
-            ->method('findAccount')
-            ->with('john@example.com')
-            ->willReturn(null);
+            ->method('findAndAuthenticateAccount')
+            ->with('john@example.com', 'pass1234')
+            ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Incorrect email address or password.");
-        $this->expectExceptionCode(StatusCode::Unauthorized->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('Expected message.');
+        AH::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfPasswordVerificationFails()
+    function testOnExecuteThrowsIfDoLogInFails()
     {
         $sut = $this->systemUnderTest(
-            'isAccountLoggedIn',
+            'ensureNotLoggedIn',
             'validateRequest',
-            'findAccount',
-            'verifyPassword'
+            'findAndAuthenticateAccount',
+            'doLogIn',
+            'logOut'
         );
-        $dataAccessor = $this->createMock(DataAccessor::class);
         $account = $this->createStub(Account::class);
-
-        $sut->expects($this->once())
-            ->method('isAccountLoggedIn')
-            ->willReturn(false);
-        $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn($dataAccessor);
-        $dataAccessor->expects($this->exactly(2))
-            ->method('GetField')
-            ->willReturnMap([
-                ['email', 'john@example.com'],
-                ['password', 'wrongpass']
-            ]);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with('john@example.com')
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('verifyPassword')
-            ->with($account, 'wrongpass')
-            ->willReturn(false);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Incorrect email address or password.");
-        $this->expectExceptionCode(StatusCode::Unauthorized->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfAccountSaveFails()
-    {
-        $sut = $this->systemUnderTest(
-            'isAccountLoggedIn',
-            'validateRequest',
-            'findAccount',
-            'verifyPassword',
-            'logOut'
-        );
-        $dataAccessor = $this->createMock(DataAccessor::class);
         $database = Database::Instance();
-        $account = $this->createMock(Account::class);
 
         $sut->expects($this->once())
-            ->method('isAccountLoggedIn')
-            ->willReturn(false);
+            ->method('ensureNotLoggedIn');
         $sut->expects($this->once())
             ->method('validateRequest')
-            ->willReturn($dataAccessor);
-        $dataAccessor->expects($this->exactly(2))
-            ->method('GetField')
-            ->willReturnMap([
-                ['email', 'john@example.com'],
-                ['password', 'pass1234']
+            ->willReturn((object)[
+                'email' => 'john@example.com',
+                'password' => 'pass1234',
+                'keepLoggedIn' => false
             ]);
         $sut->expects($this->once())
-            ->method('findAccount')
-            ->with('john@example.com')
+            ->method('findAndAuthenticateAccount')
+            ->with('john@example.com', 'pass1234')
             ->willReturn($account);
         $sut->expects($this->once())
-            ->method('verifyPassword')
-            ->with($account, 'pass1234')
-            ->willReturn(true);
+            ->method('doLogIn')
+            ->with($account, false)
+            ->willThrowException(new \RuntimeException());
         $database->expects($this->once())
             ->method('WithTransaction')
             ->willReturnCallback(function($callback) {
-                try {
-                    return $callback();
-                } catch (\Throwable $e) {
-                    $this->assertSame(
-                        'Failed to save account.',
-                        $e->getMessage()
-                    );
-                    return false;
-                }
+                $callback();
             });
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(false);
         $sut->expects($this->once())
             ->method('logOut');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Login failed.');
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfEstablishSessionIntegrityFails()
-    {
-        $sut = $this->systemUnderTest(
-            'isAccountLoggedIn',
-            'validateRequest',
-            'findAccount',
-            'verifyPassword',
-            'logOut'
-        );
-        $dataAccessor = $this->createMock(DataAccessor::class);
-        $database = Database::Instance();
-        $account = $this->createMock(Account::class);
-        $accountService = AccountService::Instance();
-
-        $sut->expects($this->once())
-            ->method('isAccountLoggedIn')
-            ->willReturn(false);
-        $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn($dataAccessor);
-        $dataAccessor->expects($this->exactly(2))
-            ->method('GetField')
-            ->willReturnMap([
-                ['email', 'john@example.com'],
-                ['password', 'pass1234']
-            ]);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with('john@example.com')
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('verifyPassword')
-            ->with($account, 'pass1234')
-            ->willReturn(true);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                try {
-                    return $callback();
-                } catch (\Throwable $e) {
-                    $this->assertSame(
-                        'Failed to establish session integrity.',
-                        $e->getMessage()
-                    );
-                    return false;
-                }
-            });
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $accountService->expects($this->once())
-            ->method('EstablishSessionIntegrity')
-            ->with($account)
-            ->willReturn(false);
-        $sut->expects($this->once())
-            ->method('logOut');
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Login failed.');
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfDeleteCsrfCookieFails()
-    {
-        $sut = $this->systemUnderTest(
-            'isAccountLoggedIn',
-            'validateRequest',
-            'findAccount',
-            'verifyPassword',
-            'deleteCsrfCookie',
-            'logOut'
-        );
-        $dataAccessor = $this->createMock(DataAccessor::class);
-        $database = Database::Instance();
-        $account = $this->createMock(Account::class);
-        $accountService = AccountService::Instance();
-
-        $sut->expects($this->once())
-            ->method('isAccountLoggedIn')
-            ->willReturn(false);
-        $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn($dataAccessor);
-        $dataAccessor->expects($this->exactly(2))
-            ->method('GetField')
-            ->willReturnMap([
-                ['email', 'john@example.com'],
-                ['password', 'pass1234']
-            ]);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with('john@example.com')
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('verifyPassword')
-            ->with($account, 'pass1234')
-            ->willReturn(true);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                try {
-                    return $callback();
-                } catch (\Throwable $e) {
-                    $this->assertSame(
-                        'Placeholder message.',
-                        $e->getMessage()
-                    );
-                    return false;
-                }
-            });
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $accountService->expects($this->once())
-            ->method('EstablishSessionIntegrity')
-            ->with($account)
-            ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('deleteCsrfCookie')
-            ->willThrowException(new \RuntimeException('Placeholder message.'));
-        $sut->expects($this->once())
-            ->method('logOut');
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Login failed.');
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage("Login failed.");
+        AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
     {
         $sut = $this->systemUnderTest(
-            'isAccountLoggedIn',
+            'ensureNotLoggedIn',
             'validateRequest',
-            'findAccount',
-            'verifyPassword',
-            'deleteCsrfCookie',
+            'findAndAuthenticateAccount',
+            'doLogIn',
             'logOut'
         );
-        $dataAccessor = $this->createMock(DataAccessor::class);
+        $account = $this->createStub(Account::class);
         $database = Database::Instance();
-        $account = $this->createMock(Account::class);
-        $accountService = AccountService::Instance();
+        $cookieService = CookieService::Instance();
 
         $sut->expects($this->once())
-            ->method('isAccountLoggedIn')
-            ->willReturn(false);
+            ->method('ensureNotLoggedIn');
         $sut->expects($this->once())
             ->method('validateRequest')
-            ->willReturn($dataAccessor);
-        $dataAccessor->expects($this->exactly(2))
-            ->method('GetField')
-            ->willReturnMap([
-                ['email', 'john@example.com'],
-                ['password', 'pass1234']
+            ->willReturn((object)[
+                'email' => 'john@example.com',
+                'password' => 'pass1234',
+                'keepLoggedIn' => true
             ]);
         $sut->expects($this->once())
-            ->method('findAccount')
-            ->with('john@example.com')
+            ->method('findAndAuthenticateAccount')
+            ->with('john@example.com', 'pass1234')
             ->willReturn($account);
         $sut->expects($this->once())
-            ->method('verifyPassword')
-            ->with($account, 'pass1234')
-            ->willReturn(true);
+            ->method('doLogIn')
+            ->with($account, true);
         $database->expects($this->once())
             ->method('WithTransaction')
             ->willReturnCallback(function($callback) {
-                return $callback();
+                $callback();
             });
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $accountService->expects($this->once())
-            ->method('EstablishSessionIntegrity')
-            ->with($account)
-            ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('deleteCsrfCookie');
         $sut->expects($this->never())
             ->method('logOut');
+        $cookieService->expects($this->once())
+            ->method('DeleteCsrfCookie');
 
-        $this->assertNull(AccessHelper::CallMethod($sut, 'onExecute'));
-        $this->assertEqualsWithDelta(\time(), $account->timeLastLogin->getTimestamp(), 1);
+        $this->assertNull(AH::CallMethod($sut, 'onExecute'));
     }
 
     #endregion onExecute
 
-    #region isAccountLoggedIn --------------------------------------------------
+    #region ensureNotLoggedIn --------------------------------------------------
 
-    function testIsAccountLoggedInReturnsFalseIfAccountIsNotLoggedIn()
-    {
-        $sut = $this->systemUnderTest();
-        $accountService = AccountService::Instance();
-
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn(null);
-
-        $result = AccessHelper::CallMethod($sut, 'isAccountLoggedIn');
-        $this->assertFalse($result);
-    }
-
-    function testIsAccountLoggedInReturnsTrueIfAccountIsLoggedIn()
+    function testEnsureNotLoggedInThrowsIfUserIsLoggedIn()
     {
         $sut = $this->systemUnderTest();
         $account = $this->createStub(Account::class);
@@ -444,16 +213,30 @@ class LoginActionTest extends TestCase
             ->method('LoggedInAccount')
             ->willReturn($account);
 
-        $result = AccessHelper::CallMethod($sut, 'isAccountLoggedIn');
-        $this->assertTrue($result);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("You are already logged in.");
+        $this->expectExceptionCode(StatusCode::Conflict->value);
+        AH::CallMethod($sut, 'ensureNotLoggedIn');
     }
 
-    #endregion isAccountLoggedIn
+    function testEnsureNotLoggedInSucceedsIfUserIsNotLoggedIn()
+    {
+        $sut = $this->systemUnderTest();
+        $accountService = AccountService::Instance();
+
+        $accountService->expects($this->once())
+            ->method('LoggedInAccount')
+            ->willReturn(null);
+
+        AH::CallMethod($sut, 'ensureNotLoggedIn');
+    }
+
+    #endregion ensureNotLoggedIn
 
     #region validateRequest ----------------------------------------------------
 
     #[DataProvider('invalidRequestDataProvider')]
-    function testValidateRequestThrowsForInvalidRequestData(
+    function testValidateRequestThrows(
         array $data,
         string $exceptionMessage
     ) {
@@ -470,41 +253,131 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AccessHelper::CallMethod($sut, 'validateRequest');
+        AH::CallMethod($sut, 'validateRequest');
+    }
+
+    #[DataProvider('validRequestDataProvider')]
+    function testValidateRequest($expected, $data)
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($data);
+
+        $this->assertEquals($expected, AH::CallMethod($sut, 'validateRequest'));
     }
 
     #endregion validateRequest
 
+    #region findAndAuthenticateAccount -----------------------------------------
+
+    function testFindAndAuthenticateAccountThrowsIfAccountNotFound()
+    {
+        $sut = $this->systemUnderTest('findAccount');
+
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with('john@example.com')
+            ->willReturn(null);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Incorrect email address or password.");
+        $this->expectExceptionCode(StatusCode::Unauthorized->value);
+        AH::CallMethod($sut, 'findAndAuthenticateAccount', [
+            'john@example.com',
+            'pass1234'
+        ]);
+    }
+
+    function testFindAndAuthenticateAccountThrowsIfPasswordVerificationFails()
+    {
+        $sut = $this->systemUnderTest('findAccount');
+        $account = $this->createStub(Account::class);
+        $account->passwordHash = 'hash1234';
+        $securityService = SecurityService::Instance();
+
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with('john@example.com')
+            ->willReturn($account);
+        $securityService->expects($this->once())
+            ->method('VerifyPassword')
+            ->with('pass1234', 'hash1234')
+            ->willReturn(false);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Incorrect email address or password.");
+        $this->expectExceptionCode(StatusCode::Unauthorized->value);
+        AH::CallMethod($sut, 'findAndAuthenticateAccount', [
+            'john@example.com',
+            'pass1234'
+        ]);
+    }
+
+    function testFindAndAuthenticateAccountReturnsAccountOnSuccess()
+    {
+        $sut = $this->systemUnderTest('findAccount');
+        $account = $this->createStub(Account::class);
+        $account->passwordHash = 'hash1234';
+        $securityService = SecurityService::Instance();
+
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with('john@example.com')
+            ->willReturn($account);
+        $securityService->expects($this->once())
+            ->method('VerifyPassword')
+            ->with('pass1234', 'hash1234')
+            ->willReturn(true);
+
+        $this->assertSame(
+            $account,
+            AH::CallMethod($sut, 'findAndAuthenticateAccount', [
+                'john@example.com',
+                'pass1234'
+            ])
+        );
+    }
+
+    #endregion findAndAuthenticateAccount
+
     #region findAccount --------------------------------------------------------
 
-    function testFindAccountReturnsNullWhenNotFound()
+    function testFindAccountReturnsNullIfRecordNotFound()
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
+        Database::ReplaceInstance($fakeDatabase);
+
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `account` WHERE email = :email LIMIT 1',
             bindings: ['email' => 'john@example.com'],
             result: null,
             times: 1
         );
-        Database::ReplaceInstance($fakeDatabase);
 
-        $this->assertNull(AccessHelper::CallMethod(
-            $sut,
-            'findAccount',
-            ['john@example.com']
-        ));
+        $account = AH::CallMethod($sut, 'findAccount', ['john@example.com']);
+        $this->assertNull($account);
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
-    function testFindAccountReturnsEntityWhenFound()
+    function testFindAccountReturnsEntityIfRecordFound()
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
+        Database::ReplaceInstance($fakeDatabase);
+
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `account` WHERE email = :email LIMIT 1',
             bindings: ['email' => 'john@example.com'],
             result: [[
-                'id' => 23,
+                'id' => 42,
                 'email' => 'john@example.com',
                 'passwordHash' => 'hash1234',
                 'displayName' => 'John',
@@ -513,15 +386,10 @@ class LoginActionTest extends TestCase
             ]],
             times: 1
         );
-        Database::ReplaceInstance($fakeDatabase);
 
-        $account = AccessHelper::CallMethod(
-            $sut,
-            'findAccount',
-            ['john@example.com']
-        );
+        $account = AH::CallMethod($sut, 'findAccount', ['john@example.com']);
         $this->assertInstanceOf(Account::class, $account);
-        $this->assertSame(23, $account->id);
+        $this->assertSame(42, $account->id);
         $this->assertSame('john@example.com', $account->email);
         $this->assertSame('hash1234', $account->passwordHash);
         $this->assertSame('John', $account->displayName);
@@ -529,51 +397,100 @@ class LoginActionTest extends TestCase
             $account->timeActivated->format('Y-m-d H:i:s'));
         $this->assertSame('2025-01-01 00:00:00',
             $account->timeLastLogin->format('Y-m-d H:i:s'));
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     #endregion findAccount
 
-    #region verifyPassword -----------------------------------------------------
+    #region doLogIn ------------------------------------------------------------
 
-    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
-    function testVerifyPassword($returnValue)
+    function testDoLogInThrowsIfAccountSaveFails()
     {
         $sut = $this->systemUnderTest();
-        $account = $this->createStub(Account::class);
-        $account->passwordHash = 'hash1234';
-        $securityService = SecurityService::Instance();
+        $account = $this->createMock(Account::class);
+        $keepLoggedIn = false;
+        $accountService = AccountService::Instance();
 
-        $securityService->expects($this->once())
-            ->method('VerifyPassword')
-            ->with('pass1234', 'hash1234')
-            ->willReturn($returnValue);
+        $account->expects($this->once())
+            ->method('Save')
+            ->willReturn(false);
+        $accountService->expects($this->never())
+            ->method('CreateSession');
+        $accountService->expects($this->never())
+            ->method('CreatePersistentLogin');
 
-        $this->assertSame(
-            $returnValue,
-            AccessHelper::CallMethod(
-                $sut,
-                'verifyPassword',
-                [$account, 'pass1234']
-            )
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Failed to save account.");
+        AH::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
+    }
+
+    function testDoLogInSucceedsWithoutKeepLoggedIn()
+    {
+        $sut = $this->systemUnderTest();
+        $account = $this->createMock(Account::class);
+        $keepLoggedIn = false;
+        $accountService = AccountService::Instance();
+
+        $account->expects($this->once())
+            ->method('Save')
+            ->willReturn(true);
+        $accountService->expects($this->once())
+            ->method('CreateSession')
+            ->with($account);
+        $accountService->expects($this->never())
+            ->method('CreatePersistentLogin');
+
+        AH::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
+        $this->assertEqualsWithDelta(
+            \time(),
+            $account->timeLastLogin->getTimestamp(),
+            1
         );
     }
 
-    #endregion verifyPassword
-
-    #region deleteCsrfCookie ---------------------------------------------------
-
-    function testDeleteCsrfCookie()
+    function testDoLogInSucceedsWithKeepLoggedIn()
     {
         $sut = $this->systemUnderTest();
-        $cookieService = CookieService::Instance();
+        $account = $this->createMock(Account::class);
+        $keepLoggedIn = true;
+        $accountService = AccountService::Instance();
 
-        $cookieService->expects($this->once())
-            ->method('DeleteCsrfCookie');
+        $account->expects($this->once())
+            ->method('Save')
+            ->willReturn(true);
+        $accountService->expects($this->once())
+            ->method('CreateSession')
+            ->with($account);
+        $accountService->expects($this->once())
+            ->method('CreatePersistentLogin')
+            ->with($account);
 
-        AccessHelper::CallMethod($sut, 'deleteCsrfCookie');
+        AH::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
+        $this->assertEqualsWithDelta(
+            \time(),
+            $account->timeLastLogin->getTimestamp(),
+            1
+        );
     }
 
-    #endregion deleteCsrfCookie
+    #endregion doLogIn
+
+    #region logOut -------------------------------------------------------------
+
+    function testLogOut()
+    {
+        $sut = $this->systemUnderTest();
+        $accountService = AccountService::Instance();
+
+        $accountService->expects($this->once())
+            ->method('DeleteSession');
+        $accountService->expects($this->once())
+            ->method('DeletePersistentLogin');
+
+        AH::CallMethod($sut, 'logOut');
+    }
+
+    #endregion logOut
 
     #region Data Providers -----------------------------------------------------
 
@@ -610,6 +527,51 @@ class LoginActionTest extends TestCase
                 ],
                 'exceptionMessage' => "Field 'password' must have a maximum length of 72 characters."
             ],
+            'keepLoggedIn not a string' => [
+                'data' => [
+                    'email' => 'john@example.com',
+                    'password' => 'pass1234',
+                    'keepLoggedIn' => 42
+                ],
+                'exceptionMessage' => "Field 'keepLoggedIn' must be a string."
+            ],
+            'keepLoggedIn invalid' => [
+                'data' => [
+                    'email' => 'john@example.com',
+                    'password' => 'pass1234',
+                    'keepLoggedIn' => 'invalid-value'
+                ],
+                'exceptionMessage' => "Field 'keepLoggedIn' failed custom validation."
+            ],
+        ];
+    }
+
+    static function validRequestDataProvider()
+    {
+        return [
+            'without keepLoggedIn' => [
+                'expected' => (object)[
+                    'email' => 'john@example.com',
+                    'password' => 'pass1234',
+                    'keepLoggedIn' => false
+                ],
+                'data' => [
+                    'email' => 'john@example.com',
+                    'password' => 'pass1234'
+                ]
+            ],
+            'with keepLoggedIn' => [
+                'expected' => (object)[
+                    'email' => 'john@example.com',
+                    'password' => 'pass1234',
+                    'keepLoggedIn' => true
+                ],
+                'data' => [
+                    'email' => 'john@example.com',
+                    'password' => 'pass1234',
+                    'keepLoggedIn' => 'on'
+                ]
+            ]
         ];
     }
 

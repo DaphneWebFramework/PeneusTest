@@ -2,7 +2,6 @@
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
-use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Account\ActivateAction;
 
@@ -11,24 +10,20 @@ use \Harmonia\Core\CUrl;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
-use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
-use \Harmonia\Systems\ValidationSystem\DataAccessor;
 use \Peneus\Model\Account;
 use \Peneus\Model\PendingAccount;
 use \Peneus\Resource;
-use \TestToolkit\AccessHelper;
-use \TestToolkit\DataHelper;
+use \TestToolkit\AccessHelper as AH;
 
 #[CoversClass(ActivateAction::class)]
 class ActivateActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
-    private ?SecurityService $originalSecurityService = null;
-    private ?CookieService $originalCookieService = null;
     private ?Resource $originalResource = null;
+    private ?CookieService $originalCookieService = null;
 
     protected function setUp(): void
     {
@@ -36,34 +31,30 @@ class ActivateActionTest extends TestCase
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalDatabase =
             Database::ReplaceInstance($this->createMock(Database::class));
-        $this->originalSecurityService =
-            SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
-        $this->originalCookieService =
-            CookieService::ReplaceInstance($this->createMock(CookieService::class));
         $this->originalResource =
             Resource::ReplaceInstance($this->createMock(Resource::class));
+        $this->originalCookieService =
+            CookieService::ReplaceInstance($this->createMock(CookieService::class));
     }
 
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
-        SecurityService::ReplaceInstance($this->originalSecurityService);
-        CookieService::ReplaceInstance($this->originalCookieService);
         Resource::ReplaceInstance($this->originalResource);
+        CookieService::ReplaceInstance($this->originalCookieService);
     }
 
     private function systemUnderTest(string ...$mockedMethods): ActivateAction
     {
         return $this->getMockBuilder(ActivateAction::class)
-            ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfValidateRequestFails()
+    function testOnExecuteThrowsIfRequestValidationFails()
     {
         $sut = $this->systemUnderTest(
             'validateRequest'
@@ -71,11 +62,11 @@ class ActivateActionTest extends TestCase
 
         $sut->expects($this->once())
             ->method('validateRequest')
-            ->willThrowException(new \RuntimeException('Placeholder message.'));
+            ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Placeholder message.');
-        AccessHelper::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('Expected message.');
+        AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfPendingAccountNotFound()
@@ -84,26 +75,20 @@ class ActivateActionTest extends TestCase
             'validateRequest',
             'findPendingAccount'
         );
-        $dataAccessor = $this->createMock(DataAccessor::class);
-        $activationCode = \str_repeat('a', 64); // valid format
 
         $sut->expects($this->once())
             ->method('validateRequest')
-            ->willReturn($dataAccessor);
-        $dataAccessor->expects($this->once())
-            ->method('GetField')
-            ->with('activationCode')
-            ->willReturn($activationCode);
+            ->willReturn((object)[
+                'activationCode' => 'code1234'
+            ]);
         $sut->expects($this->once())
             ->method('findPendingAccount')
-            ->with($activationCode)
-            ->willReturn(null);
+            ->with('code1234')
+            ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            'No account is awaiting activation for the given code.');
-        $this->expectExceptionCode(StatusCode::NotFound->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('Expected message.');
+        AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfEmailAlreadyRegistered()
@@ -111,210 +96,67 @@ class ActivateActionTest extends TestCase
         $sut = $this->systemUnderTest(
             'validateRequest',
             'findPendingAccount',
-            'isEmailAlreadyRegistered'
+            'ensureNotRegistered'
         );
-        $dataAccessor = $this->createMock(DataAccessor::class);
-        $activationCode = \str_repeat('a', 64);
-        $pendingAccount = $this->createStub(PendingAccount::class);
-        $pendingAccount->email = 'john@example.com';
+        $pa = $this->createStub(PendingAccount::class);
+        $pa->email = 'john@example.com';
 
         $sut->expects($this->once())
             ->method('validateRequest')
-            ->willReturn($dataAccessor);
-        $dataAccessor->expects($this->once())
-            ->method('GetField')
-            ->with('activationCode')
-            ->willReturn($activationCode);
+            ->willReturn((object)[
+                'activationCode' => 'code1234'
+            ]);
         $sut->expects($this->once())
             ->method('findPendingAccount')
-            ->with($activationCode)
-            ->willReturn($pendingAccount);
+            ->with('code1234')
+            ->willReturn($pa);
         $sut->expects($this->once())
-            ->method('isEmailAlreadyRegistered')
+            ->method('ensureNotRegistered')
             ->with('john@example.com')
-            ->willReturn(true);
+            ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('This email address is already registered.');
-        $this->expectExceptionCode(StatusCode::Conflict->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('Expected message.');
+        AH::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfSavingAccountFails()
+    function testOnExecuteThrowsIfDoActivateFails()
     {
         $sut = $this->systemUnderTest(
             'validateRequest',
             'findPendingAccount',
-            'isEmailAlreadyRegistered',
-            'createAccountFromPendingAccount'
+            'ensureNotRegistered',
+            'doActivate'
         );
-        $dataAccessor = $this->createMock(DataAccessor::class);
-        $activationCode = \str_repeat('a', 64);
-        $pendingAccount = $this->createStub(PendingAccount::class);
-        $pendingAccount->email = 'john@example.com';
-        $account = $this->createMock(Account::class);
+        $pa = $this->createStub(PendingAccount::class);
+        $pa->email = 'john@example.com';
         $database = Database::Instance();
 
         $sut->expects($this->once())
             ->method('validateRequest')
-            ->willReturn($dataAccessor);
-        $dataAccessor->expects($this->once())
-            ->method('GetField')
-            ->with('activationCode')
-            ->willReturn($activationCode);
+            ->willReturn((object)[
+                'activationCode' => 'code1234'
+            ]);
         $sut->expects($this->once())
             ->method('findPendingAccount')
-            ->with($activationCode)
-            ->willReturn($pendingAccount);
+            ->with('code1234')
+            ->willReturn($pa);
         $sut->expects($this->once())
-            ->method('isEmailAlreadyRegistered')
-            ->with('john@example.com')
-            ->willReturn(false);
+            ->method('ensureNotRegistered')
+            ->with('john@example.com');
         $sut->expects($this->once())
-            ->method('createAccountFromPendingAccount')
-            ->with($pendingAccount)
-            ->willReturn($account);
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(false);
+            ->method('doActivate')
+            ->with($pa)
+            ->willThrowException(new \RuntimeException());
         $database->expects($this->once())
             ->method('WithTransaction')
             ->willReturnCallback(function($callback) {
-                try {
-                    return $callback();
-                } catch (\Throwable $e) {
-                    $this->assertSame(
-                        'Failed to save account.',
-                        $e->getMessage()
-                    );
-                    return false;
-                }
+                $callback();
             });
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Account activation failed.');
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfDeletingPendingAccountFails()
-    {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'findPendingAccount',
-            'isEmailAlreadyRegistered',
-            'createAccountFromPendingAccount'
-        );
-        $dataAccessor = $this->createMock(DataAccessor::class);
-        $activationCode = \str_repeat('a', 64);
-        $pendingAccount = $this->createMock(PendingAccount::class);
-        $pendingAccount->email = 'john@example.com';
-        $account = $this->createMock(Account::class);
-        $database = Database::Instance();
-
-        $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn($dataAccessor);
-        $dataAccessor->expects($this->once())
-            ->method('GetField')
-            ->with('activationCode')
-            ->willReturn($activationCode);
-        $sut->expects($this->once())
-            ->method('findPendingAccount')
-            ->with($activationCode)
-            ->willReturn($pendingAccount);
-        $sut->expects($this->once())
-            ->method('isEmailAlreadyRegistered')
-            ->with('john@example.com')
-            ->willReturn(false);
-        $sut->expects($this->once())
-            ->method('createAccountFromPendingAccount')
-            ->with($pendingAccount)
-            ->willReturn($account);
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $pendingAccount->expects($this->once())
-            ->method('Delete')
-            ->willReturn(false);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                try {
-                    return $callback();
-                } catch (\Throwable $e) {
-                    $this->assertSame(
-                        'Failed to delete pending account.',
-                        $e->getMessage()
-                    );
-                    return false;
-                }
-            });
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Account activation failed.');
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfDeleteCsrfCookieFails()
-    {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'findPendingAccount',
-            'isEmailAlreadyRegistered',
-            'createAccountFromPendingAccount'
-        );
-        $dataAccessor = $this->createMock(DataAccessor::class);
-        $activationCode = \str_repeat('a', 64);
-        $pendingAccount = $this->createMock(PendingAccount::class);
-        $pendingAccount->email = 'john@example.com';
-        $account = $this->createMock(Account::class);
-        $cookieService = CookieService::Instance();
-        $database = Database::Instance();
-
-        $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn($dataAccessor);
-        $dataAccessor->expects($this->once())
-            ->method('GetField')
-            ->with('activationCode')
-            ->willReturn($activationCode);
-        $sut->expects($this->once())
-            ->method('findPendingAccount')
-            ->with($activationCode)
-            ->willReturn($pendingAccount);
-        $sut->expects($this->once())
-            ->method('isEmailAlreadyRegistered')
-            ->with('john@example.com')
-            ->willReturn(false);
-        $sut->expects($this->once())
-            ->method('createAccountFromPendingAccount')
-            ->with($pendingAccount)
-            ->willReturn($account);
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $pendingAccount->expects($this->once())
-            ->method('Delete')
-            ->willReturn(true);
-        $cookieService->expects($this->once())
-            ->method('DeleteCsrfCookie')
-            ->willThrowException(new \RuntimeException);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                try {
-                    return $callback();
-                } catch (\Throwable $e) {
-                    return false;
-                }
-            });
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Account activation failed.');
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage("Account activation failed.");
+        AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
@@ -322,58 +164,44 @@ class ActivateActionTest extends TestCase
         $sut = $this->systemUnderTest(
             'validateRequest',
             'findPendingAccount',
-            'isEmailAlreadyRegistered',
-            'createAccountFromPendingAccount'
+            'ensureNotRegistered',
+            'doActivate'
         );
-        $dataAccessor = $this->createMock(DataAccessor::class);
-        $activationCode = \str_repeat('a', 64);
-        $pendingAccount = $this->createMock(PendingAccount::class);
-        $pendingAccount->email = 'john@example.com';
-        $account = $this->createMock(Account::class);
-        $cookieService = CookieService::Instance();
+        $pa = $this->createStub(PendingAccount::class);
+        $pa->email = 'john@example.com';
         $database = Database::Instance();
-        $resource = Resource::Instance();
+        $cookieService = CookieService::Instance();
         $redirectUrl = new CUrl('/url/to/login');
+        $resource = Resource::Instance();
 
         $sut->expects($this->once())
             ->method('validateRequest')
-            ->willReturn($dataAccessor);
-        $dataAccessor->expects($this->once())
-            ->method('GetField')
-            ->with('activationCode')
-            ->willReturn($activationCode);
+            ->willReturn((object)[
+                'activationCode' => 'code1234'
+            ]);
         $sut->expects($this->once())
             ->method('findPendingAccount')
-            ->with($activationCode)
-            ->willReturn($pendingAccount);
+            ->with('code1234')
+            ->willReturn($pa);
         $sut->expects($this->once())
-            ->method('isEmailAlreadyRegistered')
-            ->with('john@example.com')
-            ->willReturn(false);
+            ->method('ensureNotRegistered')
+            ->with('john@example.com');
         $sut->expects($this->once())
-            ->method('createAccountFromPendingAccount')
-            ->with($pendingAccount)
-            ->willReturn($account);
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $pendingAccount->expects($this->once())
-            ->method('Delete')
-            ->willReturn(true);
-        $cookieService->expects($this->once())
-            ->method('DeleteCsrfCookie');
+            ->method('doActivate')
+            ->with($pa);
         $database->expects($this->once())
             ->method('WithTransaction')
             ->willReturnCallback(function($callback) {
-                return $callback();
+                $callback();
             });
+        $cookieService->expects($this->once())
+            ->method('DeleteCsrfCookie');
         $resource->expects($this->once())
             ->method('LoginPageUrl')
             ->with('home')
             ->willReturn($redirectUrl);
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
-
+        $result = AH::CallMethod($sut, 'onExecute');
         $this->assertIsArray($result);
         $this->assertArrayHasKey('redirectUrl', $result);
         $this->assertEquals($redirectUrl, $result['redirectUrl']);
@@ -384,14 +212,13 @@ class ActivateActionTest extends TestCase
     #region validateRequest ----------------------------------------------------
 
     #[DataProvider('invalidRequestDataProvider')]
-    function testValidateRequestThrowsForInvalidRequestData(
+    function testValidateRequestThrows(
         array $data,
         string $exceptionMessage
     ) {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
-        $securityService = SecurityService::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -399,44 +226,68 @@ class ActivateActionTest extends TestCase
         $formParams->expects($this->once())
             ->method('ToArray')
             ->willReturn($data);
-        $securityService->expects($this->once())
-            ->method('TokenPattern')
-            ->willReturn('/^[a-f0-9]{64}$/');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AccessHelper::CallMethod($sut, 'validateRequest');
+        AH::CallMethod($sut, 'validateRequest');
+    }
+
+    function testValidateRequestSucceeds()
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $data = [
+            'activationCode' => \str_repeat('0123456789AbCdEf', 4)
+        ];
+        $expected = (object)$data;
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($data);
+
+        $actual = AH::CallMethod($sut, 'validateRequest');
+        $this->assertEquals($expected, $actual);
     }
 
     #endregion validateRequest
 
     #region findPendingAccount -------------------------------------------------
 
-    function testFindPendingAccountReturnsNullWhenNotFound()
+    function testFindPendingAccountThrowsIfRecordNotFound()
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
+        Database::ReplaceInstance($fakeDatabase);
+
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `pendingaccount` WHERE activationCode = :activationCode LIMIT 1',
+            sql: 'SELECT * FROM `pendingaccount`'
+               . ' WHERE activationCode = :activationCode LIMIT 1',
             bindings: ['activationCode' => 'code1234'],
             result: null,
             times: 1
         );
-        Database::ReplaceInstance($fakeDatabase);
 
-        $this->assertNull(AccessHelper::CallMethod(
-            $sut,
-            'findPendingAccount',
-            ['code1234']
-        ));
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(
+            'No account is awaiting activation for the given code.');
+        $this->expectExceptionCode(StatusCode::NotFound->value);
+        AH::CallMethod($sut, 'findPendingAccount', ['code1234']);
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
-    function testFindPendingAccountReturnsEntityWhenFound()
+    function testFindPendingAccountReturnsEntityIfRecordFound()
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
+        Database::ReplaceInstance($fakeDatabase);
+
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `pendingaccount` WHERE activationCode = :activationCode LIMIT 1',
+            sql: 'SELECT * FROM `pendingaccount`'
+               . ' WHERE activationCode = :activationCode LIMIT 1',
             bindings: ['activationCode' => 'code1234'],
             result: [[
                 'id' => 42,
@@ -448,77 +299,150 @@ class ActivateActionTest extends TestCase
             ]],
             times: 1
         );
-        Database::ReplaceInstance($fakeDatabase);
 
-        $pendingAccount = AccessHelper::CallMethod(
-            $sut,
-            'findPendingAccount',
-            ['code1234']
-        );
-        $this->assertInstanceOf(PendingAccount::class, $pendingAccount);
-        $this->assertSame(42, $pendingAccount->id);
-        $this->assertSame('john@example.com', $pendingAccount->email);
-        $this->assertSame('hash1234', $pendingAccount->passwordHash);
-        $this->assertSame('John', $pendingAccount->displayName);
-        $this->assertSame('code1234', $pendingAccount->activationCode);
+        $pa = AH::CallMethod($sut, 'findPendingAccount', ['code1234']);
+        $this->assertInstanceOf(PendingAccount::class, $pa);
+        $this->assertSame(42, $pa->id);
+        $this->assertSame('john@example.com', $pa->email);
+        $this->assertSame('hash1234', $pa->passwordHash);
+        $this->assertSame('John', $pa->displayName);
+        $this->assertSame('code1234', $pa->activationCode);
         $this->assertSame('2025-01-01 10:00:00',
-            $pendingAccount->timeRegistered->format('Y-m-d H:i:s'));
+            $pa->timeRegistered->format('Y-m-d H:i:s'));
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     #endregion findPendingAccount
 
-    #region isEmailAlreadyRegistered -------------------------------------------
+    #region ensureNotRegistered ------------------------------------------------
 
-    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
-    function testIsEmailAlreadyRegistered($returnValue)
+    function testEnsureNotRegisteredThrowsIfCountIsNotZero()
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `account` WHERE email = :email',
-            bindings: ['email' => 'test@example.com'],
-            result: [[$returnValue ? 1 : 0]],
-            times: 1
-        );
         Database::ReplaceInstance($fakeDatabase);
 
-        $this->assertSame($returnValue, AccessHelper::CallMethod(
-            $sut,
-            'isEmailAlreadyRegistered',
-            ['test@example.com']
-        ));
+        $fakeDatabase->Expect(
+            sql: 'SELECT COUNT(*) FROM `account` WHERE email = :email',
+            bindings: ['email' => 'john@example.com'],
+            result: [[1]],
+            times: 1
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("This account is already registered.");
+        $this->expectExceptionCode(StatusCode::Conflict->value);
+        AH::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
-    #endregion isEmailAlreadyRegistered
-
-    #region createAccountFromPendingAccount ------------------------------------
-
-    function testCreateAccountFromPendingAccount()
+    function testEnsureNotRegisteredSucceedsIfCountIsZero()
     {
         $sut = $this->systemUnderTest();
-        $now = new \DateTime();
-        $pendingAccount = new PendingAccount([
-            'email' => 'john@example.com',
-            'passwordHash' => 'hash1234',
-            'displayName' => 'John',
-            'activationCode' => 'code1234',
-            'timeRegistered' => '2024-12-31 23:59:59'
-        ]);
+        $fakeDatabase = new FakeDatabase();
+        Database::ReplaceInstance($fakeDatabase);
 
-        $account = AccessHelper::CallMethod(
-            $sut,
-            'createAccountFromPendingAccount',
-            [$pendingAccount, $now]
+        $fakeDatabase->Expect(
+            sql: 'SELECT COUNT(*) FROM `account` WHERE email = :email',
+            bindings: ['email' => 'john@example.com'],
+            result: [[0]],
+            times: 1
         );
+
+        AH::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
+        $this->expectNotToPerformAssertions();
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #endregion ensureNotRegistered
+
+    #region doActivate ---------------------------------------------------------
+
+    function testDoActivateThrowsIfAccountSaveFails()
+    {
+        $sut = $this->systemUnderTest('constructAccount');
+        $pa = $this->createStub(PendingAccount::class);
+        $account = $this->createMock(Account::class);
+
+        $sut->expects($this->once())
+            ->method('constructAccount')
+            ->with($pa)
+            ->willReturn($account);
+        $account->expects($this->once())
+            ->method('Save')
+            ->willReturn(false);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Failed to save account.");
+        AH::CallMethod($sut, 'doActivate', [$pa]);
+    }
+
+    function testDoActivateThrowsIfPendingAccountDeleteFails()
+    {
+        $sut = $this->systemUnderTest('constructAccount');
+        $pa = $this->createMock(PendingAccount::class);
+        $account = $this->createMock(Account::class);
+
+        $sut->expects($this->once())
+            ->method('constructAccount')
+            ->with($pa)
+            ->willReturn($account);
+        $account->expects($this->once())
+            ->method('Save')
+            ->willReturn(true);
+        $pa->expects($this->once())
+            ->method('Delete')
+            ->willReturn(false);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Failed to delete pending account.");
+        AH::CallMethod($sut, 'doActivate', [$pa]);
+    }
+
+    function testDoActivateSucceeds()
+    {
+        $sut = $this->systemUnderTest('constructAccount');
+        $pa = $this->createMock(PendingAccount::class);
+        $account = $this->createMock(Account::class);
+
+        $sut->expects($this->once())
+            ->method('constructAccount')
+            ->with($pa)
+            ->willReturn($account);
+        $account->expects($this->once())
+            ->method('Save')
+            ->willReturn(true);
+        $pa->expects($this->once())
+            ->method('Delete')
+            ->willReturn(true);
+
+        AH::CallMethod($sut, 'doActivate', [$pa]);
+    }
+
+    #endregion doActivate
+
+    #region constructAccount ---------------------------------------------------
+
+    function testConstructAccount()
+    {
+        $sut = $this->systemUnderTest();
+        $pa = $this->createStub(PendingAccount::class);
+        $pa->email = 'john@example.com';
+        $pa->passwordHash = 'hash1234';
+        $pa->displayName = 'John';
+        $pa->activationCode = 'code1234';
+        $pa->timeRegistered = new \DateTime();
+
+        $account = AH::CallMethod($sut, 'constructAccount', [$pa]);
         $this->assertInstanceOf(Account::class, $account);
         $this->assertSame('john@example.com', $account->email);
         $this->assertSame('hash1234', $account->passwordHash);
         $this->assertSame('John', $account->displayName);
-        $this->assertSame($now->format('c'), $account->timeActivated->format('c'));
+        $this->assertEqualsWithDelta(\time(), $account->timeActivated->getTimestamp(), 1);
         $this->assertNull($account->timeLastLogin);
     }
 
-    #endregion createAccountFromPendingAccount
+    #endregion constructAccount
 
     #region Data Providers -----------------------------------------------------
 
@@ -527,11 +451,13 @@ class ActivateActionTest extends TestCase
         return [
             'activationCode missing' => [
                 'data' => [],
-                'exceptionMessage' => 'Activation code is required.'
+                'exceptionMessage' => "Activation code is required."
             ],
             'activationCode invalid' => [
-                'data' => ['activationCode' => 'invalid-code'],
-                'exceptionMessage' => 'Activation code format is invalid.'
+                'data' => [
+                    'activationCode' => 'invalid-code'
+                ],
+                'exceptionMessage' => "Activation code format is invalid."
             ],
         ];
     }

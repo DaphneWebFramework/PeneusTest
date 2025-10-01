@@ -11,7 +11,7 @@ use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\SecurityService;
 use \Peneus\Model\Account;
 use \Peneus\Services\AccountService;
-use \TestToolkit\AccessHelper;
+use \TestToolkit\AccessHelper as AH;
 
 #[CoversClass(ChangePasswordAction::class)]
 class ChangePasswordActionTest extends TestCase
@@ -62,7 +62,7 @@ class ChangePasswordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfUserNotLoggedIn()
@@ -89,7 +89,7 @@ class ChangePasswordActionTest extends TestCase
         $this->expectExceptionMessage(
             'You do not have permission to perform this action.');
         $this->expectExceptionCode(StatusCode::Unauthorized->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfPasswordVerificationFails()
@@ -122,7 +122,7 @@ class ChangePasswordActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Current password is incorrect.');
         $this->expectExceptionCode(StatusCode::Forbidden->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfAccountSaveFails()
@@ -162,7 +162,7 @@ class ChangePasswordActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Password change failed.');
         $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
@@ -199,7 +199,7 @@ class ChangePasswordActionTest extends TestCase
             ->method('Save')
             ->willReturn(true);
 
-        $this->assertNull(AccessHelper::CallMethod($sut, 'onExecute'));
+        $this->assertNull(AH::CallMethod($sut, 'onExecute'));
     }
 
     #endregion onExecute

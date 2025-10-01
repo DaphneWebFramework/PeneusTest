@@ -233,11 +233,12 @@ class DeleteRecordActionTest extends TestCase
             times: 1
         );
 
-        $this->assertNull(AccessHelper::CallMethod(
+        $entity = AccessHelper::CallMethod(
             $sut,
             'findEntity',
             [AccountRole::class, 42]
-        ));
+        );
+        $this->assertNull($entity);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
@@ -256,15 +257,15 @@ class DeleteRecordActionTest extends TestCase
             times: 1
         );
 
-        $result = AccessHelper::CallMethod(
+        $entity = AccessHelper::CallMethod(
             $sut,
             'findEntity',
             [AccountRole::class, 42]
         );
-        $this->assertInstanceOf(AccountRole::class, $result);
-        $this->assertSame(42, $result->id);
-        $this->assertSame(99, $result->accountId);
-        $this->assertSame(10, $result->role);
+        $this->assertInstanceOf(AccountRole::class, $entity);
+        $this->assertSame(42, $entity->id);
+        $this->assertSame(99, $entity->accountId);
+        $this->assertSame(10, $entity->role);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 

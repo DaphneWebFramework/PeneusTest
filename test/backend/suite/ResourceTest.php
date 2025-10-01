@@ -39,11 +39,11 @@ class ResourceTest extends TestCase
 
     private function systemUnderTest(string ...$mockedMethods): Resource
     {
-        $sut = $this->getMockBuilder(Resource::class)
+        $mock = $this->getMockBuilder(Resource::class)
             ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
-        return AccessHelper::CallConstructor($sut);
+        return AccessHelper::CallConstructor($mock);
     }
 
     #region __call -------------------------------------------------------------

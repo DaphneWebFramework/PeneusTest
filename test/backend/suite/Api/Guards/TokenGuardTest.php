@@ -6,7 +6,6 @@ use \Peneus\Api\Guards\TokenGuard;
 
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
-use \Harmonia\Services\Security\CsrfToken;
 use \Harmonia\Services\SecurityService;
 
 #[CoversClass(TokenGuard::class)]
@@ -17,10 +16,10 @@ class TokenGuardTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->originalRequest = Request::ReplaceInstance(
-            $this->createMock(Request::class));
-        $this->originalSecurityService = SecurityService::ReplaceInstance(
-            $this->createMock(SecurityService::class));
+        $this->originalRequest =
+            Request::ReplaceInstance($this->createMock(Request::class));
+        $this->originalSecurityService =
+            SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
     }
 
     protected function tearDown(): void
@@ -41,14 +40,16 @@ class TokenGuardTest extends TestCase
             ->method('Cookies')
             ->willReturn($cookies);
         $cookies->expects($this->once())
-            ->method('Get')
+            ->method('Has')
             ->with('cookie-name')
-            ->willReturn(null);
+            ->willReturn(false);
+        $cookies->expects($this->never())
+            ->method('Get');
         $securityService->expects($this->never())
-            ->method('VerifyCsrfToken');
+            ->method('VerifyCsrfPair');
 
-        $tokenGuard = new TokenGuard('token-value', 'cookie-name');
-        $this->assertFalse($tokenGuard->Verify());
+        $sut = new TokenGuard('token-value', 'cookie-name');
+        $this->assertFalse($sut->Verify());
     }
 
     function testVerifyWithInvalidCookie()
@@ -57,23 +58,28 @@ class TokenGuardTest extends TestCase
         $cookies = $this->createMock(CArray::class);
         $securityService = SecurityService::Instance();
 
-        $request->expects($this->once())
+        $request->expects($this->exactly(2))
             ->method('Cookies')
             ->willReturn($cookies);
+        $cookies->expects($this->once())
+            ->method('Has')
+            ->with('cookie-name')
+            ->willReturn(true);
         $cookies->expects($this->once())
             ->method('Get')
             ->with('cookie-name')
             ->willReturn('cookie-value');
         $securityService->expects($this->once())
-            ->method('VerifyCsrfToken')
-            ->with($this->callback(function(CsrfToken $csrfToken) {
-                return $csrfToken->Token() === 'token-value'
-                    && $csrfToken->CookieValue() === 'cookie-value';
+            ->method('VerifyCsrfPair')
+            ->with($this->callback(function(...$args) {
+                [$token, $cookieValue] = $args;
+                return $token === 'token-value'
+                    && $cookieValue === 'cookie-value';
             }))
             ->willReturn(false);
 
-        $tokenGuard = new TokenGuard('token-value', 'cookie-name');
-        $this->assertFalse($tokenGuard->Verify());
+        $sut = new TokenGuard('token-value', 'cookie-name');
+        $this->assertFalse($sut->Verify());
     }
 
     function testVerifyWithValidCookie()
@@ -82,23 +88,28 @@ class TokenGuardTest extends TestCase
         $cookies = $this->createMock(CArray::class);
         $securityService = SecurityService::Instance();
 
-        $request->expects($this->once())
+        $request->expects($this->exactly(2))
             ->method('Cookies')
             ->willReturn($cookies);
+        $cookies->expects($this->once())
+            ->method('Has')
+            ->with('cookie-name')
+            ->willReturn(true);
         $cookies->expects($this->once())
             ->method('Get')
             ->with('cookie-name')
             ->willReturn('cookie-value');
         $securityService->expects($this->once())
-            ->method('VerifyCsrfToken')
-            ->with($this->callback(function(CsrfToken $csrfToken) {
-                return $csrfToken->Token() === 'token-value'
-                    && $csrfToken->CookieValue() === 'cookie-value';
+            ->method('VerifyCsrfPair')
+            ->with($this->callback(function(...$args) {
+                [$token, $cookieValue] = $args;
+                return $token === 'token-value'
+                    && $cookieValue === 'cookie-value';
             }))
             ->willReturn(true);
 
-        $tokenGuard = new TokenGuard('token-value', 'cookie-name');
-        $this->assertTrue($tokenGuard->Verify());
+        $sut = new TokenGuard('token-value', 'cookie-name');
+        $this->assertTrue($sut->Verify());
     }
 
     #endregion Verify

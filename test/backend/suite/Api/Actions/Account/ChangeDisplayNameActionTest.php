@@ -10,7 +10,7 @@ use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Peneus\Model\Account;
 use \Peneus\Services\AccountService;
-use \TestToolkit\AccessHelper;
+use \TestToolkit\AccessHelper as AH;
 
 #[CoversClass(ChangeDisplayNameAction::class)]
 class ChangeDisplayNameActionTest extends TestCase
@@ -57,7 +57,7 @@ class ChangeDisplayNameActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfUserNotLoggedIn()
@@ -83,7 +83,7 @@ class ChangeDisplayNameActionTest extends TestCase
         $this->expectExceptionMessage(
             'You do not have permission to perform this action.');
         $this->expectExceptionCode(StatusCode::Unauthorized->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfAccountSaveFails()
@@ -112,7 +112,7 @@ class ChangeDisplayNameActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Display name change failed.');
         $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
@@ -138,7 +138,7 @@ class ChangeDisplayNameActionTest extends TestCase
             ->method('Save')
             ->willReturn(true);
 
-        $this->assertNull(AccessHelper::CallMethod($sut, 'onExecute'));
+        $this->assertNull(AH::CallMethod($sut, 'onExecute'));
     }
 
     #endregion onExecute

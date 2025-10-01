@@ -9,7 +9,7 @@ use \Harmonia\Systems\DatabaseSystem\Database;
 use \Peneus\Api\Hooks\IAccountDeletionHook;
 use \Peneus\Model\Account;
 use \Peneus\Services\AccountService;
-use \TestToolkit\AccessHelper;
+use \TestToolkit\AccessHelper as AH;
 
 #[CoversClass(DeleteAction::class)]
 class DeleteActionTest extends TestCase
@@ -34,16 +34,79 @@ class DeleteActionTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): DeleteAction
     {
         return $this->getMockBuilder(DeleteAction::class)
-            ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfUserNotLoggedIn()
+    function testOnExecuteThrowsIfUserIsNotLoggedIn()
     {
-        $sut = $this->systemUnderTest('logOut');
+        $sut = $this->systemUnderTest('ensureLoggedIn');
+
+        $sut->expects($this->once())
+            ->method('ensureLoggedIn')
+            ->willThrowException(new \RuntimeException('Expected message.'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Expected message.');
+        AH::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfDoDeleteFails()
+    {
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'doDelete');
+        $account = $this->createStub(Account::class);
+        $database = Database::Instance();
+
+        $sut->expects($this->once())
+            ->method('ensureLoggedIn')
+            ->willReturn($account);
+        $sut->expects($this->once())
+            ->method('doDelete')
+            ->with($account)
+            ->willThrowException(new \RuntimeException());
+        $database->expects($this->once())
+            ->method('WithTransaction')
+            ->willReturnCallback(function($callback) {
+                $callback();
+            });
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Account deletion failed.");
+        AH::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteSucceeds()
+    {
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'doDelete', 'logOut');
+        $account = $this->createStub(Account::class);
+        $database = Database::Instance();
+
+        $sut->expects($this->once())
+            ->method('ensureLoggedIn')
+            ->willReturn($account);
+        $sut->expects($this->once())
+            ->method('doDelete')
+            ->with($account);
+        $database->expects($this->once())
+            ->method('WithTransaction')
+            ->willReturnCallback(function($callback) {
+                return $callback();
+            });
+        $sut->expects($this->once())
+            ->method('logOut');
+
+        $this->assertNull(AH::CallMethod($sut, 'onExecute'));
+    }
+
+    #endregion onExecute
+
+    #region ensureLoggedIn -----------------------------------------------------
+
+    function testEnsureLoggedInThrowsIfUserIsNotLoggedIn()
+    {
+        $sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
 
         $accountService->expects($this->once())
@@ -52,24 +115,37 @@ class DeleteActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
-            'You do not have permission to perform this action.');
+            "You do not have permission to perform this action.");
         $this->expectExceptionCode(StatusCode::Unauthorized->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        AH::CallMethod($sut, 'ensureLoggedIn');
     }
 
-    function testOnExecuteThrowsIfHookFails()
+    function testEnsureLoggedInSucceedsIfUserIsLoggedIn()
     {
-        $sut = $this->systemUnderTest('logOut');
+        $sut = $this->systemUnderTest();
+        $account = $this->createStub(Account::class);
         $accountService = AccountService::Instance();
-        $account = $this->createMock(Account::class);
-        $hook1 = $this->createMock(IAccountDeletionHook::class);
-        $hook2 = $this->createMock(IAccountDeletionHook::class);
-        $hook3 = $this->createMock(IAccountDeletionHook::class);
-        $database = Database::Instance();
 
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
             ->willReturn($account);
+
+        $this->assertSame($account, AH::CallMethod($sut, 'ensureLoggedIn'));
+    }
+
+    #endregion ensureLoggedIn
+
+    #region doDelete -----------------------------------------------------------
+
+    function testDoDeleteThrowsIfHookDeleteFails()
+    {
+        $sut = $this->systemUnderTest();
+        $account = $this->createMock(Account::class);
+        $accountService = AccountService::Instance();
+        $hook1 = $this->createMock(IAccountDeletionHook::class);
+        $hook2 = $this->createMock(IAccountDeletionHook::class);
+        $hook3 = $this->createMock(IAccountDeletionHook::class);
+
         $accountService->expects($this->once())
             ->method('DeletionHooks')
             ->willReturn([$hook1, $hook2, $hook3]);
@@ -79,36 +155,24 @@ class DeleteActionTest extends TestCase
         $hook2->expects($this->once())
             ->method('OnDeleteAccount')
             ->with($account)
-            ->willThrowException(new \RuntimeException('hook error'));
+            ->willThrowException(new \RuntimeException('Expected message.'));
         $hook3->expects($this->never())
             ->method('OnDeleteAccount');
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                try {
-                    $callback();
-                } catch (\Throwable $e) {
-                    return false;
-                }
-            });
+        $account->expects($this->never())
+            ->method('Delete');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Account deletion failed.');
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('Expected message.');
+        AH::CallMethod($sut, 'doDelete', [$account]);
     }
 
-    function testOnExecuteThrowsIfAccountDeletionFails()
+    function testDoDeleteThrowsIfAccountDeleteFails()
     {
-        $sut = $this->systemUnderTest('logOut');
-        $accountService = AccountService::Instance();
+        $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);
+        $accountService = AccountService::Instance();
         $hook = $this->createMock(IAccountDeletionHook::class);
-        $database = Database::Instance();
 
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn($account);
         $accountService->expects($this->once())
             ->method('DeletionHooks')
             ->willReturn([$hook]);
@@ -118,33 +182,19 @@ class DeleteActionTest extends TestCase
         $account->expects($this->once())
             ->method('Delete')
             ->willReturn(false);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                try {
-                    $callback();
-                } catch (\Throwable $e) {
-                    return false;
-                }
-            });
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Account deletion failed.');
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage("Failed to delete account.");
+        AH::CallMethod($sut, 'doDelete', [$account]);
     }
 
-    function testOnExecuteSucceeds()
+    function testDoDeleteSucceeds()
     {
-        $sut = $this->systemUnderTest('logOut');
-        $accountService = AccountService::Instance();
+        $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);
+        $accountService = AccountService::Instance();
         $hook = $this->createMock(IAccountDeletionHook::class);
-        $database = Database::Instance();
 
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn($account);
         $accountService->expects($this->once())
             ->method('DeletionHooks')
             ->willReturn([$hook]);
@@ -154,16 +204,26 @@ class DeleteActionTest extends TestCase
         $account->expects($this->once())
             ->method('Delete')
             ->willReturn(true);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                return $callback();
-            });
-        $sut->expects($this->once())
-            ->method('logOut');
 
-        $this->assertNull(AccessHelper::CallMethod($sut, 'onExecute'));
+        AH::CallMethod($sut, 'doDelete', [$account]);
     }
 
-    #endregion onExecute
+    #endregion doDelete
+
+    #region logOut -------------------------------------------------------------
+
+    function testLogOut()
+    {
+        $sut = $this->systemUnderTest();
+        $accountService = AccountService::Instance();
+
+        $accountService->expects($this->once())
+            ->method('DeleteSession');
+        $accountService->expects($this->once())
+            ->method('DeletePersistentLogin');
+
+        AH::CallMethod($sut, 'logOut');
+    }
+
+    #endregion logOut
 }

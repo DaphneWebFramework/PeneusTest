@@ -2,7 +2,7 @@
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
-use \PHPUnit\Framework\Attributes\DataProviderExternal;
+use \PHPUnit\Framework\Attributes\TestWith;
 
 use \Peneus\Api\Actions\Account\SendPasswordResetAction;
 
@@ -16,19 +16,19 @@ use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
+use \Peneus\Model\PasswordReset;
 use \Peneus\Resource;
-use \TestToolkit\AccessHelper;
-use \TestToolkit\DataHelper;
+use \TestToolkit\AccessHelper as AH;
 
 #[CoversClass(SendPasswordResetAction::class)]
 class SendPasswordResetActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
-    private ?SecurityService $originalSecurityService = null;
-    private ?CookieService $originalCookieService = null;
     private ?Config $originalConfig = null;
     private ?Resource $originalResource = null;
+    private ?SecurityService $originalSecurityService = null;
+    private ?CookieService $originalCookieService = null;
 
     protected function setUp(): void
     {
@@ -36,38 +36,167 @@ class SendPasswordResetActionTest extends TestCase
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalDatabase =
             Database::ReplaceInstance($this->createMock(Database::class));
-        $this->originalSecurityService =
-            SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
-        $this->originalCookieService =
-            CookieService::ReplaceInstance($this->createMock(CookieService::class));
         $this->originalConfig =
             Config::ReplaceInstance($this->createMock(Config::class));
         $this->originalResource =
             Resource::ReplaceInstance($this->createMock(Resource::class));
+        $this->originalSecurityService =
+            SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
+        $this->originalCookieService =
+            CookieService::ReplaceInstance($this->createMock(CookieService::class));
     }
 
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
-        SecurityService::ReplaceInstance($this->originalSecurityService);
-        CookieService::ReplaceInstance($this->originalCookieService);
         Config::ReplaceInstance($this->originalConfig);
         Resource::ReplaceInstance($this->originalResource);
+        SecurityService::ReplaceInstance($this->originalSecurityService);
+        CookieService::ReplaceInstance($this->originalCookieService);
     }
 
     private function systemUnderTest(string ...$mockedMethods): SendPasswordResetAction
     {
         return $this->getMockBuilder(SendPasswordResetAction::class)
-            ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
 
     #region onExecute ----------------------------------------------------------
 
-    #[DataProvider('invalidModelDataProvider')]
-    function testOnExecuteThrowsForInvalidModelData(
+    function testOnExecuteThrowsIfRequestValidationFails()
+    {
+        $sut = $this->systemUnderTest('validateRequest');
+
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willThrowException(new \RuntimeException('Expected message.'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Expected message.');
+        AH::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteBypassesDatabaseTransactionIfAccountNotFound()
+    {
+        $sut = $this->systemUnderTest(
+            'validateRequest',
+            'findAccount',
+            'doSend'
+        );
+        $database = Database::Instance();
+        $cookieService = CookieService::Instance();
+
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willReturn((object)[
+                'email' => 'john@example.com'
+            ]);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with('john@example.com')
+            ->willReturn(null);
+        $database->expects($this->never())
+            ->method('WithTransaction');
+        $sut->expects($this->never())
+            ->method('doSend');
+        $cookieService->expects($this->once())
+            ->method('DeleteCsrfCookie');
+
+        $result = AH::CallMethod($sut, 'onExecute');
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('message', $result);
+        $this->assertSame(
+            "A password reset link has been sent to your email address.",
+            $result['message']
+        );
+    }
+
+    function testOnExecuteThrowsIfDoSendFails()
+    {
+        $sut = $this->systemUnderTest(
+            'validateRequest',
+            'findAccount',
+            'doSend'
+        );
+        $account = $this->createStub(Account::class);
+        $database = Database::Instance();
+
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willReturn((object)[
+                'email' => 'john@example.com'
+            ]);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with('john@example.com')
+            ->willReturn($account);
+        $sut->expects($this->once())
+            ->method('doSend')
+            ->with($account)
+            ->willThrowException(new \RuntimeException());
+        $database->expects($this->once())
+            ->method('WithTransaction')
+            ->willReturnCallback(function($callback) {
+                $callback();
+            });
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(
+            "We couldn't send the email. Please try again later.");
+        $this->expectExceptionCode(StatusCode::InternalServerError->value);
+        AH::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteSucceeds()
+    {
+        $sut = $this->systemUnderTest(
+            'validateRequest',
+            'findAccount',
+            'doSend'
+        );
+        $account = $this->createStub(Account::class);
+        $database = Database::Instance();
+        $cookieService = CookieService::Instance();
+
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willReturn((object)[
+                'email' => 'john@example.com'
+            ]);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with('john@example.com')
+            ->willReturn($account);
+        $sut->expects($this->once())
+            ->method('doSend')
+            ->with($account);
+        $database->expects($this->once())
+            ->method('WithTransaction')
+            ->willReturnCallback(function($callback) {
+                return $callback();
+            });
+        $cookieService->expects($this->once())
+            ->method('DeleteCsrfCookie');
+
+        $result = AH::CallMethod($sut, 'onExecute');
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('message', $result);
+        $this->assertSame(
+            "A password reset link has been sent to your email address.",
+            $result['message']
+        );
+    }
+
+    #endregion onExecute
+
+    #region validateRequest ----------------------------------------------------
+
+    #[DataProvider('invalidRequestDataProvider')]
+    function testValidateRequestThrows(
         array $data,
         string $exceptionMessage
     ) {
@@ -84,298 +213,62 @@ class SendPasswordResetActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        AH::CallMethod($sut, 'validateRequest');
     }
 
-    function testOnExecuteReturnsSuccessEvenIfAccountNotFound()
+    function testValidateRequestSucceeds()
     {
-        $sut = $this->systemUnderTest('findAccount');
+        $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
+        $data = [
+            'email' => 'john@example.com'
+        ];
+        $expected = (object)$data;
 
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn([
-                'email' => 'nobody@example.com'
-            ]);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with('nobody@example.com')
-            ->willReturn(null);
+            ->willReturn($data);
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
-
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey('message', $result);
-        $this->assertSame(
-            'A password reset link has been sent to your email address.',
-            $result['message']
-        );
+        $this->assertEquals($expected, AH::CallMethod($sut, 'validateRequest'));
     }
 
-    function testOnExecuteThrowsIfCreatePasswordResetFails()
-    {
-        $sut = $this->systemUnderTest(
-            'findAccount',
-            'createPasswordReset',
-            'sendPasswordResetEmail'
-        );
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-        $account = $this->createStub(Account::class);
-        $account->id = 42;
-        $account->email = 'john@example.com';
-        $account->displayName = 'John';
-        $securityService = SecurityService::Instance();
-        $database = Database::Instance();
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['email' => 'john@example.com']);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with('john@example.com')
-            ->willReturn($account);
-        $securityService->expects($this->once())
-            ->method('GenerateToken')
-            ->willReturn('code1234');
-        $sut->expects($this->once())
-            ->method('createPasswordReset')
-            ->with(42, 'code1234')
-            ->willReturn(false);
-        $sut->expects($this->never())
-            ->method('sendPasswordResetEmail');
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                try {
-                    return $callback();
-                } catch (\Throwable $e) {
-                    $this->assertSame(
-                        'Failed to save password reset record.',
-                        $e->getMessage()
-                    );
-                    return false;
-                }
-            });
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Sending password reset link failed.');
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
-
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfSendPasswordResetEmailFails()
-    {
-        $sut = $this->systemUnderTest(
-            'findAccount',
-            'createPasswordReset',
-            'sendPasswordResetEmail'
-        );
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-        $account = $this->createStub(Account::class);
-        $account->id = 42;
-        $account->email = 'john@example.com';
-        $account->displayName = 'John';
-        $securityService = SecurityService::Instance();
-        $database = Database::Instance();
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['email' => 'john@example.com']);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with('john@example.com')
-            ->willReturn($account);
-        $securityService->expects($this->once())
-            ->method('GenerateToken')
-            ->willReturn('code1234');
-        $sut->expects($this->once())
-            ->method('createPasswordReset')
-            ->with(42, 'code1234')
-            ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('sendPasswordResetEmail')
-            ->with('john@example.com', 'John', 'code1234')
-            ->willReturn(false);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                try {
-                    return $callback();
-                } catch (\Throwable $e) {
-                    $this->assertSame(
-                        'Failed to send password reset email.',
-                        $e->getMessage()
-                    );
-                    return false;
-                }
-            });
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Sending password reset link failed.');
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
-
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfDeleteCsrfCookieFails()
-    {
-        $sut = $this->systemUnderTest(
-            'findAccount',
-            'createPasswordReset',
-            'sendPasswordResetEmail'
-        );
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-        $account = $this->createStub(Account::class);
-        $account->id = 42;
-        $account->email = 'john@example.com';
-        $account->displayName = 'John';
-        $securityService = SecurityService::Instance();
-        $cookieService = CookieService::Instance();
-        $database = Database::Instance();
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['email' => 'john@example.com']);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with('john@example.com')
-            ->willReturn($account);
-        $securityService->expects($this->once())
-            ->method('GenerateToken')
-            ->willReturn('code1234');
-        $sut->expects($this->once())
-            ->method('createPasswordReset')
-            ->with(42, 'code1234')
-            ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('sendPasswordResetEmail')
-            ->with('john@example.com', 'John', 'code1234')
-            ->willReturn(true);
-        $cookieService->expects($this->once())
-            ->method('DeleteCsrfCookie')
-            ->willThrowException(new \RuntimeException);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                try {
-                    return $callback();
-                } catch (\Throwable $e) {
-                    return false;
-                }
-            });
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Sending password reset link failed.');
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
-
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteSucceeds()
-    {
-        $sut = $this->systemUnderTest(
-            'findAccount',
-            'createPasswordReset',
-            'sendPasswordResetEmail'
-        );
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-        $account = $this->createStub(Account::class);
-        $account->id = 42;
-        $account->email = 'john@example.com';
-        $account->displayName = 'John';
-        $securityService = SecurityService::Instance();
-        $cookieService = CookieService::Instance();
-        $database = Database::Instance();
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['email' => 'john@example.com']);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with('john@example.com')
-            ->willReturn($account);
-        $securityService->expects($this->once())
-            ->method('GenerateToken')
-            ->willReturn('code1234');
-        $sut->expects($this->once())
-            ->method('createPasswordReset')
-            ->with(42, 'code1234')
-            ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('sendPasswordResetEmail')
-            ->with('john@example.com', 'John', 'code1234')
-            ->willReturn(true);
-        $cookieService->expects($this->once())
-            ->method('DeleteCsrfCookie');
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                return $callback();
-            });
-
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
-
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey('message', $result);
-        $this->assertSame(
-            'A password reset link has been sent to your email address.',
-            $result['message']
-        );
-    }
-
-    #endregion onExecute
+    #endregion validateRequest
 
     #region findAccount --------------------------------------------------------
 
-    function testFindAccountReturnsNullWhenNotFound()
+    function testFindAccountReturnsNullIfRecordNotFound()
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
+        Database::ReplaceInstance($fakeDatabase);
+
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `account` WHERE email = :email LIMIT 1',
             bindings: ['email' => 'john@example.com'],
             result: null,
             times: 1
         );
-        Database::ReplaceInstance($fakeDatabase);
 
-        $this->assertNull(AccessHelper::CallMethod(
-            $sut,
-            'findAccount',
-            ['john@example.com']
-        ));
+        $account = AH::CallMethod($sut, 'findAccount', ['john@example.com']);
+        $this->assertNull($account);
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
-    function testFindAccountReturnsEntityWhenFound()
+    function testFindAccountReturnsEntityIfRecordFound()
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = new FakeDatabase();
+        Database::ReplaceInstance($fakeDatabase);
+
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `account` WHERE email = :email LIMIT 1',
             bindings: ['email' => 'john@example.com'],
             result: [[
-                'id' => 23,
+                'id' => 42,
                 'email' => 'john@example.com',
                 'passwordHash' => 'hash1234',
                 'displayName' => 'John',
@@ -384,15 +277,10 @@ class SendPasswordResetActionTest extends TestCase
             ]],
             times: 1
         );
-        Database::ReplaceInstance($fakeDatabase);
 
-        $account = AccessHelper::CallMethod(
-            $sut,
-            'findAccount',
-            ['john@example.com']
-        );
+        $account = AH::CallMethod($sut, 'findAccount', ['john@example.com']);
         $this->assertInstanceOf(Account::class, $account);
-        $this->assertSame(23, $account->id);
+        $this->assertSame(42, $account->id);
         $this->assertSame('john@example.com', $account->email);
         $this->assertSame('hash1234', $account->passwordHash);
         $this->assertSame('John', $account->displayName);
@@ -400,126 +288,230 @@ class SendPasswordResetActionTest extends TestCase
             $account->timeActivated->format('Y-m-d H:i:s'));
         $this->assertSame('2025-01-01 00:00:00',
             $account->timeLastLogin->format('Y-m-d H:i:s'));
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
     #endregion findAccount
 
-    #region createPasswordReset ------------------------------------------------
+    #region doSend -------------------------------------------------------------
 
-    function testCreatePasswordResetUpdatesWhenRecordExists()
+    function testDoSendThrowsIfPasswordResetSaveFails()
+    {
+        $sut = $this->systemUnderTest(
+            'findOrConstructPasswordReset',
+            'sendEmail'
+        );
+        $account = $this->createStub(Account::class);
+        $account->id = 42;
+        $securityService = SecurityService::Instance();
+        $pr = $this->createMock(PasswordReset::class);
+
+        $securityService->expects($this->once())
+            ->method('GenerateToken')
+            ->willReturn('code1234');
+        $sut->expects($this->once())
+            ->method('findOrConstructPasswordReset')
+            ->with(42)
+            ->willReturn($pr);
+        $pr->expects($this->once())
+            ->method('Save')
+            ->willReturn(false);
+        $sut->expects($this->never())
+            ->method('sendEmail');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Failed to save password reset.");
+        AH::CallMethod($sut, 'doSend', [$account]);
+    }
+
+    function testDoSendThrowsIfSendEmailFails()
+    {
+        $sut = $this->systemUnderTest(
+            'findOrConstructPasswordReset',
+            'sendEmail'
+        );
+        $account = $this->createStub(Account::class);
+        $account->id = 42;
+        $account->email = 'john@example.com';
+        $account->displayName = 'John';
+        $securityService = SecurityService::Instance();
+        $pr = $this->createMock(PasswordReset::class);
+
+        $securityService->expects($this->once())
+            ->method('GenerateToken')
+            ->willReturn('code1234');
+        $sut->expects($this->once())
+            ->method('findOrConstructPasswordReset')
+            ->with(42)
+            ->willReturn($pr);
+        $pr->expects($this->once())
+            ->method('Save')
+            ->willReturn(true);
+        $sut->expects($this->once())
+            ->method('sendEmail')
+            ->with('john@example.com', 'John', 'code1234')
+            ->willReturn(false);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Failed to send email.");
+        AH::CallMethod($sut, 'doSend', [$account]);
+    }
+
+    function testDoSendSucceeds()
+    {
+        $sut = $this->systemUnderTest(
+            'findOrConstructPasswordReset',
+            'sendEmail'
+        );
+        $account = $this->createStub(Account::class);
+        $account->id = 42;
+        $account->email = 'john@example.com';
+        $account->displayName = 'John';
+        $securityService = SecurityService::Instance();
+        $pr = $this->createMock(PasswordReset::class);
+
+        $securityService->expects($this->once())
+            ->method('GenerateToken')
+            ->willReturn('code1234');
+        $sut->expects($this->once())
+            ->method('findOrConstructPasswordReset')
+            ->with(42)
+            ->willReturn($pr);
+        $pr->expects($this->once())
+            ->method('Save')
+            ->willReturn(true);
+        $sut->expects($this->once())
+            ->method('sendEmail')
+            ->with('john@example.com', 'John', 'code1234')
+            ->willReturn(true);
+
+        AH::CallMethod($sut, 'doSend', [$account]);
+    }
+
+    #endregion doSend
+
+    #region findOrConstructPasswordReset ---------------------------------------
+
+    function testFindOrConstructPasswordResetWithExistingRecord()
+    {
+        $sut = $this->systemUnderTest(
+            'findPasswordReset',
+            'constructPasswordReset'
+        );
+        $pr = $this->createStub(PasswordReset::class);
+
+        $sut->expects($this->once())
+            ->method('findPasswordReset')
+            ->with(42)
+            ->willReturn($pr);
+        $sut->expects($this->never())
+            ->method('constructPasswordReset');
+
+        $this->assertSame($pr, AH::CallMethod(
+            $sut,
+            'findOrConstructPasswordReset',
+            [42]
+        ));
+    }
+
+    function testFindOrConstructPasswordResetWithNonExistingRecord()
+    {
+        $sut = $this->systemUnderTest(
+            'findPasswordReset',
+            'constructPasswordReset'
+        );
+        $pr = $this->createStub(PasswordReset::class);
+
+        $sut->expects($this->once())
+            ->method('findPasswordReset')
+            ->with(42)
+            ->willReturn(null);
+        $sut->expects($this->once())
+            ->method('constructPasswordReset')
+            ->with(42)
+            ->willReturn($pr);
+
+        $this->assertSame($pr, AH::CallMethod(
+            $sut,
+            'findOrConstructPasswordReset',
+            [42]
+        ));
+    }
+
+    #endregion findOrConstructPasswordReset
+
+    #region findPasswordReset --------------------------------------------------
+
+    function testFindPasswordResetReturnsNullWhenNotFound()
     {
         $sut = $this->systemUnderTest();
-        $now = new \DateTime();
-        $passwordResetId = 1;
-        $accountId = 42;
-        $resetCode = 'code1234';
         $fakeDatabase = new FakeDatabase();
+        Database::ReplaceInstance($fakeDatabase);
+
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `passwordreset` WHERE accountId = :accountId LIMIT 1',
-            bindings: ['accountId' => $accountId],
+            bindings: ['accountId' => 42],
+            result: null,
+            times: 1
+        );
+
+        $pr = AH::CallMethod($sut, 'findPasswordReset', [42]);
+        $this->assertNull($pr);
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testFindPasswordResetReturnsEntityWhenFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = new FakeDatabase();
+        Database::ReplaceInstance($fakeDatabase);
+
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM `passwordreset` WHERE accountId = :accountId LIMIT 1',
+            bindings: ['accountId' => 42],
             result: [[
-                'id' => $passwordResetId,
-                'accountId' => $accountId,
-                'resetCode' => 'old-code',
-                'timeRequested' => '2024-01-01 00:00:00'
+                'id' => 1,
+                'accountId' => 42,
+                'resetCode' => 'code1234',
+                'timeRequested' => '2024-12-31 00:00:00'
             ]],
             times: 1
         );
-        $fakeDatabase->Expect(
-            sql: 'UPDATE `passwordreset` SET'
-               . ' `accountId` = :accountId, `resetCode` = :resetCode,'
-               . ' `timeRequested` = :timeRequested'
-               . ' WHERE `id` = :id',
-            bindings: [
-                'id' => $passwordResetId,
-                'accountId' => $accountId,
-                'resetCode' => $resetCode,
-                'timeRequested' => $now->format('Y-m-d H:i:s')
-            ]
-        );
-        Database::ReplaceInstance($fakeDatabase);
 
-        $this->assertTrue(AccessHelper::CallMethod(
-            $sut,
-            'createPasswordReset',
-            [$accountId, $resetCode, $now]
-        ));
+        $pr = AH::CallMethod($sut, 'findPasswordReset', [42]);
+        $this->assertInstanceOf(PasswordReset::class, $pr);
+        $this->assertSame(1, $pr->id);
+        $this->assertSame(42, $pr->accountId);
+        $this->assertSame('code1234', $pr->resetCode);
+        $this->assertSame('2024-12-31 00:00:00',
+            $pr->timeRequested->format('Y-m-d H:i:s'));
+        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
-    function testCreatePasswordResetInsertsWhenRecordDoesNotExist()
+    #endregion findPasswordReset
+
+    #region constructPasswordReset ---------------------------------------------
+
+    function testConstructPasswordReset()
     {
         $sut = $this->systemUnderTest();
-        $now = new \DateTime();
-        $accountId = 42;
-        $resetCode = 'code1234';
-        $fakeDatabase = new FakeDatabase();
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `passwordreset` WHERE accountId = :accountId LIMIT 1',
-            bindings: ['accountId' => $accountId],
-            result: null, // no existing record
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'INSERT INTO `passwordreset`'
-               . ' (`accountId`, `resetCode`, `timeRequested`)'
-               . ' VALUES (:accountId, :resetCode, :timeRequested)',
-            bindings: [
-                'accountId' => $accountId,
-                'resetCode' => $resetCode,
-                'timeRequested' => $now->format('Y-m-d H:i:s')
-            ]
-        );
-        Database::ReplaceInstance($fakeDatabase);
 
-        $this->assertTrue(AccessHelper::CallMethod(
-            $sut,
-            'createPasswordReset',
-            [$accountId, $resetCode, $now]
-        ));
+        $pr = AH::CallMethod($sut, 'constructPasswordReset', [42]);
+        $this->assertInstanceOf(PasswordReset::class, $pr);
+        $this->assertSame(42, $pr->accountId);
     }
 
-    function testCreatePasswordResetReturnsFalseIfSaveFails()
-    {
-        $sut = $this->systemUnderTest();
-        $now = new \DateTime();
-        $accountId = 42;
-        $resetCode = 'code1234';
-        $fakeDatabase = new FakeDatabase();
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `passwordreset` WHERE accountId = :accountId LIMIT 1',
-            bindings: ['accountId' => $accountId],
-            result: null, // no existing record
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'INSERT INTO `passwordreset`'
-               . ' (`accountId`, `resetCode`, `timeRequested`)'
-               . ' VALUES (:accountId, :resetCode, :timeRequested)',
-            bindings: [
-                'accountId' => $accountId,
-                'resetCode' => $resetCode,
-                'timeRequested' => $now->format('Y-m-d H:i:s')
-            ],
-            result: null // simulate failure
-        );
-        Database::ReplaceInstance($fakeDatabase);
+    #endregion constructPasswordReset
 
-        $this->assertFalse(AccessHelper::CallMethod(
-            $sut,
-            'createPasswordReset',
-            [$accountId, $resetCode, $now]
-        ));
-    }
+    #region sendEmail ----------------------------------------------------------
 
-    #endregion createPasswordReset
-
-    #region sendPasswordResetEmail ---------------------------------------------
-
-    #[DataProviderExternal(DataHelper::class, 'BooleanProvider')]
-    function testSendActivationEmailDelegatesToTrait($returnValue)
+    #[TestWith([true])]
+    #[TestWith([false])]
+    function testSendEmail($returnValue)
     {
         $sut = $this->systemUnderTest('sendTransactionalEmail');
         $config = Config::Instance();
+        $actionUrl = $this->createMock(CUrl::class);
         $resource = Resource::Instance();
 
         $config->expects($this->once())
@@ -529,13 +521,20 @@ class SendPasswordResetActionTest extends TestCase
         $resource->expects($this->once())
             ->method('PageUrl')
             ->with('reset-password')
-            ->willReturn(new CUrl('url/to/page/'));
+            ->willReturn($actionUrl);
+        $actionUrl->expects($this->once())
+            ->method('Extend')
+            ->with('code1234')
+            ->willReturnSelf();
+        $actionUrl->expects($this->once())
+            ->method('__toString')
+            ->willReturn('https://example.com/pages/reset-password/code1234');
         $sut->expects($this->once())
             ->method('sendTransactionalEmail')
             ->with(
                 'john@example.com',
-                'John Doe',
-                'url/to/page/code1234',
+                'John',
+                'https://example.com/pages/reset-password/code1234',
                 [
                     'heroText' =>
                         "Reset your password",
@@ -551,18 +550,21 @@ class SendPasswordResetActionTest extends TestCase
             )
             ->willReturn($returnValue);
 
-        $this->assertSame($returnValue, AccessHelper::CallMethod(
-            $sut,
-            'sendPasswordResetEmail',
-            ['john@example.com', 'John Doe', 'code1234']
-        ));
+        $this->assertSame(
+            $returnValue,
+            AH::CallMethod($sut, 'sendEmail', [
+                'john@example.com',
+                'John',
+                'code1234'
+            ])
+        );
     }
 
-    #endregion sendPasswordResetEmail
+    #endregion sendEmail
 
     #region Data Providers -----------------------------------------------------
 
-    static function invalidModelDataProvider()
+    static function invalidRequestDataProvider()
     {
         return [
             'email missing' => [

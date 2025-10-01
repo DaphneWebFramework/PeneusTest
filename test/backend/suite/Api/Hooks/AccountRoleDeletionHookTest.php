@@ -81,7 +81,7 @@ class AccountRoleDeletionHookTest extends TestCase
         );
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Failed to delete account role.');
+        $this->expectExceptionMessage("Failed to delete account role.");
         $sut->OnDeleteAccount($account);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
