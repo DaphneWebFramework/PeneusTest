@@ -11,10 +11,7 @@ use \Harmonia\Http\Request;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
-use \Peneus\Model\Account;
-use \Peneus\Model\AccountRole;
-use \Peneus\Model\PasswordReset;
-use \Peneus\Model\PendingAccount;
+use \Peneus\Model\AccountRole; // sample
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
@@ -672,6 +669,131 @@ class EditRecordActionTest extends TestCase
                 'exceptionMessage' => "Field 'timeRequested' must match the datetime format: Y-m-d H:i:s"
             ],
             #endregion PasswordReset
+            #region PersistentLogin
+            'persistentLogin: id missing' => [
+                'table' => 'persistentlogin',
+                'data' => [],
+                'exceptionMessage' => "Required field 'id' is missing."
+            ],
+            'persistentLogin: id not an integer' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 'not-an-integer'
+                ],
+                'exceptionMessage' => "Field 'id' must be an integer."
+            ],
+            'persistentLogin: id less than one' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 0
+                ],
+                'exceptionMessage' => "Field 'id' must have a minimum value of 1."
+            ],
+            'persistentLogin: accountId missing' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 42
+                ],
+                'exceptionMessage' => "Required field 'accountId' is missing."
+            ],
+            'persistentLogin: accountId not an integer' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 42,
+                    'accountId' => 'not-an-integer'
+                ],
+                'exceptionMessage' => "Field 'accountId' must be an integer."
+            ],
+            'persistentLogin: accountId less than one' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 42,
+                    'accountId' => 0
+                ],
+                'exceptionMessage' => "Field 'accountId' must have a minimum value of 1."
+            ],
+            'persistentLogin: clientSignature missing' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 42,
+                    'accountId' => 1
+                ],
+                'exceptionMessage' => "Required field 'clientSignature' is missing."
+            ],
+            'persistentLogin: clientSignature invalid' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 42,
+                    'accountId' => 1,
+                    'clientSignature' => 'invalid-signature'
+                ],
+                'exceptionMessage' => "Field 'clientSignature' must match the required pattern: /^[0-9a-zA-Z]{22}$/"
+            ],
+            'persistentLogin: lookupKey missing' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 42,
+                    'accountId' => 1,
+                    'clientSignature' => \str_repeat('a', 22)
+                ],
+                'exceptionMessage' => "Required field 'lookupKey' is missing."
+            ],
+            'persistentLogin: lookupKey invalid' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 42,
+                    'accountId' => 1,
+                    'clientSignature' => \str_repeat('a', 22),
+                    'lookupKey' => 'invalid-key'
+                ],
+                'exceptionMessage' => "Field 'lookupKey' must match the required pattern: /^[0-9a-fA-F]{16}$/"
+            ],
+            'persistentLogin: tokenHash missing' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 42,
+                    'accountId' => 1,
+                    'clientSignature' => \str_repeat('a', 22),
+                    'lookupKey' => \str_repeat('a', 16)
+                ],
+                'exceptionMessage' => "Required field 'tokenHash' is missing."
+            ],
+            'persistentLogin: tokenHash invalid' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 42,
+                    'accountId' => 1,
+                    'clientSignature' => \str_repeat('a', 22),
+                    'lookupKey' => \str_repeat('a', 16),
+                    'tokenHash' => 'invalid-hash'
+                ],
+                'exceptionMessage' => "Field 'tokenHash' must match the required pattern: "
+                    . SecurityService::PASSWORD_HASH_PATTERN
+            ],
+            'persistentLogin: timeExpires missing' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 42,
+                    'accountId' => 1,
+                    'clientSignature' => \str_repeat('a', 22),
+                    'lookupKey' => \str_repeat('a', 16),
+                    'tokenHash' => '$2y$10$12345678901234567890123456789012345678901234567890123'
+                ],
+                'exceptionMessage' => "Required field 'timeExpires' is missing."
+            ],
+            'persistentLogin: timeExpires invalid' => [
+                'table' => 'persistentlogin',
+                'data' => [
+                    'id' => 42,
+                    'accountId' => 1,
+                    'clientSignature' => \str_repeat('a', 22),
+                    'lookupKey' => \str_repeat('a', 16),
+                    'tokenHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
+                    'timeExpires' => 'not-a-datetime'
+                ],
+                'exceptionMessage' => "Field 'timeExpires' must match the datetime format: Y-m-d H:i:s"
+            ],
+            #endregion PersistentLogin
         ];
     }
 
