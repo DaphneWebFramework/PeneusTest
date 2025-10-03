@@ -503,7 +503,7 @@ class AddRecordActionTest extends TestCase
                     'accountId' => 1,
                     'clientSignature' => 'invalid-signature'
                 ],
-                'exceptionMessage' => "Field 'clientSignature' must match the required pattern: /^[0-9a-zA-Z]{22}$/"
+                'exceptionMessage' => "Field 'clientSignature' must match the required pattern: /^[0-9a-zA-Z+\/]{22,24}$/"
             ],
             'persistentLogin: lookupKey missing' => [
                 'table' => 'persistentlogin',
