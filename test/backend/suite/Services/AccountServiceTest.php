@@ -414,13 +414,18 @@ class AccountServiceTest extends TestCase
     function testLoggedInAccountWhenSessionExists()
     {
         $sut = $this->systemUnderTest(
-            'accountFromSession'
+            'accountFromSession',
+            'rotatePersistentLoginIfNeeded'
         );
         $account = $this->createStub(Account::class);
+        $account->id = 42;
 
         $sut->expects($this->once())
             ->method('accountFromSession')
             ->willReturn($account);
+        $sut->expects($this->once())
+            ->method('rotatePersistentLoginIfNeeded')
+            ->with(42);
 
         $this->assertSame(
             $account,
@@ -432,6 +437,7 @@ class AccountServiceTest extends TestCase
     {
         $sut = $this->systemUnderTest(
             'accountFromSession',
+            'rotatePersistentLoginIfNeeded',
             'tryPersistentLogin'
         );
         $account = $this->createStub(Account::class);
@@ -439,6 +445,8 @@ class AccountServiceTest extends TestCase
         $sut->expects($this->once())
             ->method('accountFromSession')
             ->willReturn(null);
+        $sut->expects($this->never())
+            ->method('rotatePersistentLoginIfNeeded');
         $sut->expects($this->once())
             ->method('tryPersistentLogin')
             ->willReturn($account);
@@ -1255,6 +1263,7 @@ class AccountServiceTest extends TestCase
         $persistentLogin->timeExpires = new \DateTime('2025-01-01 00:00:00');
         $securityService = SecurityService::Instance();
         $account = $this->createStub(Account::class);
+        $session = Session::Instance();
 
         $sut->expects($this->once())
             ->method('persistentLoginCookieName')
@@ -1295,9 +1304,15 @@ class AccountServiceTest extends TestCase
         $sut->expects($this->once())
             ->method('CreateSession')
             ->with($account);
-        $sut->expects($this->once())
-            ->method('issuePersistentLogin')
-            ->with($persistentLogin);
+        $session->expects($this->once())
+            ->method('Start')
+            ->willReturnSelf();
+        $session->expects($this->once())
+            ->method('Set')
+            ->with('NEEDS_PL_ROTATION', true)
+            ->willReturnSelf();
+        $session->expects($this->once())
+            ->method('Close');
 
         $this->assertSame(
             $account,
@@ -1306,6 +1321,98 @@ class AccountServiceTest extends TestCase
     }
 
     #endregion tryPersistentLogin
+
+    #region rotatePersistentLoginIfNeeded --------------------------------------
+
+    function testRotatePersistentLoginIfNeededWhenSessionVariableIsMissing()
+    {
+        $sut = $this->systemUnderTest();
+        $session = Session::Instance();
+
+        $session->expects($this->once())
+            ->method('Start');
+        $session->expects($this->once())
+            ->method('Has')
+            ->with('NEEDS_PL_ROTATION')
+            ->willReturn(false);
+        $session->expects($this->never())
+            ->method('Remove');
+        $session->expects($this->once())
+            ->method('Close');
+
+        AccessHelper::CallMethod($sut, 'rotatePersistentLoginIfNeeded', [42]);
+    }
+
+    function testRotatePersistentLoginIfNeededWhenSessionVariableIsPresentButRecordNotFound()
+    {
+        $sut = $this->systemUnderTest(
+            'findPersistentLoginForReuse',
+            'clientSignature'
+        );
+        $session = Session::Instance();
+        $account = $this->createStub(Account::class);
+        $account->id = 42;
+
+        $session->expects($this->once())
+            ->method('Start');
+        $session->expects($this->once())
+            ->method('Has')
+            ->with('NEEDS_PL_ROTATION')
+            ->willReturn(true);
+        $sut->expects($this->once())
+            ->method('clientSignature')
+            ->willReturn('client-signature');
+        $sut->expects($this->once())
+            ->method('findPersistentLoginForReuse')
+            ->with(42, 'client-signature')
+            ->willReturn(null);
+        $session->expects($this->once())
+            ->method('Remove')
+            ->with('NEEDS_PL_ROTATION');
+        $session->expects($this->once())
+            ->method('Close');
+
+        AccessHelper::CallMethod($sut, 'rotatePersistentLoginIfNeeded', [42]);
+    }
+
+    function testRotatePersistentLoginIfNeededWhenSessionVariableIsPresentAndRecordFound()
+    {
+        $sut = $this->systemUnderTest(
+            'findPersistentLoginForReuse',
+            'clientSignature',
+            'issuePersistentLogin'
+        );
+        $session = Session::Instance();
+        $account = $this->createStub(Account::class);
+        $account->id = 42;
+        $pl = $this->createStub(PersistentLogin::class);
+
+        $session->expects($this->once())
+            ->method('Start');
+        $session->expects($this->once())
+            ->method('Has')
+            ->with('NEEDS_PL_ROTATION')
+            ->willReturn(true);
+        $sut->expects($this->once())
+            ->method('clientSignature')
+            ->willReturn('client-signature');
+        $sut->expects($this->once())
+            ->method('findPersistentLoginForReuse')
+            ->with(42, 'client-signature')
+            ->willReturn($pl);
+        $sut->expects($this->once())
+            ->method('issuePersistentLogin')
+            ->with($pl);
+        $session->expects($this->once())
+            ->method('Remove')
+            ->with('NEEDS_PL_ROTATION');
+        $session->expects($this->once())
+            ->method('Close');
+
+        AccessHelper::CallMethod($sut, 'rotatePersistentLoginIfNeeded', [42]);
+    }
+
+    #endregion rotatePersistentLoginIfNeeded
 
     #region findPersistentLogin ------------------------------------------------
 
@@ -1489,7 +1596,7 @@ class AccountServiceTest extends TestCase
     function testIssuePersistentLoginSucceeds()
     {
         $sut = $this->systemUnderTest(
-            'expiryTime',
+            'persistentLoginExpiryTime',
             'persistentLoginCookieName',
             'makePersistentLoginCookieValue'
         );
@@ -1509,7 +1616,7 @@ class AccountServiceTest extends TestCase
             ->with('token-value')
             ->willReturn('token-hash');
         $sut->expects($this->once())
-            ->method('expiryTime')
+            ->method('persistentLoginExpiryTime')
             ->willReturn($expiryTime);
         $persistentLogin->expects($this->once())
             ->method('Save')
@@ -1628,14 +1735,14 @@ class AccountServiceTest extends TestCase
 
     #endregion currentTime
 
-    #region expiryTime ---------------------------------------------------------
+    #region persistentLoginExpiryTime ------------------------------------------
 
     function testExpiryTime()
     {
         $sut = $this->systemUnderTest();
 
         $expected = new \DateTime('+1 month');
-        $actual = AccessHelper::CallMethod($sut, 'expiryTime');
+        $actual = AccessHelper::CallMethod($sut, 'persistentLoginExpiryTime');
         $this->assertInstanceOf(\DateTime::class, $actual);
         $this->assertEqualsWithDelta(
             $expected->getTimestamp(),
@@ -1644,5 +1751,5 @@ class AccountServiceTest extends TestCase
         );
     }
 
-    #endregion expiryTime
+    #endregion persistentLoginExpiryTime
 }
