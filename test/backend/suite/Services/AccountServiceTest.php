@@ -62,14 +62,15 @@ class AccountServiceTest extends TestCase
 
     #region CreateSession ------------------------------------------------------
 
-    function testCreateSession()
+    #[TestWith([true])]
+    #[TestWith([false])]
+    function testCreateSession($persistent)
     {
-        $sut = $this->systemUnderTest(
-            'sessionBindingCookieName'
-        );
+        $sut = $this->systemUnderTest('sessionBindingCookieName');
         $securityService = SecurityService::Instance();
         $session = Session::Instance();
         $cookieService = CookieService::Instance();
+        $accountId = 42;
 
         $securityService->expects($this->once())
             ->method('GenerateCsrfPair')
@@ -85,12 +86,11 @@ class AccountServiceTest extends TestCase
             ->willReturnSelf();
         $session->expects($this->exactly(2))
             ->method('Set')
-            ->with($this->callback(function(...$args) {
+            ->with($this->callback(function(...$args) use($accountId) {
                 [$key, $value] = $args;
                 return match ($key) {
                     'BINDING_TOKEN' => $value === 'token-value',
-                    'ACCOUNT_ID'    => $value === 42,
-                    default => false
+                    'ACCOUNT_ID'    => $value === $accountId
                 };
             }))
             ->willReturnSelf();
@@ -102,8 +102,16 @@ class AccountServiceTest extends TestCase
         $cookieService->expects($this->once())
             ->method('SetCookie')
             ->with('cookie-name', 'cookie-value');
+        if ($persistent) {
+            $this->plm->expects($this->once())
+                ->method('Create')
+                ->with($accountId);
+        } else {
+            $this->plm->expects($this->never())
+                ->method('Create');
+        }
 
-        $sut->CreateSession(42);
+        $sut->CreateSession($accountId, $persistent);
     }
 
     #endregion CreateSession
@@ -129,40 +137,13 @@ class AccountServiceTest extends TestCase
             ->willReturnSelf();
         $session->expects($this->once())
             ->method('Destroy');
+        $this->plm->expects($this->once())
+            ->method('Delete');
 
         $sut->DeleteSession();
     }
 
     #endregion DeleteSession
-
-    #region CreatePersistentLogin ----------------------------------------------
-
-    function testCreatePersistentLogin()
-    {
-        $sut = $this->systemUnderTest();
-
-        $this->plm->expects($this->once())
-            ->method('Create')
-            ->with(42);
-
-        $sut->CreatePersistentLogin(42);
-    }
-
-    #endregion CreatePersistentLogin
-
-    #region DeletePersistentLogin ----------------------------------------------
-
-    function testDeletePersistentLogin()
-    {
-        $sut = $this->systemUnderTest();
-
-        $this->plm->expects($this->once())
-            ->method('Delete');
-
-        $sut->DeletePersistentLogin();
-    }
-
-    #endregion DeletePersistentLogin
 
     #region LoggedInAccount ----------------------------------------------------
 

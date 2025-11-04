@@ -311,8 +311,6 @@ class DeleteActionTest extends TestCase
 
         $accountService->expects($this->once())
             ->method('DeleteSession');
-        $accountService->expects($this->once())
-            ->method('DeletePersistentLogin');
 
         ah::CallMethod($sut, 'logOut');
     }

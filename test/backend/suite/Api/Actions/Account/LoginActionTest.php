@@ -2,6 +2,7 @@
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
+use \PHPUnit\Framework\Attributes\TestWith;
 
 use \Peneus\Api\Actions\Account\LoginAction;
 
@@ -417,55 +418,26 @@ class LoginActionTest extends TestCase
             ->willReturn(false);
         $accountService->expects($this->never())
             ->method('CreateSession');
-        $accountService->expects($this->never())
-            ->method('CreatePersistentLogin');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save account.");
         ah::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
     }
 
-    function testDoLogInSucceedsWithoutKeepLoggedIn()
+    #[TestWith([true])]
+    #[TestWith([false])]
+    function testDoLogInSucceeds($keepLoggedIn)
     {
         $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);
         $account->id = 42;
-        $keepLoggedIn = false;
         $accountService = AccountService::Instance();
 
         $account->expects($this->once())
             ->method('Save')
             ->willReturn(true);
         $accountService->expects($this->once())
-            ->method('CreateSession')
-            ->with($account->id);
-        $accountService->expects($this->never())
-            ->method('CreatePersistentLogin');
-
-        ah::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
-        $this->assertEqualsWithDelta(
-            \time(),
-            $account->timeLastLogin->getTimestamp(),
-            1
-        );
-    }
-
-    function testDoLogInSucceedsWithKeepLoggedIn()
-    {
-        $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
-        $account->id = 42;
-        $keepLoggedIn = true;
-        $accountService = AccountService::Instance();
-
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $accountService->expects($this->once())
-            ->method('CreateSession')
-            ->with($account->id);
-        $accountService->expects($this->once())
-            ->method('CreatePersistentLogin')
+            ->method('CreateSession', $keepLoggedIn)
             ->with($account->id);
 
         ah::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
@@ -487,8 +459,6 @@ class LoginActionTest extends TestCase
 
         $accountService->expects($this->once())
             ->method('DeleteSession');
-        $accountService->expects($this->once())
-            ->method('DeletePersistentLogin');
 
         ah::CallMethod($sut, 'logOut');
     }

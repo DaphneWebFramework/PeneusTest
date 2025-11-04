@@ -593,8 +593,6 @@ class SignInWithGoogleActionTest extends TestCase
             ->willReturn(false);
         $accountService->expects($this->never())
             ->method('CreateSession');
-        $accountService->expects($this->never())
-            ->method('CreatePersistentLogin');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save account.");
@@ -613,10 +611,7 @@ class SignInWithGoogleActionTest extends TestCase
             ->willReturn(true);
         $accountService->expects($this->once())
             ->method('CreateSession')
-            ->with($account->id);
-        $accountService->expects($this->once())
-            ->method('CreatePersistentLogin')
-            ->with($account->id);
+            ->with($account->id, true);
 
         ah::CallMethod($sut, 'doLogIn', [$account]);
         $this->assertEqualsWithDelta(
@@ -637,8 +632,6 @@ class SignInWithGoogleActionTest extends TestCase
 
         $accountService->expects($this->once())
             ->method('DeleteSession');
-        $accountService->expects($this->once())
-            ->method('DeletePersistentLogin');
 
         ah::CallMethod($sut, 'logOut');
     }
