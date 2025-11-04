@@ -10,6 +10,7 @@ use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\SecurityService;
 use \Peneus\Model\Account;
+use \Peneus\Model\AccountView;
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as AH;
 
@@ -37,9 +38,11 @@ class ChangePasswordActionTest extends TestCase
         SecurityService::ReplaceInstance($this->originalSecurityService);
     }
 
-    private function systemUnderTest(): ChangePasswordAction
+    private function systemUnderTest(string ...$mockedMethods): ChangePasswordAction
     {
-        return new ChangePasswordAction();
+        return $this->getMockBuilder(ChangePasswordAction::class)
+            ->onlyMethods($mockedMethods)
+            ->getMock();
     }
 
     #region onExecute ----------------------------------------------------------
@@ -92,48 +95,14 @@ class ChangePasswordActionTest extends TestCase
         AH::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfPasswordVerificationFails()
+    function testOnExecuteThrowsIfAccountIsNotFound()
     {
-        $sut = $this->systemUnderTest();
+        $sut = $this->systemUnderTest('findAccount');
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $accountService = AccountService::Instance();
-        $securityService = SecurityService::Instance();
-        $account = $this->createMock(Account::class);
-        $account->passwordHash = 'hash1234';
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'currentPassword' => 'wrongpass',
-                'newPassword' => 'pass5678'
-            ]);
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn($account);
-        $securityService->expects($this->once())
-            ->method('VerifyPassword')
-            ->with('wrongpass', $account->passwordHash)
-            ->willReturn(false);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Current password is incorrect.');
-        $this->expectExceptionCode(StatusCode::Forbidden->value);
-        AH::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfAccountSaveFails()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-        $accountService = AccountService::Instance();
-        $securityService = SecurityService::Instance();
-        $account = $this->createMock(Account::class);
-        $account->passwordHash = 'hash1234';
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -146,6 +115,84 @@ class ChangePasswordActionTest extends TestCase
             ]);
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
+            ->willReturn(null);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Account not found.");
+        $this->expectExceptionCode(StatusCode::NotFound->value);
+        AH::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfPasswordVerificationFails()
+    {
+        $sut = $this->systemUnderTest('findAccount');
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $accountService = AccountService::Instance();
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
+        $account = $this->createMock(Account::class);
+        $account->passwordHash = 'hash1234';
+        $securityService = SecurityService::Instance();
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'currentPassword' => 'wrongpass',
+                'newPassword' => 'pass5678'
+            ]);
+        $accountService->expects($this->once())
+            ->method('LoggedInAccount')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
+            ->willReturn($account);
+        $securityService->expects($this->once())
+            ->method('VerifyPassword')
+            ->with('wrongpass', $account->passwordHash)
+            ->willReturn(false);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Current password is incorrect.");
+        $this->expectExceptionCode(StatusCode::Forbidden->value);
+        AH::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfAccountCannotBeSaved()
+    {
+        $sut = $this->systemUnderTest('findAccount');
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $accountService = AccountService::Instance();
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
+        $account = $this->createMock(Account::class);
+        $account->passwordHash = 'hash1234';
+        $securityService = SecurityService::Instance();
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'currentPassword' => 'pass1234',
+                'newPassword' => 'pass5678'
+            ]);
+        $accountService->expects($this->once())
+            ->method('LoggedInAccount')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
             ->willReturn($account);
         $securityService->expects($this->once())
             ->method('VerifyPassword')
@@ -160,20 +207,22 @@ class ChangePasswordActionTest extends TestCase
             ->willReturn(false);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Password change failed.');
+        $this->expectExceptionMessage("Failed to change password.");
         $this->expectExceptionCode(StatusCode::InternalServerError->value);
         AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest();
+        $sut = $this->systemUnderTest('findAccount');
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $accountService = AccountService::Instance();
-        $securityService = SecurityService::Instance();
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
         $account = $this->createMock(Account::class);
         $account->passwordHash = 'hash1234';
+        $securityService = SecurityService::Instance();
 
         $request->expects($this->once())
             ->method('FormParams')
@@ -186,6 +235,10 @@ class ChangePasswordActionTest extends TestCase
             ]);
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
             ->willReturn($account);
         $securityService->expects($this->once())
             ->method('VerifyPassword')

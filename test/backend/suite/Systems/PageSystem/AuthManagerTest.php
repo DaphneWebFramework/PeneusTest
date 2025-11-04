@@ -1,12 +1,13 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProvider;
 
 use \Peneus\Systems\PageSystem\AuthManager;
 
 use \Harmonia\Core\CUrl;
 use \Harmonia\Http\StatusCode;
-use \Peneus\Model\Account;
+use \Peneus\Model\AccountView;
 use \Peneus\Model\Role;
 use \Peneus\Resource;
 use \Peneus\Services\AccountService;
@@ -42,7 +43,7 @@ class AuthManagerTest extends TestCase
 
     function testLoggedInAccountReturnsNullWhenNotLoggedIn()
     {
-        $sut = new AuthManager();
+        $sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
 
         $accountService->expects($this->once())
@@ -55,49 +56,19 @@ class AuthManagerTest extends TestCase
 
     function testLoggedInAccountReturnsCachedValue()
     {
-        $sut = new AuthManager();
+        $sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
-        $account = $this->createStub(Account::class);
+        $accountView = $this->createStub(AccountView::class);
 
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
-            ->willReturn($account);
+            ->willReturn($accountView);
 
-        $this->assertSame($account, $sut->LoggedInAccount());
-        $this->assertSame($account, $sut->LoggedInAccount()); // from cache
+        $this->assertSame($accountView, $sut->LoggedInAccount());
+        $this->assertSame($accountView, $sut->LoggedInAccount()); // from cache
     }
 
     #endregion LoggedInAccount
-
-    #region LoggedInAccountRole ------------------------------------------------
-
-    function testLoggedInAccountRoleReturnsCachedOrFallback()
-    {
-        $sut = new AuthManager();
-        $accountService = AccountService::Instance();
-
-        $accountService->expects($this->once())
-            ->method('LoggedInAccountRole')
-            ->willReturn(null); // Simulate no role stored
-
-        $this->assertSame(Role::None, $sut->LoggedInAccountRole());
-        $this->assertSame(Role::None, $sut->LoggedInAccountRole()); // from cache
-    }
-
-    function testLoggedInAccountRoleReturnsSetRole()
-    {
-        $sut = new AuthManager();
-        $accountService = AccountService::Instance();
-
-        $accountService->expects($this->once())
-            ->method('LoggedInAccountRole')
-            ->willReturn(Role::Editor); // Simulate stored role
-
-        $this->assertSame(Role::Editor, $sut->LoggedInAccountRole());
-        $this->assertSame(Role::Editor, $sut->LoggedInAccountRole()); // from cache
-    }
-
-    #endregion LoggedInAccountRole
 
     #region RequireLogin -------------------------------------------------------
 
@@ -106,124 +77,83 @@ class AuthManagerTest extends TestCase
         $sut = $this->systemUnderTest('redirect');
         $accountService = AccountService::Instance();
         $resource = Resource::Instance();
-        $loginPageUrl = new CUrl('login-page-url');
+        $url = $this->createStub(CUrl::class);
 
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
             ->willReturn(null);
         $resource->expects($this->once())
             ->method('LoginPageUrl')
-            ->willReturn($loginPageUrl);
+            ->willReturn($url);
         $sut->expects($this->once())
             ->method('redirect')
-            ->with($loginPageUrl);
+            ->with($url);
 
         $sut->RequireLogin();
     }
 
-    function testRequireLoginPassesWhenRoleIsNullAndMinimumIsNone()
-    {
-        $sut = new AuthManager();
-        $accountService = AccountService::Instance();
-        $resource = Resource::Instance();
-
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn($this->createStub(Account::class));
-        $resource->expects($this->never())
-            ->method('LoginPageUrl');
-        $accountService->expects($this->once())
-            ->method('LoggedInAccountRole')
-            ->willReturn(null);
-        $resource->expects($this->never())
-            ->method('ErrorPageUrl');
-
-        $sut->RequireLogin(Role::None);
-    }
-
-    function testRequireLoginPassesWhenRoleIsNoneAndMinimumIsNone()
-    {
-        $sut = new AuthManager();
-        $accountService = AccountService::Instance();
-        $resource = Resource::Instance();
-
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn($this->createStub(Account::class));
-        $accountService->expects($this->once())
-            ->method('LoggedInAccountRole')
-            ->willReturn(Role::None);
-        $resource->expects($this->never())
-            ->method('LoginPageUrl');
-        $resource->expects($this->never())
-            ->method('ErrorPageUrl');
-
-        $sut->RequireLogin(Role::None);
-    }
-
-    function testRequireLoginRedirectsToErrorPageWhenRoleIsInsufficient()
-    {
+    #[DataProvider('requireLoginDataProvider')]
+    function testRequireLogin(
+        bool $expected,
+        ?int $accountRole,
+        Role $minimumRole
+    ) {
         $sut = $this->systemUnderTest('redirect');
         $accountService = AccountService::Instance();
-        $resource = Resource::Instance();
-        $errorPageUrl = new CUrl('error-page-url');
-
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn($this->createStub(Account::class));
-        $accountService->expects($this->once())
-            ->method('LoggedInAccountRole')
-            ->willReturn(Role::Editor); // less than Admin
-        $resource->expects($this->once())
-            ->method('ErrorPageUrl')
-            ->with(StatusCode::Unauthorized)
-            ->willReturn($errorPageUrl);
-        $sut->expects($this->once())
-            ->method('redirect')
-            ->with($errorPageUrl);
-
-        $sut->RequireLogin(Role::Admin);
-    }
-
-    function testRequireLoginPassesWhenRoleIsEqualToMinimum()
-    {
-        $sut = new AuthManager();
-        $accountService = AccountService::Instance();
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->role = $accountRole;
         $resource = Resource::Instance();
 
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
-            ->willReturn($this->createStub(Account::class));
-        $accountService->expects($this->once())
-            ->method('LoggedInAccountRole')
-            ->willReturn(Role::Admin);
-        $resource->expects($this->never())
-            ->method('LoginPageUrl');
-        $resource->expects($this->never())
-            ->method('ErrorPageUrl');
+            ->willReturn($accountView);
+        if ($expected == true) {
+            $resource->expects($this->never())
+                ->method('ErrorPageUrl');
+            $sut->expects($this->never())
+                ->method('redirect');
+        } else {
+            $url = $this->createStub(CUrl::class);
+            $resource->expects($this->once())
+                ->method('ErrorPageUrl')
+                ->with(StatusCode::Unauthorized)
+                ->willReturn($url);
+            $sut->expects($this->once())
+                ->method('redirect')
+                ->with($url);
+        }
 
-        $sut->RequireLogin(Role::Admin);
-    }
-
-    function testRequireLoginPassesWhenRoleIsGreaterThanMinimum()
-    {
-        $sut = new AuthManager();
-        $accountService = AccountService::Instance();
-        $resource = Resource::Instance();
-
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn($this->createStub(Account::class));
-        $accountService->expects($this->once())
-            ->method('LoggedInAccountRole')
-            ->willReturn(Role::Admin); // greater than Editor
-        $resource->expects($this->never())
-            ->method('LoginPageUrl');
-        $resource->expects($this->never())
-            ->method('ErrorPageUrl');
-
-        $sut->RequireLogin(Role::Editor);
+        $sut->RequireLogin($minimumRole);
     }
 
     #endregion RequireLogin
+
+    #region Data Providers -----------------------------------------------------
+
+    static function requireLoginDataProvider()
+    {
+        return [
+            'invalid vs None'   => [true,  99, Role::None],
+            'invalid vs Editor' => [false, 99, Role::Editor],
+            'invalid vs Admin'  => [false, 99, Role::Admin],
+
+            'null vs None'   => [true,  null, Role::None],
+            'null vs Editor' => [false, null, Role::Editor],
+            'null vs Admin'  => [false, null, Role::Admin],
+
+            'None vs None'   => [true,  0, Role::None],
+            'None vs Editor' => [false, 0, Role::Editor],
+            'None vs Admin'  => [false, 0, Role::Admin],
+
+            'Editor vs None'   => [true,  10, Role::None],
+            'Editor vs Editor' => [true,  10, Role::Editor],
+            'Editor vs Admin'  => [false, 10, Role::Admin],
+
+            'Admin vs None'   => [true,  20, Role::None],
+            'Admin vs Editor' => [true,  20, Role::Editor],
+            'Admin vs Admin'  => [true,  20, Role::Admin],
+        ];
+    }
+
+    #endregion Data Providers
 }

@@ -194,7 +194,7 @@ class RegisterActionTest extends TestCase
         $database->expects($this->once())
             ->method('WithTransaction')
             ->willReturnCallback(function($callback) {
-                return $callback();
+                $callback();
             });
         $cookieService->expects($this->once())
             ->method('DeleteCsrfCookie');

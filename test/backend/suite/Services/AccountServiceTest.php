@@ -13,8 +13,7 @@ use \Harmonia\Session;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Api\Hooks\IAccountDeletionHook;
-use \Peneus\Model\Account;
-use \Peneus\Model\Role;
+use \Peneus\Model\AccountView;
 use \Peneus\Services\PersistentLoginManager;
 use \TestToolkit\AccessHelper as ah;
 
@@ -63,12 +62,9 @@ class AccountServiceTest extends TestCase
 
     #region CreateSession ------------------------------------------------------
 
-    #[TestWith([null])]
-    #[TestWith([Role::Editor])]
-    function testCreateSession(?Role $role)
+    function testCreateSession()
     {
         $sut = $this->systemUnderTest(
-            'findAccountRole',
             'sessionBindingCookieName'
         );
         $securityService = SecurityService::Instance();
@@ -78,10 +74,6 @@ class AccountServiceTest extends TestCase
         $securityService->expects($this->once())
             ->method('GenerateCsrfPair')
             ->willReturn(['token-value', 'cookie-value']);
-        $sut->expects($this->once())
-            ->method('findAccountRole')
-            ->with(42)
-            ->willReturn($role);
         $session->expects($this->once())
             ->method('Start')
             ->willReturnSelf();
@@ -91,14 +83,13 @@ class AccountServiceTest extends TestCase
         $session->expects($this->once())
             ->method('RenewId')
             ->willReturnSelf();
-        $session->expects($this->exactly($role === null ? 2 : 3))
+        $session->expects($this->exactly(2))
             ->method('Set')
             ->with($this->callback(function(...$args) {
                 [$key, $value] = $args;
                 return match ($key) {
                     'BINDING_TOKEN' => $value === 'token-value',
                     'ACCOUNT_ID'    => $value === 42,
-                    'ACCOUNT_ROLE'  => $value === Role::Editor->value,
                     default => false
                 };
             }))
@@ -181,17 +172,17 @@ class AccountServiceTest extends TestCase
             'accountFromSession',
             'rotatePersistentLoginIfNeeded'
         );
-        $account = $this->createStub(Account::class);
-        $account->id = 42;
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
 
         $sut->expects($this->once())
             ->method('accountFromSession')
-            ->willReturn($account);
+            ->willReturn($accountView);
         $sut->expects($this->once())
             ->method('rotatePersistentLoginIfNeeded')
-            ->with(42);
+            ->with($accountView->id);
 
-        $this->assertSame($account, $sut->LoggedInAccount());
+        $this->assertSame($accountView, $sut->LoggedInAccount());
     }
 
     function testLoggedInAccountWhenSessionDoesNotExistAndPersistentLoginExists()
@@ -201,7 +192,7 @@ class AccountServiceTest extends TestCase
             'rotatePersistentLoginIfNeeded',
             'tryPersistentLogin'
         );
-        $account = $this->createStub(Account::class);
+        $accountView = $this->createStub(AccountView::class);
 
         $sut->expects($this->once())
             ->method('accountFromSession')
@@ -210,9 +201,9 @@ class AccountServiceTest extends TestCase
             ->method('rotatePersistentLoginIfNeeded');
         $sut->expects($this->once())
             ->method('tryPersistentLogin')
-            ->willReturn($account);
+            ->willReturn($accountView);
 
-        $this->assertSame($account, $sut->LoggedInAccount());
+        $this->assertSame($accountView, $sut->LoggedInAccount());
     }
 
     function testLoggedInAccountWhenSessionAndPersistentLoginDoNotExist()
@@ -236,64 +227,6 @@ class AccountServiceTest extends TestCase
     }
 
     #endregion LoggedInAccount
-
-    #region LoggedInAccountRole ------------------------------------------------
-
-    function testLoggedInAccountRoleWhenSessionVariableIsMissing()
-    {
-        $sut = $this->systemUnderTest();
-        $session = Session::Instance();
-
-        $session->expects($this->once())
-            ->method('Start')
-            ->willReturnSelf();
-        $session->expects($this->once())
-            ->method('Close');
-        $session->expects($this->once())
-            ->method('Get')
-            ->with('ACCOUNT_ROLE')
-            ->willReturn(null);
-
-        $this->assertNull($sut->LoggedInAccountRole());
-    }
-
-    function testLoggedInAccountRoleWhenSessionVariableIsNotAnEnumValue()
-    {
-        $sut = $this->systemUnderTest();
-        $session = Session::Instance();
-
-        $session->expects($this->once())
-            ->method('Start')
-            ->willReturnSelf();
-        $session->expects($this->once())
-            ->method('Close');
-        $session->expects($this->once())
-            ->method('Get')
-            ->with('ACCOUNT_ROLE')
-            ->willReturn(999); // invalid
-
-        $this->assertNull($sut->LoggedInAccountRole());
-    }
-
-    function testLoggedInAccountRoleWhenSessionVariableIsAnEnumValue()
-    {
-        $sut = $this->systemUnderTest();
-        $session = Session::Instance();
-
-        $session->expects($this->once())
-            ->method('Start')
-            ->willReturnSelf();
-        $session->expects($this->once())
-            ->method('Close');
-        $session->expects($this->once())
-            ->method('Get')
-            ->with('ACCOUNT_ROLE')
-            ->willReturn(Role::Admin->value);
-
-        $this->assertSame(Role::Admin, $sut->LoggedInAccountRole());
-    }
-
-    #endregion LoggedInAccountRole
 
     #region RegisterDeletionHook -----------------------------------------------
 
@@ -359,70 +292,66 @@ class AccountServiceTest extends TestCase
 
     #endregion sessionBindingCookieName
 
-    #region findAccountRole ----------------------------------------------------
+    #region findAccountView ----------------------------------------------------
 
-    function testFindAccountRoleReturnsNullIfRecordNotFound()
+    function testFindAccountViewReturnsNullIfNotFound()
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = Database::Instance();
 
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole`'
-               . ' WHERE accountId = :accountId LIMIT 1',
-            bindings: ['accountId' => 42],
+            sql: 'SELECT * FROM `accountview` WHERE `id` = :id LIMIT 1',
+            bindings: ['id' => 42],
             result: null,
             times: 1
         );
 
-        $role = ah::CallMethod($sut, 'findAccountRole', [42]);
-        $this->assertNull($role);
+        $accountView = ah::CallMethod(
+            $sut,
+            'findAccountView',
+            [42]
+        );
+        $this->assertNull($accountView);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
-    function testFindAccountRoleReturnsNullIfRoleIsNotAnEnumValue()
+    function testFindAccountViewReturnsEntityIfFound()
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = Database::Instance();
 
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole`'
-               . ' WHERE accountId = :accountId LIMIT 1',
-            bindings: ['accountId' => 42],
+            sql: 'SELECT * FROM `accountview` WHERE `id` = :id LIMIT 1',
+            bindings: ['id' => 42],
             result: [[
-                'accountId' => 42,
-                'role' => 999 // invalid
+                'id' => 42,
+                'email' => 'john@example.com',
+                'displayName' => 'John',
+                'timeActivated' => '2024-01-01 00:00:00',
+                'timeLastLogin' => '2025-01-01 00:00:00',
+                'role' => null
             ]],
             times: 1
         );
 
-        $role = ah::CallMethod($sut, 'findAccountRole', [42]);
-        $this->assertNull($role);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testFindAccountRoleReturnsRoleOnSuccess()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = Database::Instance();
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole`'
-               . ' WHERE accountId = :accountId LIMIT 1',
-            bindings: ['accountId' => 42],
-            result: [[
-                'accountId' => 42,
-                'role' => Role::Editor->value
-            ]],
-            times: 1
+        $accountView = ah::CallMethod(
+            $sut,
+            'findAccountView',
+            [42]
         );
-
-        $role = ah::CallMethod($sut, 'findAccountRole', [42]);
-        $this->assertInstanceOf(Role::class, $role);
-        $this->assertSame(Role::Editor, $role);
+        $this->assertInstanceOf(AccountView::class, $accountView);
+        $this->assertSame(42, $accountView->id);
+        $this->assertSame('john@example.com', $accountView->email);
+        $this->assertSame('John', $accountView->displayName);
+        $this->assertSame('2024-01-01 00:00:00',
+                          $accountView->timeActivated->format('Y-m-d H:i:s'));
+        $this->assertSame('2025-01-01 00:00:00',
+                          $accountView->timeLastLogin->format('Y-m-d H:i:s'));
+        $this->assertNull($accountView->role);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
-    #endregion findAccountRole
+    #endregion findAccountView
 
     #region accountFromSession -------------------------------------------------
 
@@ -482,7 +411,7 @@ class AccountServiceTest extends TestCase
             'resolveAccountFromSession'
         );
         $session = Session::Instance();
-        $account = $this->createStub(Account::class);
+        $accountView = $this->createStub(AccountView::class);
 
         $session->expects($this->once())
             ->method('Start')
@@ -494,10 +423,10 @@ class AccountServiceTest extends TestCase
             ->willReturn(true);
         $sut->expects($this->once())
             ->method('resolveAccountFromSession')
-            ->willReturn($account);
+            ->willReturn($accountView);
 
         $this->assertSame(
-            $account,
+            $accountView,
             ah::CallMethod($sut, 'accountFromSession')
         );
     }
@@ -606,7 +535,7 @@ class AccountServiceTest extends TestCase
 
     function testResolveAccountFromSessionReturnsNullIfRecordNotFound()
     {
-        $sut = $this->systemUnderTest('findAccount');
+        $sut = $this->systemUnderTest('findAccountView');
         $session = Session::Instance();
 
         $session->expects($this->once())
@@ -614,7 +543,7 @@ class AccountServiceTest extends TestCase
             ->with('ACCOUNT_ID')
             ->willReturn(42);
         $sut->expects($this->once())
-            ->method('findAccount')
+            ->method('findAccountView')
             ->with(42)
             ->willReturn(null);
 
@@ -623,78 +552,26 @@ class AccountServiceTest extends TestCase
 
     function testResolveAccountFromSessionReturnsEntityOnSuccess()
     {
-        $sut = $this->systemUnderTest('findAccount');
+        $sut = $this->systemUnderTest('findAccountView');
         $session = Session::Instance();
-        $account = $this->createStub(Account::class);
+        $accountView = $this->createStub(AccountView::class);
 
         $session->expects($this->once())
             ->method('Get')
             ->with('ACCOUNT_ID')
             ->willReturn(42);
         $sut->expects($this->once())
-            ->method('findAccount')
+            ->method('findAccountView')
             ->with(42)
-            ->willReturn($account);
+            ->willReturn($accountView);
 
         $this->assertSame(
-            $account,
+            $accountView,
             ah::CallMethod($sut, 'resolveAccountFromSession')
         );
     }
 
     #endregion resolveAccountFromSession
-
-    #region findAccount --------------------------------------------------------
-
-    function testFindAccountReturnsNullIfRecordNotFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = Database::Instance();
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: null,
-            times: 1
-        );
-
-        $this->assertNull(ah::CallMethod($sut, 'findAccount', [42]));
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testFindAccountReturnsEntityIfRecordFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = Database::Instance();
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: [[
-                'id' => 42,
-                'email' => 'john@example.com',
-                'passwordHash' => 'hash1234',
-                'displayName' => 'John',
-                'timeActivated' => '2024-01-01 00:00:00',
-                'timeLastLogin' => '2025-01-01 00:00:00'
-            ]],
-            times: 1
-        );
-
-        $account = ah::CallMethod($sut, 'findAccount', [42]);
-        $this->assertInstanceOf(Account::class, $account);
-        $this->assertSame(42, $account->id);
-        $this->assertSame('john@example.com', $account->email);
-        $this->assertSame('hash1234', $account->passwordHash);
-        $this->assertSame('John', $account->displayName);
-        $this->assertSame('2024-01-01 00:00:00',
-                          $account->timeActivated->format('Y-m-d H:i:s'));
-        $this->assertSame('2025-01-01 00:00:00',
-                          $account->timeLastLogin->format('Y-m-d H:i:s'));
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    #endregion findAccount
 
     #region tryPersistentLogin -------------------------------------------------
 
@@ -711,13 +588,13 @@ class AccountServiceTest extends TestCase
 
     function testTryPersistentLoginReturnsNullIfAccountNotFound()
     {
-        $sut = $this->systemUnderTest('findAccount');
+        $sut = $this->systemUnderTest('findAccountView');
 
         $this->plm->expects($this->once())
             ->method('Resolve')
             ->willReturn(42);
         $sut->expects($this->once())
-            ->method('findAccount')
+            ->method('findAccountView')
             ->with(42)
             ->willReturn(null);
 
@@ -726,17 +603,17 @@ class AccountServiceTest extends TestCase
 
     function testTryPersistentLoginReturnsAccountOnSuccess()
     {
-        $sut = $this->systemUnderTest('findAccount', 'CreateSession');
-        $account = $this->createStub(Account::class);
+        $sut = $this->systemUnderTest('findAccountView', 'CreateSession');
+        $accountView = $this->createStub(AccountView::class);
         $session = Session::Instance();
 
         $this->plm->expects($this->once())
             ->method('Resolve')
             ->willReturn(42);
         $sut->expects($this->once())
-            ->method('findAccount')
+            ->method('findAccountView')
             ->with(42)
-            ->willReturn($account);
+            ->willReturn($accountView);
         $sut->expects($this->once())
             ->method('CreateSession')
             ->with(42);
@@ -751,7 +628,7 @@ class AccountServiceTest extends TestCase
             ->method('Close');
 
         $this->assertSame(
-            $account,
+            $accountView,
             ah::CallMethod($sut, 'tryPersistentLogin')
         );
     }

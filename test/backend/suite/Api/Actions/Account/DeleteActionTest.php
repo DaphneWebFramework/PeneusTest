@@ -6,8 +6,10 @@ use \Peneus\Api\Actions\Account\DeleteAction;
 
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Systems\DatabaseSystem\Database;
+use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Api\Hooks\IAccountDeletionHook;
 use \Peneus\Model\Account;
+use \Peneus\Model\AccountView;
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as AH;
 
@@ -53,14 +55,40 @@ class DeleteActionTest extends TestCase
         AH::CallMethod($sut, 'onExecute');
     }
 
+    function testOnExecuteThrowsIfAccountNotFound()
+    {
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount');
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
+
+        $sut->expects($this->once())
+            ->method('ensureLoggedIn')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
+            ->willThrowException(new \RuntimeException('Expected message.'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Expected message.');
+        AH::CallMethod($sut, 'onExecute');
+    }
+
     function testOnExecuteThrowsIfDoDeleteFails()
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'doDelete');
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
+            'doDelete');
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
         $account = $this->createStub(Account::class);
         $database = Database::Instance();
 
         $sut->expects($this->once())
             ->method('ensureLoggedIn')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
             ->willReturn($account);
         $sut->expects($this->once())
             ->method('doDelete')
@@ -73,18 +101,25 @@ class DeleteActionTest extends TestCase
             });
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Account deletion failed.");
+        $this->expectExceptionMessage("Failed to delete account.");
         AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'doDelete', 'logOut');
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
+            'doDelete', 'logOut');
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
         $account = $this->createStub(Account::class);
         $database = Database::Instance();
 
         $sut->expects($this->once())
             ->method('ensureLoggedIn')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
             ->willReturn($account);
         $sut->expects($this->once())
             ->method('doDelete')
@@ -92,7 +127,7 @@ class DeleteActionTest extends TestCase
         $database->expects($this->once())
             ->method('WithTransaction')
             ->willReturnCallback(function($callback) {
-                return $callback();
+                $callback();
             });
         $sut->expects($this->once())
             ->method('logOut');
@@ -123,17 +158,74 @@ class DeleteActionTest extends TestCase
     function testEnsureLoggedInSucceedsIfUserIsLoggedIn()
     {
         $sut = $this->systemUnderTest();
-        $account = $this->createStub(Account::class);
         $accountService = AccountService::Instance();
+        $accountView = $this->createStub(AccountView::class);
 
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
-            ->willReturn($account);
+            ->willReturn($accountView);
 
-        $this->assertSame($account, AH::CallMethod($sut, 'ensureLoggedIn'));
+        $this->assertSame($accountView, AH::CallMethod($sut, 'ensureLoggedIn'));
     }
 
     #endregion ensureLoggedIn
+
+    #region findAccount --------------------------------------------------------
+
+    function testFindAccountThrowsIfRecordNotFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = new FakeDatabase();
+        Database::ReplaceInstance($fakeDatabase);
+
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
+            bindings: ['id' => 42],
+            result: null,
+            times: 1
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Account not found.");
+        $this->expectExceptionCode(StatusCode::NotFound->value);
+        AH::CallMethod($sut, 'findAccount', [42]);
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testFindAccountReturnsEntityIfRecordFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = new FakeDatabase();
+        Database::ReplaceInstance($fakeDatabase);
+
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
+            bindings: ['id' => 42],
+            result: [[
+                'id' => 42,
+                'email' => 'john@example.com',
+                'passwordHash' => 'hash1234',
+                'displayName' => 'John',
+                'timeActivated' => '2024-01-01 00:00:00',
+                'timeLastLogin' => '2025-01-01 00:00:00'
+            ]],
+            times: 1
+        );
+
+        $account = AH::CallMethod($sut, 'findAccount', [42]);
+        $this->assertInstanceOf(Account::class, $account);
+        $this->assertSame(42, $account->id);
+        $this->assertSame('john@example.com', $account->email);
+        $this->assertSame('hash1234', $account->passwordHash);
+        $this->assertSame('John', $account->displayName);
+        $this->assertSame('2024-01-01 00:00:00',
+                          $account->timeActivated->format('Y-m-d H:i:s'));
+        $this->assertSame('2025-01-01 00:00:00',
+                          $account->timeLastLogin->format('Y-m-d H:i:s'));
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #endregion findAccount
 
     #region doDelete -----------------------------------------------------------
 

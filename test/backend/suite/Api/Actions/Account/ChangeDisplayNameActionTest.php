@@ -9,6 +9,7 @@ use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Peneus\Model\Account;
+use \Peneus\Model\AccountView;
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as AH;
 
@@ -32,9 +33,11 @@ class ChangeDisplayNameActionTest extends TestCase
         AccountService::ReplaceInstance($this->originalAccountService);
     }
 
-    private function systemUnderTest(): ChangeDisplayNameAction
+    private function systemUnderTest(string ...$mockedMethods): ChangeDisplayNameAction
     {
-        return new ChangeDisplayNameAction();
+        return $this->getMockBuilder(ChangeDisplayNameAction::class)
+            ->onlyMethods($mockedMethods)
+            ->getMock();
     }
 
     #region onExecute ----------------------------------------------------------
@@ -86,12 +89,45 @@ class ChangeDisplayNameActionTest extends TestCase
         AH::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfAccountSaveFails()
+    function testOnExecuteThrowsIfAccountIsNotFound()
     {
-        $sut = $this->systemUnderTest();
+        $sut = $this->systemUnderTest('findAccount');
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $accountService = AccountService::Instance();
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn([
+                'displayName' => 'Alice'
+            ]);
+        $accountService->expects($this->once())
+            ->method('LoggedInAccount')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
+            ->willReturn(null);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Account not found.");
+        $this->expectExceptionCode(StatusCode::NotFound->value);
+        AH::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfAccountCannotBeSaved()
+    {
+        $sut = $this->systemUnderTest('findAccount');
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $accountService = AccountService::Instance();
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
         $account = $this->createMock(Account::class);
 
         $request->expects($this->once())
@@ -104,23 +140,29 @@ class ChangeDisplayNameActionTest extends TestCase
             ]);
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
             ->willReturn($account);
         $account->expects($this->once())
             ->method('Save')
             ->willReturn(false);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Display name change failed.');
+        $this->expectExceptionMessage("Failed to change display name.");
         $this->expectExceptionCode(StatusCode::InternalServerError->value);
         AH::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest();
+        $sut = $this->systemUnderTest('findAccount');
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
         $accountService = AccountService::Instance();
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
         $account = $this->createMock(Account::class);
 
         $request->expects($this->once())
@@ -133,6 +175,10 @@ class ChangeDisplayNameActionTest extends TestCase
             ]);
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
             ->willReturn($account);
         $account->expects($this->once())
             ->method('Save')

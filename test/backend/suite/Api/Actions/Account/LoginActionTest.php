@@ -13,6 +13,7 @@ use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
+use \Peneus\Model\AccountView;
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as AH;
 
@@ -206,12 +207,12 @@ class LoginActionTest extends TestCase
     function testEnsureNotLoggedInThrowsIfUserIsLoggedIn()
     {
         $sut = $this->systemUnderTest();
-        $account = $this->createStub(Account::class);
         $accountService = AccountService::Instance();
+        $accountView = $this->createStub(AccountView::class);
 
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
-            ->willReturn($account);
+            ->willReturn($accountView);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("You are already logged in.");

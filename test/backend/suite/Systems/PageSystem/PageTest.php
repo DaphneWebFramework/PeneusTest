@@ -10,7 +10,7 @@ use \Harmonia\Core\CSequentialArray;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\SecurityService;
 use \Peneus\Api\Guards\FormTokenGuard;
-use \Peneus\Model\Account;
+use \Peneus\Model\AccountView;
 use \Peneus\Model\Role;
 use \Peneus\Systems\PageSystem\AuthManager;
 use \Peneus\Systems\PageSystem\LibraryManager;
@@ -563,31 +563,16 @@ class PageTest extends TestCase
     function testLoggedInAccountDelegatesToAuthManager()
     {
         $sut = $this->systemUnderTest();
-        $account = $this->createStub(Account::class);
+        $accountView = $this->createStub(AccountView::class);
 
         $this->authManager->expects($this->once())
             ->method('LoggedInAccount')
-            ->willReturn($account);
+            ->willReturn($accountView);
 
-        $this->assertSame($account, $sut->LoggedInAccount());
+        $this->assertSame($accountView, $sut->LoggedInAccount());
     }
 
     #endregion LoggedInAccount
-
-    #region LoggedInAccountRole ------------------------------------------------
-
-    function testLoggedInAccountRoleDelegatesToAuthManager()
-    {
-        $sut = $this->systemUnderTest();
-
-        $this->authManager->expects($this->once())
-            ->method('LoggedInAccountRole')
-            ->willReturn(Role::Editor);
-
-        $this->assertSame(Role::Editor, $sut->LoggedInAccountRole());
-    }
-
-    #endregion LoggedInAccountRole
 
     #region RequireLogin -------------------------------------------------------
 

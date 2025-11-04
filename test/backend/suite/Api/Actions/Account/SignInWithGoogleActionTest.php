@@ -15,6 +15,7 @@ use \Harmonia\Services\CookieService;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
+use \Peneus\Model\AccountView;
 use \Peneus\Resource;
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as AH;
@@ -208,7 +209,7 @@ class SignInWithGoogleActionTest extends TestCase
         $database->expects($this->once())
             ->method('WithTransaction')
             ->willReturnCallback(function($callback) {
-                return $callback();
+                $callback();
             });
         $sut->expects($this->never())
             ->method('logOut');
@@ -232,12 +233,12 @@ class SignInWithGoogleActionTest extends TestCase
     function testEnsureNotLoggedInThrowsIfUserIsLoggedIn()
     {
         $sut = $this->systemUnderTest();
-        $account = $this->createStub(Account::class);
+        $accountView = $this->createStub(AccountView::class);
         $accountService = AccountService::Instance();
 
         $accountService->expects($this->once())
             ->method('LoggedInAccount')
-            ->willReturn($account);
+            ->willReturn($accountView);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("You are already logged in.");
