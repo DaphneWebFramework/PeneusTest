@@ -18,7 +18,7 @@ use \Peneus\Model\Account;
 use \Peneus\Model\AccountView;
 use \Peneus\Resource;
 use \Peneus\Services\AccountService;
-use \TestToolkit\AccessHelper as AH;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(SignInWithGoogleAction::class)]
 class SignInWithGoogleActionTest extends TestCase
@@ -75,7 +75,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfRequestValidationFails()
@@ -93,7 +93,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfCredentialDecodeAndValidationFails()
@@ -118,7 +118,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfDoLogInFails()
@@ -166,7 +166,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Login failed.");
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
@@ -220,7 +220,7 @@ class SignInWithGoogleActionTest extends TestCase
             ->with('home')
             ->willReturn($redirectUrl);
 
-        $result = AH::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertIsArray($result);
         $this->assertArrayHasKey('redirectUrl', $result);
         $this->assertEquals($redirectUrl, $result['redirectUrl']);
@@ -243,7 +243,7 @@ class SignInWithGoogleActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("You are already logged in.");
         $this->expectExceptionCode(StatusCode::Conflict->value);
-        AH::CallMethod($sut, 'ensureNotLoggedIn');
+        ah::CallMethod($sut, 'ensureNotLoggedIn');
     }
 
     function testEnsureNotLoggedInSucceedsIfUserIsNotLoggedIn()
@@ -255,14 +255,14 @@ class SignInWithGoogleActionTest extends TestCase
             ->method('LoggedInAccount')
             ->willReturn(null);
 
-        AH::CallMethod($sut, 'ensureNotLoggedIn');
+        ah::CallMethod($sut, 'ensureNotLoggedIn');
     }
 
     #endregion ensureNotLoggedIn
 
     #region validateRequest ----------------------------------------------------
 
-    #[DataProvider('invalidRequestDataProvider')]
+    #[DataProvider('invalidPayloadProvider')]
     function testValidateRequestThrows(
         array $data,
         string $exceptionMessage
@@ -280,7 +280,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AH::CallMethod($sut, 'validateRequest');
+        ah::CallMethod($sut, 'validateRequest');
     }
 
     function testValidateRequestSucceeds()
@@ -300,7 +300,7 @@ class SignInWithGoogleActionTest extends TestCase
             ->method('ToArray')
             ->willReturn($data);
 
-        $this->assertEquals($expected, AH::CallMethod($sut, 'validateRequest'));
+        $this->assertEquals($expected, ah::CallMethod($sut, 'validateRequest'));
     }
 
     #endregion validateRequest
@@ -318,7 +318,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Invalid credential.");
-        AH::CallMethod($sut, 'decodeAndValidateCredential', ['credential']);
+        ah::CallMethod($sut, 'decodeAndValidateCredential', ['credential']);
     }
 
     function testDecodeAndValidateCredentialThrowsIfClaimsValidationFails()
@@ -337,7 +337,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Invalid claims.");
-        AH::CallMethod($sut, 'decodeAndValidateCredential', ['credential']);
+        ah::CallMethod($sut, 'decodeAndValidateCredential', ['credential']);
     }
 
     function testDecodeAndValidateCredentialSucceeds()
@@ -357,7 +357,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->assertSame(
             $data,
-            AH::CallMethod($sut, 'decodeAndValidateCredential', ['credential'])
+            ah::CallMethod($sut, 'decodeAndValidateCredential', ['credential'])
         );
     }
 
@@ -383,7 +383,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Missing or invalid Google OAuth 2.0 client ID.");
-        AH::CallMethod($sut, 'validateClaims', [$claims]);
+        ah::CallMethod($sut, 'validateClaims', [$claims]);
     }
 
     #[DataProvider('invalidClaimsProvider')]
@@ -399,7 +399,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AH::CallMethod($sut, 'validateClaims', [$claims]);
+        ah::CallMethod($sut, 'validateClaims', [$claims]);
     }
 
     function testValidateClaimsSucceeds()
@@ -429,7 +429,7 @@ class SignInWithGoogleActionTest extends TestCase
             ->with('John', 'john@example.com', '1234567890')
             ->willReturn('John');
 
-        $actual = AH::CallMethod($sut, 'validateClaims', [$claims]);
+        $actual = ah::CallMethod($sut, 'validateClaims', [$claims]);
         $this->assertEquals($expected, $actual);
     }
 
@@ -446,7 +446,7 @@ class SignInWithGoogleActionTest extends TestCase
     ) {
         $sut = $this->systemUnderTest();
 
-        $actual = AH::CallMethod($sut, 'normalizeDisplayName', [
+        $actual = ah::CallMethod($sut, 'normalizeDisplayName', [
             $name,
             $email,
             $sub
@@ -472,7 +472,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->assertSame(
             $account,
-            AH::CallMethod($sut, 'findOrConstructAccount', [
+            ah::CallMethod($sut, 'findOrConstructAccount', [
                 'john@example.com',
                 'John'
             ])
@@ -495,7 +495,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->assertSame(
             $account,
-            AH::CallMethod($sut, 'findOrConstructAccount', [
+            ah::CallMethod($sut, 'findOrConstructAccount', [
                 'john@example.com',
                 'John'
             ])
@@ -519,7 +519,7 @@ class SignInWithGoogleActionTest extends TestCase
             times: 1
         );
 
-        $account = AH::CallMethod($sut, 'findAccount', ['john@example.com']);
+        $account = ah::CallMethod($sut, 'findAccount', ['john@example.com']);
         $this->assertNull($account);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -544,7 +544,7 @@ class SignInWithGoogleActionTest extends TestCase
             times: 1
         );
 
-        $account = AH::CallMethod($sut, 'findAccount', ['john@example.com']);
+        $account = ah::CallMethod($sut, 'findAccount', ['john@example.com']);
         $this->assertInstanceOf(Account::class, $account);
         $this->assertSame(42, $account->id);
         $this->assertSame('john@example.com', $account->email);
@@ -565,7 +565,7 @@ class SignInWithGoogleActionTest extends TestCase
     {
         $sut = $this->systemUnderTest();
 
-        $account = AH::CallMethod($sut, 'constructAccount', [
+        $account = ah::CallMethod($sut, 'constructAccount', [
             'john@example.com',
             'John'
         ]);
@@ -598,7 +598,7 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save account.");
-        AH::CallMethod($sut, 'doLogIn', [$account]);
+        ah::CallMethod($sut, 'doLogIn', [$account]);
     }
 
     function testDoLogInSucceeds()
@@ -618,7 +618,7 @@ class SignInWithGoogleActionTest extends TestCase
             ->method('CreatePersistentLogin')
             ->with($account->id);
 
-        AH::CallMethod($sut, 'doLogIn', [$account]);
+        ah::CallMethod($sut, 'doLogIn', [$account]);
         $this->assertEqualsWithDelta(
             \time(),
             $account->timeLastLogin->getTimestamp(),
@@ -640,14 +640,14 @@ class SignInWithGoogleActionTest extends TestCase
         $accountService->expects($this->once())
             ->method('DeletePersistentLogin');
 
-        AH::CallMethod($sut, 'logOut');
+        ah::CallMethod($sut, 'logOut');
     }
 
     #endregion logOut
 
     #region Data Providers -----------------------------------------------------
 
-    static function invalidRequestDataProvider()
+    static function invalidPayloadProvider()
     {
         return [
             'credential missing' => [

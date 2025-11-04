@@ -16,7 +16,7 @@ use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\PasswordReset;
 use \Peneus\Resource;
-use \TestToolkit\AccessHelper as AH;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(ResetPasswordAction::class)]
 class ResetPasswordActionTest extends TestCase
@@ -69,7 +69,7 @@ class ResetPasswordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfAccountAndPasswordResetNotFound()
@@ -91,7 +91,7 @@ class ResetPasswordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfDoResetFails()
@@ -127,7 +127,7 @@ class ResetPasswordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Password reset failed.");
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
@@ -169,7 +169,7 @@ class ResetPasswordActionTest extends TestCase
             ->with('home')
             ->willReturn($redirectUrl);
 
-        $result = AH::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertIsArray($result);
         $this->assertArrayHasKey('redirectUrl', $result);
         $this->assertEquals($redirectUrl, $result['redirectUrl']);
@@ -179,7 +179,7 @@ class ResetPasswordActionTest extends TestCase
 
     #region validateRequest ----------------------------------------------------
 
-    #[DataProvider('invalidRequestDataProvider')]
+    #[DataProvider('invalidPayloadProvider')]
     function testValidateRequestThrows(
         array $data,
         string $exceptionMessage
@@ -197,7 +197,7 @@ class ResetPasswordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AH::CallMethod($sut, 'validateRequest');
+        ah::CallMethod($sut, 'validateRequest');
     }
 
     function testValidateRequestSucceeds()
@@ -218,7 +218,7 @@ class ResetPasswordActionTest extends TestCase
             ->method('ToArray')
             ->willReturn($data);
 
-        $this->assertEquals($expected, AH::CallMethod($sut, 'validateRequest'));
+        $this->assertEquals($expected, ah::CallMethod($sut, 'validateRequest'));
     }
 
     #endregion validateRequest
@@ -238,7 +238,7 @@ class ResetPasswordActionTest extends TestCase
         $this->expectExceptionMessage(
             "This password reset request is no longer valid.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AH::CallMethod($sut, 'findAccountAndPasswordReset', ['code1234']);
+        ah::CallMethod($sut, 'findAccountAndPasswordReset', ['code1234']);
     }
 
     function testFindAccountAndPasswordResetThrowsIfAccountNotFound()
@@ -260,7 +260,7 @@ class ResetPasswordActionTest extends TestCase
         $this->expectExceptionMessage(
             "This password reset request is no longer valid.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AH::CallMethod($sut, 'findAccountAndPasswordReset', ['code1234']);
+        ah::CallMethod($sut, 'findAccountAndPasswordReset', ['code1234']);
     }
 
     function testFindAccountAndPasswordResetSucceeds()
@@ -281,7 +281,7 @@ class ResetPasswordActionTest extends TestCase
 
         $this->assertSame(
             [$account, $pr],
-            AH::CallMethod($sut, 'findAccountAndPasswordReset', ['code1234'])
+            ah::CallMethod($sut, 'findAccountAndPasswordReset', ['code1234'])
         );
     }
 
@@ -303,7 +303,7 @@ class ResetPasswordActionTest extends TestCase
             times: 1
         );
 
-        $pr = AH::CallMethod($sut, 'findPasswordReset', ['code1234']);
+        $pr = ah::CallMethod($sut, 'findPasswordReset', ['code1234']);
         $this->assertNull($pr);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -327,7 +327,7 @@ class ResetPasswordActionTest extends TestCase
             times: 1
         );
 
-        $pr = AH::CallMethod($sut, 'findPasswordReset', ['code1234']);
+        $pr = ah::CallMethod($sut, 'findPasswordReset', ['code1234']);
         $this->assertInstanceOf(PasswordReset::class, $pr);
         $this->assertSame(1, $pr->id);
         $this->assertSame(42, $pr->accountId);
@@ -354,7 +354,7 @@ class ResetPasswordActionTest extends TestCase
             times: 1
         );
 
-        $account = AH::CallMethod($sut, 'findAccount', [42]);
+        $account = ah::CallMethod($sut, 'findAccount', [42]);
         $this->assertNull($account);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -379,7 +379,7 @@ class ResetPasswordActionTest extends TestCase
             times: 1
         );
 
-        $account = AH::CallMethod($sut, 'findAccount', [42]);
+        $account = ah::CallMethod($sut, 'findAccount', [42]);
         $this->assertInstanceOf(Account::class, $account);
         $this->assertSame(42, $account->id);
         $this->assertSame('john@example.com', $account->email);
@@ -413,7 +413,7 @@ class ResetPasswordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save account.");
-        AH::CallMethod($sut, 'doReset', [$account, 'pass1234', $pr]);
+        ah::CallMethod($sut, 'doReset', [$account, 'pass1234', $pr]);
     }
 
     function testDoResetThrowsIfPasswordResetDeleteFails()
@@ -436,7 +436,7 @@ class ResetPasswordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to delete password reset.");
-        AH::CallMethod($sut, 'doReset', [$account, 'pass1234', $pr]);
+        ah::CallMethod($sut, 'doReset', [$account, 'pass1234', $pr]);
     }
 
     function testDoResetSucceeds()
@@ -457,7 +457,7 @@ class ResetPasswordActionTest extends TestCase
             ->method('Delete')
             ->willReturn(true);
 
-        AH::CallMethod($sut, 'doReset', [$account, 'pass1234', $pr]);
+        ah::CallMethod($sut, 'doReset', [$account, 'pass1234', $pr]);
         $this->assertSame('hash1234', $account->passwordHash);
     }
 
@@ -465,7 +465,7 @@ class ResetPasswordActionTest extends TestCase
 
     #region Data Providers -----------------------------------------------------
 
-    static function invalidRequestDataProvider()
+    static function invalidPayloadProvider()
     {
         return [
             'resetCode missing' => [

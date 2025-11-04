@@ -5,7 +5,7 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 use \Peneus\Api\Actions\Account\LogoutAction;
 
 use \Peneus\Services\AccountService;
-use \TestToolkit\AccessHelper as AH;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(LogoutAction::class)]
 class LogoutActionTest extends TestCase
@@ -42,7 +42,7 @@ class LogoutActionTest extends TestCase
         $accountService->expects($this->once())
             ->method('DeletePersistentLogin');
 
-        $this->assertNull(AH::CallMethod($sut, 'onExecute'));
+        $this->assertNull(ah::CallMethod($sut, 'onExecute'));
     }
 
     #endregion onExecute

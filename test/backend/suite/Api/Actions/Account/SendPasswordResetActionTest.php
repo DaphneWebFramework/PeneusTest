@@ -18,7 +18,7 @@ use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\PasswordReset;
 use \Peneus\Resource;
-use \TestToolkit\AccessHelper as AH;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(SendPasswordResetAction::class)]
 class SendPasswordResetActionTest extends TestCase
@@ -75,7 +75,7 @@ class SendPasswordResetActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteBypassesDatabaseTransactionIfAccountNotFound()
@@ -104,7 +104,7 @@ class SendPasswordResetActionTest extends TestCase
         $cookieService->expects($this->once())
             ->method('DeleteCsrfCookie');
 
-        $result = AH::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('message', $result);
@@ -147,7 +147,7 @@ class SendPasswordResetActionTest extends TestCase
         $this->expectExceptionMessage(
             "We couldn't send the email. Please try again later.");
         $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
@@ -181,7 +181,7 @@ class SendPasswordResetActionTest extends TestCase
         $cookieService->expects($this->once())
             ->method('DeleteCsrfCookie');
 
-        $result = AH::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('message', $result);
@@ -195,7 +195,7 @@ class SendPasswordResetActionTest extends TestCase
 
     #region validateRequest ----------------------------------------------------
 
-    #[DataProvider('invalidRequestDataProvider')]
+    #[DataProvider('invalidPayloadProvider')]
     function testValidateRequestThrows(
         array $data,
         string $exceptionMessage
@@ -213,7 +213,7 @@ class SendPasswordResetActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AH::CallMethod($sut, 'validateRequest');
+        ah::CallMethod($sut, 'validateRequest');
     }
 
     function testValidateRequestSucceeds()
@@ -233,7 +233,7 @@ class SendPasswordResetActionTest extends TestCase
             ->method('ToArray')
             ->willReturn($data);
 
-        $this->assertEquals($expected, AH::CallMethod($sut, 'validateRequest'));
+        $this->assertEquals($expected, ah::CallMethod($sut, 'validateRequest'));
     }
 
     #endregion validateRequest
@@ -253,7 +253,7 @@ class SendPasswordResetActionTest extends TestCase
             times: 1
         );
 
-        $account = AH::CallMethod($sut, 'findAccount', ['john@example.com']);
+        $account = ah::CallMethod($sut, 'findAccount', ['john@example.com']);
         $this->assertNull($account);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -278,7 +278,7 @@ class SendPasswordResetActionTest extends TestCase
             times: 1
         );
 
-        $account = AH::CallMethod($sut, 'findAccount', ['john@example.com']);
+        $account = ah::CallMethod($sut, 'findAccount', ['john@example.com']);
         $this->assertInstanceOf(Account::class, $account);
         $this->assertSame(42, $account->id);
         $this->assertSame('john@example.com', $account->email);
@@ -321,7 +321,7 @@ class SendPasswordResetActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save password reset.");
-        AH::CallMethod($sut, 'doSend', [$account]);
+        ah::CallMethod($sut, 'doSend', [$account]);
     }
 
     function testDoSendThrowsIfSendEmailFails()
@@ -354,7 +354,7 @@ class SendPasswordResetActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to send email.");
-        AH::CallMethod($sut, 'doSend', [$account]);
+        ah::CallMethod($sut, 'doSend', [$account]);
     }
 
     function testDoSendSucceeds()
@@ -385,7 +385,7 @@ class SendPasswordResetActionTest extends TestCase
             ->with('john@example.com', 'John', 'code1234')
             ->willReturn(true);
 
-        AH::CallMethod($sut, 'doSend', [$account]);
+        ah::CallMethod($sut, 'doSend', [$account]);
     }
 
     #endregion doSend
@@ -407,7 +407,7 @@ class SendPasswordResetActionTest extends TestCase
         $sut->expects($this->never())
             ->method('constructPasswordReset');
 
-        $this->assertSame($pr, AH::CallMethod(
+        $this->assertSame($pr, ah::CallMethod(
             $sut,
             'findOrConstructPasswordReset',
             [42]
@@ -431,7 +431,7 @@ class SendPasswordResetActionTest extends TestCase
             ->with(42)
             ->willReturn($pr);
 
-        $this->assertSame($pr, AH::CallMethod(
+        $this->assertSame($pr, ah::CallMethod(
             $sut,
             'findOrConstructPasswordReset',
             [42]
@@ -455,7 +455,7 @@ class SendPasswordResetActionTest extends TestCase
             times: 1
         );
 
-        $pr = AH::CallMethod($sut, 'findPasswordReset', [42]);
+        $pr = ah::CallMethod($sut, 'findPasswordReset', [42]);
         $this->assertNull($pr);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -478,7 +478,7 @@ class SendPasswordResetActionTest extends TestCase
             times: 1
         );
 
-        $pr = AH::CallMethod($sut, 'findPasswordReset', [42]);
+        $pr = ah::CallMethod($sut, 'findPasswordReset', [42]);
         $this->assertInstanceOf(PasswordReset::class, $pr);
         $this->assertSame(1, $pr->id);
         $this->assertSame(42, $pr->accountId);
@@ -496,7 +496,7 @@ class SendPasswordResetActionTest extends TestCase
     {
         $sut = $this->systemUnderTest();
 
-        $pr = AH::CallMethod($sut, 'constructPasswordReset', [42]);
+        $pr = ah::CallMethod($sut, 'constructPasswordReset', [42]);
         $this->assertInstanceOf(PasswordReset::class, $pr);
         $this->assertSame(42, $pr->accountId);
     }
@@ -552,7 +552,7 @@ class SendPasswordResetActionTest extends TestCase
 
         $this->assertSame(
             $returnValue,
-            AH::CallMethod($sut, 'sendEmail', [
+            ah::CallMethod($sut, 'sendEmail', [
                 'john@example.com',
                 'John',
                 'code1234'
@@ -564,7 +564,7 @@ class SendPasswordResetActionTest extends TestCase
 
     #region Data Providers -----------------------------------------------------
 
-    static function invalidRequestDataProvider()
+    static function invalidPayloadProvider()
     {
         return [
             'email missing' => [

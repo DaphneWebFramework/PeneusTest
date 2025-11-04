@@ -15,7 +15,7 @@ use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\PendingAccount;
 use \Peneus\Resource;
-use \TestToolkit\AccessHelper as AH;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(ActivateAction::class)]
 class ActivateActionTest extends TestCase
@@ -66,7 +66,7 @@ class ActivateActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfPendingAccountNotFound()
@@ -88,7 +88,7 @@ class ActivateActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfEmailAlreadyRegistered()
@@ -117,7 +117,7 @@ class ActivateActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfDoActivateFails()
@@ -156,7 +156,7 @@ class ActivateActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Account activation failed.");
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
@@ -201,7 +201,7 @@ class ActivateActionTest extends TestCase
             ->with('home')
             ->willReturn($redirectUrl);
 
-        $result = AH::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertIsArray($result);
         $this->assertArrayHasKey('redirectUrl', $result);
         $this->assertEquals($redirectUrl, $result['redirectUrl']);
@@ -211,7 +211,7 @@ class ActivateActionTest extends TestCase
 
     #region validateRequest ----------------------------------------------------
 
-    #[DataProvider('invalidRequestDataProvider')]
+    #[DataProvider('invalidPayloadProvider')]
     function testValidateRequestThrows(
         array $data,
         string $exceptionMessage
@@ -229,7 +229,7 @@ class ActivateActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AH::CallMethod($sut, 'validateRequest');
+        ah::CallMethod($sut, 'validateRequest');
     }
 
     function testValidateRequestSucceeds()
@@ -249,7 +249,7 @@ class ActivateActionTest extends TestCase
             ->method('ToArray')
             ->willReturn($data);
 
-        $actual = AH::CallMethod($sut, 'validateRequest');
+        $actual = ah::CallMethod($sut, 'validateRequest');
         $this->assertEquals($expected, $actual);
     }
 
@@ -275,7 +275,7 @@ class ActivateActionTest extends TestCase
         $this->expectExceptionMessage(
             'No account is awaiting activation for the given code.');
         $this->expectExceptionCode(StatusCode::NotFound->value);
-        AH::CallMethod($sut, 'findPendingAccount', ['code1234']);
+        ah::CallMethod($sut, 'findPendingAccount', ['code1234']);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
@@ -300,7 +300,7 @@ class ActivateActionTest extends TestCase
             times: 1
         );
 
-        $pa = AH::CallMethod($sut, 'findPendingAccount', ['code1234']);
+        $pa = ah::CallMethod($sut, 'findPendingAccount', ['code1234']);
         $this->assertInstanceOf(PendingAccount::class, $pa);
         $this->assertSame(42, $pa->id);
         $this->assertSame('john@example.com', $pa->email);
@@ -332,7 +332,7 @@ class ActivateActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("This account is already registered.");
         $this->expectExceptionCode(StatusCode::Conflict->value);
-        AH::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
+        ah::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
@@ -349,7 +349,7 @@ class ActivateActionTest extends TestCase
             times: 1
         );
 
-        AH::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
+        ah::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
         $this->expectNotToPerformAssertions();
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -374,7 +374,7 @@ class ActivateActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save account.");
-        AH::CallMethod($sut, 'doActivate', [$pa]);
+        ah::CallMethod($sut, 'doActivate', [$pa]);
     }
 
     function testDoActivateThrowsIfPendingAccountDeleteFails()
@@ -396,7 +396,7 @@ class ActivateActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to delete pending account.");
-        AH::CallMethod($sut, 'doActivate', [$pa]);
+        ah::CallMethod($sut, 'doActivate', [$pa]);
     }
 
     function testDoActivateSucceeds()
@@ -416,7 +416,7 @@ class ActivateActionTest extends TestCase
             ->method('Delete')
             ->willReturn(true);
 
-        AH::CallMethod($sut, 'doActivate', [$pa]);
+        ah::CallMethod($sut, 'doActivate', [$pa]);
     }
 
     #endregion doActivate
@@ -433,7 +433,7 @@ class ActivateActionTest extends TestCase
         $pa->activationCode = 'code1234';
         $pa->timeRegistered = new \DateTime();
 
-        $account = AH::CallMethod($sut, 'constructAccount', [$pa]);
+        $account = ah::CallMethod($sut, 'constructAccount', [$pa]);
         $this->assertInstanceOf(Account::class, $account);
         $this->assertSame('john@example.com', $account->email);
         $this->assertSame('hash1234', $account->passwordHash);
@@ -446,7 +446,7 @@ class ActivateActionTest extends TestCase
 
     #region Data Providers -----------------------------------------------------
 
-    static function invalidRequestDataProvider()
+    static function invalidPayloadProvider()
     {
         return [
             'activationCode missing' => [

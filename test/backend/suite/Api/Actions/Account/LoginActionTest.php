@@ -15,7 +15,7 @@ use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\AccountView;
 use \Peneus\Services\AccountService;
-use \TestToolkit\AccessHelper as AH;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(LoginAction::class)]
 class LoginActionTest extends TestCase
@@ -68,7 +68,7 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfRequestValidationFails()
@@ -86,7 +86,7 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfAccountAuthenticationFails()
@@ -113,7 +113,7 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfDoLogInFails()
@@ -155,7 +155,7 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Login failed.");
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
@@ -197,7 +197,7 @@ class LoginActionTest extends TestCase
         $cookieService->expects($this->once())
             ->method('DeleteCsrfCookie');
 
-        $this->assertNull(AH::CallMethod($sut, 'onExecute'));
+        $this->assertNull(ah::CallMethod($sut, 'onExecute'));
     }
 
     #endregion onExecute
@@ -217,7 +217,7 @@ class LoginActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("You are already logged in.");
         $this->expectExceptionCode(StatusCode::Conflict->value);
-        AH::CallMethod($sut, 'ensureNotLoggedIn');
+        ah::CallMethod($sut, 'ensureNotLoggedIn');
     }
 
     function testEnsureNotLoggedInSucceedsIfUserIsNotLoggedIn()
@@ -229,14 +229,14 @@ class LoginActionTest extends TestCase
             ->method('LoggedInAccount')
             ->willReturn(null);
 
-        AH::CallMethod($sut, 'ensureNotLoggedIn');
+        ah::CallMethod($sut, 'ensureNotLoggedIn');
     }
 
     #endregion ensureNotLoggedIn
 
     #region validateRequest ----------------------------------------------------
 
-    #[DataProvider('invalidRequestDataProvider')]
+    #[DataProvider('invalidPayloadProvider')]
     function testValidateRequestThrows(
         array $data,
         string $exceptionMessage
@@ -254,10 +254,10 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AH::CallMethod($sut, 'validateRequest');
+        ah::CallMethod($sut, 'validateRequest');
     }
 
-    #[DataProvider('validRequestDataProvider')]
+    #[DataProvider('validPayloadProvider')]
     function testValidateRequest($expected, $data)
     {
         $sut = $this->systemUnderTest();
@@ -271,7 +271,7 @@ class LoginActionTest extends TestCase
             ->method('ToArray')
             ->willReturn($data);
 
-        $this->assertEquals($expected, AH::CallMethod($sut, 'validateRequest'));
+        $this->assertEquals($expected, ah::CallMethod($sut, 'validateRequest'));
     }
 
     #endregion validateRequest
@@ -290,7 +290,7 @@ class LoginActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Incorrect email address or password.");
         $this->expectExceptionCode(StatusCode::Unauthorized->value);
-        AH::CallMethod($sut, 'findAndAuthenticateAccount', [
+        ah::CallMethod($sut, 'findAndAuthenticateAccount', [
             'john@example.com',
             'pass1234'
         ]);
@@ -315,7 +315,7 @@ class LoginActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Incorrect email address or password.");
         $this->expectExceptionCode(StatusCode::Unauthorized->value);
-        AH::CallMethod($sut, 'findAndAuthenticateAccount', [
+        ah::CallMethod($sut, 'findAndAuthenticateAccount', [
             'john@example.com',
             'pass1234'
         ]);
@@ -339,7 +339,7 @@ class LoginActionTest extends TestCase
 
         $this->assertSame(
             $account,
-            AH::CallMethod($sut, 'findAndAuthenticateAccount', [
+            ah::CallMethod($sut, 'findAndAuthenticateAccount', [
                 'john@example.com',
                 'pass1234'
             ])
@@ -363,7 +363,7 @@ class LoginActionTest extends TestCase
             times: 1
         );
 
-        $account = AH::CallMethod($sut, 'findAccount', ['john@example.com']);
+        $account = ah::CallMethod($sut, 'findAccount', ['john@example.com']);
         $this->assertNull($account);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -388,7 +388,7 @@ class LoginActionTest extends TestCase
             times: 1
         );
 
-        $account = AH::CallMethod($sut, 'findAccount', ['john@example.com']);
+        $account = ah::CallMethod($sut, 'findAccount', ['john@example.com']);
         $this->assertInstanceOf(Account::class, $account);
         $this->assertSame(42, $account->id);
         $this->assertSame('john@example.com', $account->email);
@@ -422,7 +422,7 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save account.");
-        AH::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
+        ah::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
     }
 
     function testDoLogInSucceedsWithoutKeepLoggedIn()
@@ -442,7 +442,7 @@ class LoginActionTest extends TestCase
         $accountService->expects($this->never())
             ->method('CreatePersistentLogin');
 
-        AH::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
+        ah::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
         $this->assertEqualsWithDelta(
             \time(),
             $account->timeLastLogin->getTimestamp(),
@@ -468,7 +468,7 @@ class LoginActionTest extends TestCase
             ->method('CreatePersistentLogin')
             ->with($account->id);
 
-        AH::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
+        ah::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
         $this->assertEqualsWithDelta(
             \time(),
             $account->timeLastLogin->getTimestamp(),
@@ -490,14 +490,14 @@ class LoginActionTest extends TestCase
         $accountService->expects($this->once())
             ->method('DeletePersistentLogin');
 
-        AH::CallMethod($sut, 'logOut');
+        ah::CallMethod($sut, 'logOut');
     }
 
     #endregion logOut
 
     #region Data Providers -----------------------------------------------------
 
-    static function invalidRequestDataProvider()
+    static function invalidPayloadProvider()
     {
         return [
             'email missing' => [
@@ -549,7 +549,7 @@ class LoginActionTest extends TestCase
         ];
     }
 
-    static function validRequestDataProvider()
+    static function validPayloadProvider()
     {
         return [
             'without keepLoggedIn' => [

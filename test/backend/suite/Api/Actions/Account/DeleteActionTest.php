@@ -11,7 +11,7 @@ use \Peneus\Api\Hooks\IAccountDeletionHook;
 use \Peneus\Model\Account;
 use \Peneus\Model\AccountView;
 use \Peneus\Services\AccountService;
-use \TestToolkit\AccessHelper as AH;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(DeleteAction::class)]
 class DeleteActionTest extends TestCase
@@ -52,7 +52,7 @@ class DeleteActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfAccountNotFound()
@@ -71,7 +71,7 @@ class DeleteActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfDoDeleteFails()
@@ -102,7 +102,7 @@ class DeleteActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to delete account.");
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
@@ -132,7 +132,7 @@ class DeleteActionTest extends TestCase
         $sut->expects($this->once())
             ->method('logOut');
 
-        $this->assertNull(AH::CallMethod($sut, 'onExecute'));
+        $this->assertNull(ah::CallMethod($sut, 'onExecute'));
     }
 
     #endregion onExecute
@@ -152,7 +152,7 @@ class DeleteActionTest extends TestCase
         $this->expectExceptionMessage(
             "You do not have permission to perform this action.");
         $this->expectExceptionCode(StatusCode::Unauthorized->value);
-        AH::CallMethod($sut, 'ensureLoggedIn');
+        ah::CallMethod($sut, 'ensureLoggedIn');
     }
 
     function testEnsureLoggedInSucceedsIfUserIsLoggedIn()
@@ -165,7 +165,7 @@ class DeleteActionTest extends TestCase
             ->method('LoggedInAccount')
             ->willReturn($accountView);
 
-        $this->assertSame($accountView, AH::CallMethod($sut, 'ensureLoggedIn'));
+        $this->assertSame($accountView, ah::CallMethod($sut, 'ensureLoggedIn'));
     }
 
     #endregion ensureLoggedIn
@@ -188,7 +188,7 @@ class DeleteActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Account not found.");
         $this->expectExceptionCode(StatusCode::NotFound->value);
-        AH::CallMethod($sut, 'findAccount', [42]);
+        ah::CallMethod($sut, 'findAccount', [42]);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
@@ -212,7 +212,7 @@ class DeleteActionTest extends TestCase
             times: 1
         );
 
-        $account = AH::CallMethod($sut, 'findAccount', [42]);
+        $account = ah::CallMethod($sut, 'findAccount', [42]);
         $this->assertInstanceOf(Account::class, $account);
         $this->assertSame(42, $account->id);
         $this->assertSame('john@example.com', $account->email);
@@ -255,7 +255,7 @@ class DeleteActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'doDelete', [$account]);
+        ah::CallMethod($sut, 'doDelete', [$account]);
     }
 
     function testDoDeleteThrowsIfAccountDeleteFails()
@@ -277,7 +277,7 @@ class DeleteActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to delete account.");
-        AH::CallMethod($sut, 'doDelete', [$account]);
+        ah::CallMethod($sut, 'doDelete', [$account]);
     }
 
     function testDoDeleteSucceeds()
@@ -297,7 +297,7 @@ class DeleteActionTest extends TestCase
             ->method('Delete')
             ->willReturn(true);
 
-        AH::CallMethod($sut, 'doDelete', [$account]);
+        ah::CallMethod($sut, 'doDelete', [$account]);
     }
 
     #endregion doDelete
@@ -314,7 +314,7 @@ class DeleteActionTest extends TestCase
         $accountService->expects($this->once())
             ->method('DeletePersistentLogin');
 
-        AH::CallMethod($sut, 'logOut');
+        ah::CallMethod($sut, 'logOut');
     }
 
     #endregion logOut

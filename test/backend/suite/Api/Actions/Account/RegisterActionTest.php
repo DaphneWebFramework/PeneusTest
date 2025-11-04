@@ -17,7 +17,7 @@ use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\PendingAccount;
 use \Peneus\Resource;
-use \TestToolkit\AccessHelper as AH;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(RegisterAction::class)]
 class RegisterActionTest extends TestCase
@@ -74,7 +74,7 @@ class RegisterActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfAlreadyRegistered()
@@ -96,7 +96,7 @@ class RegisterActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfAlreadyPending()
@@ -122,7 +122,7 @@ class RegisterActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Expected message.');
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfDoRegisterFails()
@@ -161,7 +161,7 @@ class RegisterActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Account registration failed.");
         $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
@@ -199,7 +199,7 @@ class RegisterActionTest extends TestCase
         $cookieService->expects($this->once())
             ->method('DeleteCsrfCookie');
 
-        $result = AH::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertIsArray($result);
         $this->assertArrayHasKey('message', $result);
         $this->assertSame(
@@ -212,7 +212,7 @@ class RegisterActionTest extends TestCase
 
     #region validateRequest ----------------------------------------------------
 
-    #[DataProvider('invalidRequestDataProvider')]
+    #[DataProvider('invalidPayloadProvider')]
     function testValidateRequestThrows(
         array $data,
         string $exceptionMessage
@@ -230,7 +230,7 @@ class RegisterActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AH::CallMethod($sut, 'validateRequest');
+        ah::CallMethod($sut, 'validateRequest');
     }
 
     function testValidateRequestSucceeds()
@@ -252,7 +252,7 @@ class RegisterActionTest extends TestCase
             ->method('ToArray')
             ->willReturn($data);
 
-        $this->assertEquals($expected, AH::CallMethod($sut, 'validateRequest'));
+        $this->assertEquals($expected, ah::CallMethod($sut, 'validateRequest'));
     }
 
     #endregion validateRequest
@@ -275,7 +275,7 @@ class RegisterActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("This account is already registered.");
         $this->expectExceptionCode(StatusCode::Conflict->value);
-        AH::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
+        ah::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
@@ -292,7 +292,7 @@ class RegisterActionTest extends TestCase
             times: 1
         );
 
-        AH::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
+        ah::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
         $this->expectNotToPerformAssertions();
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -317,7 +317,7 @@ class RegisterActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("This account is already awaiting activation.");
         $this->expectExceptionCode(StatusCode::Conflict->value);
-        AH::CallMethod($sut, 'ensureNotPending', ['john@example.com']);
+        ah::CallMethod($sut, 'ensureNotPending', ['john@example.com']);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
@@ -334,7 +334,7 @@ class RegisterActionTest extends TestCase
             times: 1
         );
 
-        AH::CallMethod($sut, 'ensureNotPending', ['john@example.com']);
+        ah::CallMethod($sut, 'ensureNotPending', ['john@example.com']);
         $this->expectNotToPerformAssertions();
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -362,7 +362,7 @@ class RegisterActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save pending account.");
-        AH::CallMethod($sut, 'doRegister', [
+        ah::CallMethod($sut, 'doRegister', [
             'john@example.com',
             'pass1234',
             'John'
@@ -395,7 +395,7 @@ class RegisterActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to send email.");
-        AH::CallMethod($sut, 'doRegister', [
+        ah::CallMethod($sut, 'doRegister', [
             'john@example.com',
             'pass1234',
             'John'
@@ -426,7 +426,7 @@ class RegisterActionTest extends TestCase
             ->with('john@example.com', 'John', 'code1234')
             ->willReturn(true);
 
-        AH::CallMethod($sut, 'doRegister', [
+        ah::CallMethod($sut, 'doRegister', [
             'john@example.com',
             'pass1234',
             'John'
@@ -447,7 +447,7 @@ class RegisterActionTest extends TestCase
             ->with('pass1234')
             ->willReturn('hash1234');
 
-        $pa = AH::CallMethod($sut, 'constructPendingAccount', [
+        $pa = ah::CallMethod($sut, 'constructPendingAccount', [
             'john@example.com',
             'pass1234',
             'John',
@@ -517,7 +517,7 @@ class RegisterActionTest extends TestCase
 
         $this->assertSame(
             $returnValue,
-            AH::CallMethod($sut, 'sendEmail', [
+            ah::CallMethod($sut, 'sendEmail', [
                 'john@example.com',
                 'John',
                 'code1234'
@@ -529,7 +529,7 @@ class RegisterActionTest extends TestCase
 
     #region Data Providers -----------------------------------------------------
 
-    static function invalidRequestDataProvider()
+    static function invalidPayloadProvider()
     {
         return [
             'email missing' => [
