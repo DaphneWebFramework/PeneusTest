@@ -39,36 +39,36 @@ class AuthManagerTest extends TestCase
             ->getMock();
     }
 
-    #region LoggedInAccount ----------------------------------------------------
+    #region SessionAccount -----------------------------------------------------
 
-    function testLoggedInAccountReturnsNullWhenNotLoggedIn()
+    function testSessionAccountReturnsNullWhenNotLoggedIn()
     {
         $sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
 
         $accountService->expects($this->once())
-            ->method('LoggedInAccount')
+            ->method('SessionAccount')
             ->willReturn(null);
 
-        $this->assertNull($sut->LoggedInAccount());
-        $this->assertNull($sut->LoggedInAccount()); // from cache
+        $this->assertNull($sut->SessionAccount());
+        $this->assertNull($sut->SessionAccount()); // from cache
     }
 
-    function testLoggedInAccountReturnsCachedValue()
+    function testSessionAccountReturnsCachedValue()
     {
         $sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
         $accountView = $this->createStub(AccountView::class);
 
         $accountService->expects($this->once())
-            ->method('LoggedInAccount')
+            ->method('SessionAccount')
             ->willReturn($accountView);
 
-        $this->assertSame($accountView, $sut->LoggedInAccount());
-        $this->assertSame($accountView, $sut->LoggedInAccount()); // from cache
+        $this->assertSame($accountView, $sut->SessionAccount());
+        $this->assertSame($accountView, $sut->SessionAccount()); // from cache
     }
 
-    #endregion LoggedInAccount
+    #endregion SessionAccount
 
     #region RequireLogin -------------------------------------------------------
 
@@ -80,7 +80,7 @@ class AuthManagerTest extends TestCase
         $url = $this->createStub(CUrl::class);
 
         $accountService->expects($this->once())
-            ->method('LoggedInAccount')
+            ->method('SessionAccount')
             ->willReturn(null);
         $resource->expects($this->once())
             ->method('LoginPageUrl')
@@ -105,7 +105,7 @@ class AuthManagerTest extends TestCase
         $resource = Resource::Instance();
 
         $accountService->expects($this->once())
-            ->method('LoggedInAccount')
+            ->method('SessionAccount')
             ->willReturn($accountView);
         if ($expected == true) {
             $resource->expects($this->never())

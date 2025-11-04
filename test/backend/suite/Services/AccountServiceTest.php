@@ -145,9 +145,9 @@ class AccountServiceTest extends TestCase
 
     #endregion DeleteSession
 
-    #region LoggedInAccount ----------------------------------------------------
+    #region SessionAccount -----------------------------------------------------
 
-    function testLoggedInAccountWhenSessionExists()
+    function testSessionAccountWhenSessionExists()
     {
         $sut = $this->systemUnderTest(
             'accountFromSession',
@@ -163,10 +163,10 @@ class AccountServiceTest extends TestCase
             ->method('rotatePersistentLoginIfNeeded')
             ->with($accountView->id);
 
-        $this->assertSame($accountView, $sut->LoggedInAccount());
+        $this->assertSame($accountView, $sut->SessionAccount());
     }
 
-    function testLoggedInAccountWhenSessionDoesNotExistAndPersistentLoginExists()
+    function testSessionAccountWhenSessionDoesNotExistButPersistentLoginExists()
     {
         $sut = $this->systemUnderTest(
             'accountFromSession',
@@ -184,10 +184,10 @@ class AccountServiceTest extends TestCase
             ->method('tryPersistentLogin')
             ->willReturn($accountView);
 
-        $this->assertSame($accountView, $sut->LoggedInAccount());
+        $this->assertSame($accountView, $sut->SessionAccount());
     }
 
-    function testLoggedInAccountWhenSessionAndPersistentLoginDoNotExist()
+    function testSessionAccountWhenSessionAndPersistentLoginDoNotExist()
     {
         $sut = $this->systemUnderTest(
             'accountFromSession',
@@ -204,10 +204,10 @@ class AccountServiceTest extends TestCase
             ->method('tryPersistentLogin')
             ->willReturn(null);
 
-        $this->assertNull($sut->LoggedInAccount());
+        $this->assertNull($sut->SessionAccount());
     }
 
-    #endregion LoggedInAccount
+    #endregion SessionAccount
 
     #region RegisterDeletionHook -----------------------------------------------
 

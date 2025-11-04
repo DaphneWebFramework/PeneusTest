@@ -212,7 +212,7 @@ class LoginActionTest extends TestCase
         $accountView = $this->createStub(AccountView::class);
 
         $accountService->expects($this->once())
-            ->method('LoggedInAccount')
+            ->method('SessionAccount')
             ->willReturn($accountView);
 
         $this->expectException(\RuntimeException::class);
@@ -227,7 +227,7 @@ class LoginActionTest extends TestCase
         $accountService = AccountService::Instance();
 
         $accountService->expects($this->once())
-            ->method('LoggedInAccount')
+            ->method('SessionAccount')
             ->willReturn(null);
 
         ah::CallMethod($sut, 'ensureNotLoggedIn');

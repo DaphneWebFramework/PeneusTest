@@ -145,7 +145,7 @@ class DeleteActionTest extends TestCase
         $accountService = AccountService::Instance();
 
         $accountService->expects($this->once())
-            ->method('LoggedInAccount')
+            ->method('SessionAccount')
             ->willReturn(null);
 
         $this->expectException(\RuntimeException::class);
@@ -162,7 +162,7 @@ class DeleteActionTest extends TestCase
         $accountView = $this->createStub(AccountView::class);
 
         $accountService->expects($this->once())
-            ->method('LoggedInAccount')
+            ->method('SessionAccount')
             ->willReturn($accountView);
 
         $this->assertSame($accountView, ah::CallMethod($sut, 'ensureLoggedIn'));

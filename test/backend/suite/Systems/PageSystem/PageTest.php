@@ -558,21 +558,21 @@ class PageTest extends TestCase
 
     #endregion MetaItems
 
-    #region LoggedInAccount ----------------------------------------------------
+    #region SessionAccount -----------------------------------------------------
 
-    function testLoggedInAccountDelegatesToAuthManager()
+    function testSessionAccountDelegatesToAuthManager()
     {
         $sut = $this->systemUnderTest();
         $accountView = $this->createStub(AccountView::class);
 
         $this->authManager->expects($this->once())
-            ->method('LoggedInAccount')
+            ->method('SessionAccount')
             ->willReturn($accountView);
 
-        $this->assertSame($accountView, $sut->LoggedInAccount());
+        $this->assertSame($accountView, $sut->SessionAccount());
     }
 
-    #endregion LoggedInAccount
+    #endregion SessionAccount
 
     #region RequireLogin -------------------------------------------------------
 

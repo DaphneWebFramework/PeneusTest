@@ -27,13 +27,13 @@ class SessionGuardTest extends TestCase
 
     #region Verify -------------------------------------------------------------
 
-    function testVerifyWhenLoggedInAccountDoesNotExist()
+    function testVerifyWhenSessionAccountDoesNotExist()
     {
         $sut = new SessionGuard();
         $accountService = AccountService::Instance();
 
         $accountService->expects($this->once())
-            ->method('LoggedInAccount')
+            ->method('SessionAccount')
             ->willReturn(null);
 
         $this->assertFalse($sut->Verify());
@@ -51,7 +51,7 @@ class SessionGuardTest extends TestCase
         $accountView->role = $accountRole;
 
         $accountService->expects($this->once())
-            ->method('LoggedInAccount')
+            ->method('SessionAccount')
             ->willReturn($accountView);
 
         $this->assertSame($expected, $sut->Verify());
