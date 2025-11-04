@@ -584,6 +584,7 @@ class SignInWithGoogleActionTest extends TestCase
     {
         $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);
+        $account->id = 42;
         $accountService = AccountService::Instance();
 
         $account->expects($this->once())
@@ -603,6 +604,7 @@ class SignInWithGoogleActionTest extends TestCase
     {
         $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);
+        $account->id = 42;
         $accountService = AccountService::Instance();
 
         $account->expects($this->once())
@@ -610,10 +612,10 @@ class SignInWithGoogleActionTest extends TestCase
             ->willReturn(true);
         $accountService->expects($this->once())
             ->method('CreateSession')
-            ->with($account);
+            ->with($account->id);
         $accountService->expects($this->once())
             ->method('CreatePersistentLogin')
-            ->with($account);
+            ->with($account->id);
 
         AH::CallMethod($sut, 'doLogIn', [$account]);
         $this->assertEqualsWithDelta(

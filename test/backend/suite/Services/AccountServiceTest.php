@@ -71,8 +71,6 @@ class AccountServiceTest extends TestCase
             'findAccountRole',
             'sessionBindingCookieName'
         );
-        $account = $this->createStub(Account::class);
-        $account->id = 42;
         $securityService = SecurityService::Instance();
         $session = Session::Instance();
         $cookieService = CookieService::Instance();
@@ -114,7 +112,7 @@ class AccountServiceTest extends TestCase
             ->method('SetCookie')
             ->with('cookie-name', 'cookie-value');
 
-        $sut->CreateSession($account);
+        $sut->CreateSession(42);
     }
 
     #endregion CreateSession
@@ -151,14 +149,12 @@ class AccountServiceTest extends TestCase
     function testCreatePersistentLogin()
     {
         $sut = $this->systemUnderTest();
-        $account = $this->createStub(Account::class);
-        $account->id = 42;
 
         $this->plm->expects($this->once())
             ->method('Create')
             ->with(42);
 
-        $sut->CreatePersistentLogin($account);
+        $sut->CreatePersistentLogin(42);
     }
 
     #endregion CreatePersistentLogin
@@ -743,7 +739,7 @@ class AccountServiceTest extends TestCase
             ->willReturn($account);
         $sut->expects($this->once())
             ->method('CreateSession')
-            ->with($account);
+            ->with(42);
         $session->expects($this->once())
             ->method('Start')
             ->willReturnSelf();

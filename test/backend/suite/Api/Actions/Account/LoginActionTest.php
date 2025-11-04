@@ -428,6 +428,7 @@ class LoginActionTest extends TestCase
     {
         $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);
+        $account->id = 42;
         $keepLoggedIn = false;
         $accountService = AccountService::Instance();
 
@@ -436,7 +437,7 @@ class LoginActionTest extends TestCase
             ->willReturn(true);
         $accountService->expects($this->once())
             ->method('CreateSession')
-            ->with($account);
+            ->with($account->id);
         $accountService->expects($this->never())
             ->method('CreatePersistentLogin');
 
@@ -452,6 +453,7 @@ class LoginActionTest extends TestCase
     {
         $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);
+        $account->id = 42;
         $keepLoggedIn = true;
         $accountService = AccountService::Instance();
 
@@ -460,10 +462,10 @@ class LoginActionTest extends TestCase
             ->willReturn(true);
         $accountService->expects($this->once())
             ->method('CreateSession')
-            ->with($account);
+            ->with($account->id);
         $accountService->expects($this->once())
             ->method('CreatePersistentLogin')
-            ->with($account);
+            ->with($account->id);
 
         AH::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
         $this->assertEqualsWithDelta(
