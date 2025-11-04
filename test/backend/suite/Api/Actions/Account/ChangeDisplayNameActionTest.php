@@ -127,7 +127,7 @@ class ChangeDisplayNameActionTest extends TestCase
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('doChange')
-            ->with($account, $payload)
+            ->with($account, $payload->displayName)
             ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
@@ -158,7 +158,7 @@ class ChangeDisplayNameActionTest extends TestCase
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('doChange')
-            ->with($account, $payload);
+            ->with($account, $payload->displayName);
 
         ah::CallMethod($sut, 'onExecute');
     }
@@ -305,9 +305,6 @@ class ChangeDisplayNameActionTest extends TestCase
     {
         $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);
-        $payload = (object)[
-            'displayName' => 'Alice'
-        ];
 
         $account->expects($this->once())
             ->method('Save')
@@ -315,22 +312,21 @@ class ChangeDisplayNameActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to change display name.");
-        ah::CallMethod($sut, 'doChange', [$account, $payload]);
+        ah::CallMethod($sut, 'doChange', [$account, 'Alice']);
+        $this->assertSame('Alice', $account->displayName);
     }
 
     function testDoChangeSucceeds()
     {
         $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);
-        $payload = (object)[
-            'displayName' => 'Alice'
-        ];
 
         $account->expects($this->once())
             ->method('Save')
             ->willReturn(true);
 
-        ah::CallMethod($sut, 'doChange', [$account, $payload]);
+        ah::CallMethod($sut, 'doChange', [$account, 'Alice']);
+        $this->assertSame('Alice', $account->displayName);
     }
 
     #endregion doChange
