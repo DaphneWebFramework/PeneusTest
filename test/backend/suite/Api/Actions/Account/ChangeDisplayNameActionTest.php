@@ -8,21 +8,26 @@ use \Peneus\Api\Actions\Account\ChangeDisplayNameAction;
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
+use \Harmonia\Systems\DatabaseSystem\Database;
+use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\AccountView;
 use \Peneus\Services\AccountService;
-use \TestToolkit\AccessHelper as AH;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(ChangeDisplayNameAction::class)]
 class ChangeDisplayNameActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
+    private ?Database $originalDatabase = null;
     private ?AccountService $originalAccountService = null;
 
     protected function setUp(): void
     {
         $this->originalRequest =
             Request::ReplaceInstance($this->createMock(Request::class));
+        $this->originalDatabase =
+            Database::ReplaceInstance(new FakeDatabase());
         $this->originalAccountService =
             AccountService::ReplaceInstance($this->createMock(AccountService::class));
     }
@@ -30,6 +35,7 @@ class ChangeDisplayNameActionTest extends TestCase
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
+        Database::ReplaceInstance($this->originalDatabase);
         AccountService::ReplaceInstance($this->originalAccountService);
     }
 
@@ -42,9 +48,216 @@ class ChangeDisplayNameActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    #[DataProvider('invalidModelDataProvider')]
-    function testOnExecuteThrowsForInvalidModelData(
-        array $data,
+    function testOnExecuteThrowsIfUserNotLoggedIn()
+    {
+        $sut = $this->systemUnderTest('ensureLoggedIn');
+
+        $sut->expects($this->once())
+            ->method('ensureLoggedIn')
+            ->willThrowException(new \RuntimeException('Expected message.'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Expected message.');
+        ah::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfAccountNotFound()
+    {
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount');
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
+
+        $sut->expects($this->once())
+            ->method('ensureLoggedIn')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
+            ->willThrowException(new \RuntimeException('Expected message.'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Expected message.');
+        ah::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfRequestValidationFails()
+    {
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
+            'validateRequest');
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
+        $account = $this->createStub(Account::class);
+
+        $sut->expects($this->once())
+            ->method('ensureLoggedIn')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
+            ->willReturn($account);
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willThrowException(new \RuntimeException('Expected message.'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Expected message.');
+        ah::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteThrowsIfDoChangeFails()
+    {
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
+            'validateRequest', 'doChange');
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
+        $account = $this->createStub(Account::class);
+        $payload = (object)[
+            'displayName' => 'Alice'
+        ];
+
+        $sut->expects($this->once())
+            ->method('ensureLoggedIn')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
+            ->willReturn($account);
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('doChange')
+            ->with($account, $payload)
+            ->willThrowException(new \RuntimeException('Expected message.'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Expected message.');
+        ah::CallMethod($sut, 'onExecute');
+    }
+
+    function testOnExecuteSucceeds()
+    {
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
+            'validateRequest', 'doChange');
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
+        $account = $this->createStub(Account::class);
+        $payload = (object)[
+            'displayName' => 'Alice'
+        ];
+
+        $sut->expects($this->once())
+            ->method('ensureLoggedIn')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('findAccount')
+            ->with($accountView->id)
+            ->willReturn($account);
+        $sut->expects($this->once())
+            ->method('validateRequest')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('doChange')
+            ->with($account, $payload);
+
+        ah::CallMethod($sut, 'onExecute');
+    }
+
+    #endregion onExecute
+
+    #region ensureLoggedIn -----------------------------------------------------
+
+    function testEnsureLoggedInThrowsIfUserIsNotLoggedIn()
+    {
+        $sut = $this->systemUnderTest();
+        $accountService = AccountService::Instance();
+
+        $accountService->expects($this->once())
+            ->method('LoggedInAccount')
+            ->willReturn(null);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(
+            "You do not have permission to perform this action.");
+        $this->expectExceptionCode(StatusCode::Unauthorized->value);
+        ah::CallMethod($sut, 'ensureLoggedIn');
+    }
+
+    function testEnsureLoggedInSucceedsIfUserIsLoggedIn()
+    {
+        $sut = $this->systemUnderTest();
+        $accountService = AccountService::Instance();
+        $accountView = $this->createStub(AccountView::class);
+
+        $accountService->expects($this->once())
+            ->method('LoggedInAccount')
+            ->willReturn($accountView);
+
+        $this->assertSame($accountView, ah::CallMethod($sut, 'ensureLoggedIn'));
+    }
+
+    #endregion ensureLoggedIn
+
+    #region findAccount --------------------------------------------------------
+
+    function testFindAccountThrowsIfRecordNotFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = Database::Instance();
+
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
+            bindings: ['id' => 42],
+            result: null,
+            times: 1
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Account not found.");
+        $this->expectExceptionCode(StatusCode::NotFound->value);
+        ah::CallMethod($sut, 'findAccount', [42]);
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testFindAccountReturnsEntityIfRecordFound()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = Database::Instance();
+
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
+            bindings: ['id' => 42],
+            result: [[
+                'id' => 42,
+                'email' => 'john@example.com',
+                'passwordHash' => 'hash1234',
+                'displayName' => 'John',
+                'timeActivated' => '2024-01-01 00:00:00',
+                'timeLastLogin' => '2025-01-01 00:00:00'
+            ]],
+            times: 1
+        );
+
+        $account = ah::CallMethod($sut, 'findAccount', [42]);
+        $this->assertInstanceOf(Account::class, $account);
+        $this->assertSame(42, $account->id);
+        $this->assertSame('john@example.com', $account->email);
+        $this->assertSame('hash1234', $account->passwordHash);
+        $this->assertSame('John', $account->displayName);
+        $this->assertSame('2024-01-01 00:00:00',
+                          $account->timeActivated->format('Y-m-d H:i:s'));
+        $this->assertSame('2025-01-01 00:00:00',
+                          $account->timeLastLogin->format('Y-m-d H:i:s'));
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #endregion findAccount
+
+    #region validateRequest ----------------------------------------------------
+
+    #[DataProvider('invalidPayloadProvider')]
+    function testValidateRequestThrows(
+        array $payload,
         string $exceptionMessage
     ) {
         $sut = $this->systemUnderTest();
@@ -56,150 +269,83 @@ class ChangeDisplayNameActionTest extends TestCase
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn($data);
+            ->willReturn($payload);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'validateRequest');
     }
 
-    function testOnExecuteThrowsIfUserNotLoggedIn()
+    function testValidateRequestSucceeds()
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
-        $accountService = AccountService::Instance();
+        $payload = [
+            'displayName' => 'Alice'
+        ];
+        $expected = (object)$payload;
 
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn([
-                'displayName' => 'Alice'
-            ]);
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn(null);
+            ->willReturn($payload);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            'You do not have permission to perform this action.');
-        $this->expectExceptionCode(StatusCode::Unauthorized->value);
-        AH::CallMethod($sut, 'onExecute');
+        $actual = ah::CallMethod($sut, 'validateRequest');
+        $this->assertEquals($expected, $actual);
     }
 
-    function testOnExecuteThrowsIfAccountIsNotFound()
+    #endregion validateRequest
+
+    #region doChange -----------------------------------------------------------
+
+    function testDoChangeThrowsIfAccountSaveFails()
     {
-        $sut = $this->systemUnderTest('findAccount');
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-        $accountService = AccountService::Instance();
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'displayName' => 'Alice'
-            ]);
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with($accountView->id)
-            ->willReturn(null);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Account not found.");
-        $this->expectExceptionCode(StatusCode::NotFound->value);
-        AH::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfAccountCannotBeSaved()
-    {
-        $sut = $this->systemUnderTest('findAccount');
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-        $accountService = AccountService::Instance();
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
+        $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);
+        $payload = (object)[
+            'displayName' => 'Alice'
+        ];
 
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'displayName' => 'Alice'
-            ]);
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with($accountView->id)
-            ->willReturn($account);
         $account->expects($this->once())
             ->method('Save')
             ->willReturn(false);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to change display name.");
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
-        AH::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'doChange', [$account, $payload]);
     }
 
-    function testOnExecuteSucceeds()
+    function testDoChangeSucceeds()
     {
-        $sut = $this->systemUnderTest('findAccount');
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-        $accountService = AccountService::Instance();
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
+        $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);
+        $payload = (object)[
+            'displayName' => 'Alice'
+        ];
 
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'displayName' => 'Alice'
-            ]);
-        $accountService->expects($this->once())
-            ->method('LoggedInAccount')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with($accountView->id)
-            ->willReturn($account);
         $account->expects($this->once())
             ->method('Save')
             ->willReturn(true);
 
-        $this->assertNull(AH::CallMethod($sut, 'onExecute'));
+        ah::CallMethod($sut, 'doChange', [$account, $payload]);
     }
 
-    #endregion onExecute
+    #endregion doChange
 
     #region Data Providers -----------------------------------------------------
 
-    static function invalidModelDataProvider()
+    static function invalidPayloadProvider()
     {
         return [
             'displayName missing' => [
-                'data' => [],
+                'payload' => [],
                 'exceptionMessage' => "Required field 'displayName' is missing."
             ],
             'displayName invalid' => [
-                'data' => [ 'displayName' => '<invalid-display-name>' ],
+                'payload' => [ 'displayName' => '<invalid-display-name>' ],
                 'exceptionMessage' => 'Display name is invalid. It must start'
                     . ' with a letter or number and may only contain letters,'
                     . ' numbers, spaces, dots, hyphens, and apostrophes.'
