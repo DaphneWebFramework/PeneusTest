@@ -1,23 +1,27 @@
 <?php declare(strict_types=1);
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
+use \PHPUnit\Framework\Attributes\DataProvider;
 
 use \Peneus\Systems\PageSystem\Page;
 
 use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Core\CSequentialArray;
+use \Harmonia\Core\CUrl;
+use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\SecurityService;
 use \Peneus\Api\Guards\FormTokenGuard;
 use \Peneus\Model\AccountView;
 use \Peneus\Model\Role;
-use \Peneus\Systems\PageSystem\AuthManager;
+use \Peneus\Resource;
+use \Peneus\Services\AccountService;
 use \Peneus\Systems\PageSystem\LibraryManager;
 use \Peneus\Systems\PageSystem\MetaCollection;
 use \Peneus\Systems\PageSystem\PageManifest;
 use \Peneus\Systems\PageSystem\Renderer;
-use \TestToolkit\AccessHelper;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(Page::class)]
 class PageTest extends TestCase
@@ -26,8 +30,9 @@ class PageTest extends TestCase
     private ?LibraryManager $libraryManager = null;
     private ?PageManifest $pageManifest = null;
     private ?MetaCollection $metaCollection = null;
-    private ?AuthManager $authManager = null;
     private ?Config $originalConfig = null;
+    private ?Resource $originalResource = null;
+    private ?AccountService $originalAccountService = null;
     private ?SecurityService $originalSecurityService = null;
     private ?CookieService $originalCookieService = null;
 
@@ -37,9 +42,12 @@ class PageTest extends TestCase
         $this->libraryManager = $this->createMock(LibraryManager::class);
         $this->pageManifest = $this->createMock(PageManifest::class);
         $this->metaCollection = $this->createMock(MetaCollection::class);
-        $this->authManager = $this->createMock(AuthManager::class);
         $this->originalConfig =
             Config::ReplaceInstance($this->createMock(Config::class));
+        $this->originalResource =
+            Resource::ReplaceInstance($this->createMock(Resource::class));
+        $this->originalAccountService =
+            AccountService::ReplaceInstance($this->createMock(AccountService::class));
         $this->originalSecurityService =
             SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
         $this->originalCookieService =
@@ -52,8 +60,9 @@ class PageTest extends TestCase
         $this->libraryManager = null;
         $this->pageManifest = null;
         $this->metaCollection = null;
-        $this->authManager = null;
         Config::ReplaceInstance($this->originalConfig);
+        Resource::ReplaceInstance($this->originalResource);
+        AccountService::ReplaceInstance($this->originalAccountService);
         SecurityService::ReplaceInstance($this->originalSecurityService);
         CookieService::ReplaceInstance($this->originalCookieService);
     }
@@ -66,8 +75,7 @@ class PageTest extends TestCase
                 $this->renderer,
                 $this->libraryManager,
                 $this->pageManifest,
-                $this->metaCollection,
-                $this->authManager
+                $this->metaCollection
             ])
             ->onlyMethods($mockedMethods)
             ->getMock();
@@ -94,13 +102,13 @@ class PageTest extends TestCase
         // Test default value
         $this->assertSame(
             '',
-            AccessHelper::GetMockProperty(Page::class, $sut, 'title')
+            ah::GetMockProperty(Page::class, $sut, 'title')
         );
 
         $this->assertSame($sut, $sut->SetTitle('Home'));
         $this->assertSame(
             'Home',
-            AccessHelper::GetMockProperty(Page::class, $sut, 'title')
+            ah::GetMockProperty(Page::class, $sut, 'title')
         );
     }
 
@@ -115,13 +123,13 @@ class PageTest extends TestCase
         // Test default value
         $this->assertSame(
             '{{Title}} | {{AppName}}',
-            AccessHelper::GetMockProperty(Page::class, $sut, 'titleTemplate')
+            ah::GetMockProperty(Page::class, $sut, 'titleTemplate')
         );
 
         $this->assertSame($sut, $sut->SetTitleTemplate('{{AppName}}: {{Title}}'));
         $this->assertSame(
             '{{AppName}}: {{Title}}',
-            AccessHelper::GetMockProperty(Page::class, $sut, 'titleTemplate')
+            ah::GetMockProperty(Page::class, $sut, 'titleTemplate')
         );
     }
 
@@ -292,13 +300,13 @@ class PageTest extends TestCase
         // Test default value
         $this->assertSame(
             '',
-            AccessHelper::GetMockProperty(Page::class, $sut, 'masterpage')
+            ah::GetMockProperty(Page::class, $sut, 'masterpage')
         );
 
         $this->assertSame($sut, $sut->SetMasterpage('basic'));
         $this->assertSame(
             'basic',
-            AccessHelper::GetMockProperty(Page::class, $sut, 'masterpage')
+            ah::GetMockProperty(Page::class, $sut, 'masterpage')
         );
     }
 
@@ -310,7 +318,7 @@ class PageTest extends TestCase
     {
         $sut = $this->systemUnderTest();
 
-        AccessHelper::SetMockProperty(
+        ah::SetMockProperty(
             Page::class,
             $sut,
             'masterpage',
@@ -328,7 +336,7 @@ class PageTest extends TestCase
     {
         $sut = $this->systemUnderTest();
 
-        AccessHelper::SetMockProperty(
+        ah::SetMockProperty(
             Page::class,
             $sut,
             'content',
@@ -560,12 +568,25 @@ class PageTest extends TestCase
 
     #region SessionAccount -----------------------------------------------------
 
-    function testSessionAccountDelegatesToAuthManager()
+    function testSessionAccountReturnsNullIfAccountServiceMethodReturnsNull()
     {
         $sut = $this->systemUnderTest();
+        $accountService = AccountService::Instance();
+
+        $accountService->expects($this->once())
+            ->method('SessionAccount')
+            ->willReturn(null);
+
+        $this->assertNull($sut->SessionAccount());
+    }
+
+    function testSessionAccountReturnsEntityIfAccountServiceMethodReturnsEntity()
+    {
+        $sut = $this->systemUnderTest();
+        $accountService = AccountService::Instance();
         $accountView = $this->createStub(AccountView::class);
 
-        $this->authManager->expects($this->once())
+        $accountService->expects($this->once())
             ->method('SessionAccount')
             ->willReturn($accountView);
 
@@ -576,15 +597,78 @@ class PageTest extends TestCase
 
     #region RequireLogin -------------------------------------------------------
 
-    function testRequireLoginDelegatesToAuthManager()
+    function testRequireLoginRedirectsToLoginPageIfUserIsNotLoggedIn()
     {
-        $sut = $this->systemUnderTest();
+        $sut = $this->systemUnderTest('redirect');
+        $accountService = AccountService::Instance();
+        $resource = Resource::Instance();
+        $url = $this->createStub(CUrl::class);
 
-        $this->authManager->expects($this->once())
-            ->method('RequireLogin')
-            ->with(Role::Admin);
+        $accountService->expects($this->once())
+            ->method('SessionAccount')
+            ->willReturn(null);
+        $resource->expects($this->once())
+            ->method('LoginPageUrl')
+            ->willReturn($url);
+        $resource->expects($this->never())
+            ->method('ErrorPageUrl');
+        $sut->expects($this->once())
+            ->method('redirect')
+            ->with($url);
 
-        $this->assertSame($sut, $sut->RequireLogin(Role::Admin));
+        $sut->RequireLogin();
+    }
+
+    #[DataProvider('requireLoginRedirectsDataProvider')]
+    function testRequireLoginRedirectsToErrorPageIfAccountRoleIsInsufficient(
+        ?int $accountRole,
+        Role $minimumRole
+    ) {
+        $sut = $this->systemUnderTest('redirect');
+        $accountService = AccountService::Instance();
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->role = $accountRole;
+        $resource = Resource::Instance();
+        $url = $this->createStub(CUrl::class);
+
+        $accountService->expects($this->once())
+            ->method('SessionAccount')
+            ->willReturn($accountView);
+        $resource->expects($this->never())
+            ->method('LoginPageUrl');
+        $resource->expects($this->once())
+            ->method('ErrorPageUrl')
+            ->with(StatusCode::Unauthorized)
+            ->willReturn($url);
+        $sut->expects($this->once())
+            ->method('redirect')
+            ->with($url);
+
+        $sut->RequireLogin($minimumRole);
+    }
+
+    #[DataProvider('requireLoginPassesDataProvider')]
+    function testRequireLoginPassesIfUserIsLoggedInAndRoleIsSufficient(
+        ?int $accountRole,
+        Role $minimumRole
+    ) {
+        $sut = $this->systemUnderTest('redirect');
+        $accountService = AccountService::Instance();
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->role = $accountRole;
+        $resource = Resource::Instance();
+
+        $accountService->expects($this->once())
+            ->method('SessionAccount')
+            ->willReturn($accountView);
+        $resource->expects($this->never())
+            ->method('LoginPageUrl');
+        $resource->expects($this->never())
+            ->method('ErrorPageUrl');
+        $sut->expects($this->never())
+            ->method('redirect');
+
+        $this->assertSame($sut, $sut->RequireLogin($minimumRole));
     }
 
     #endregion RequireLogin
@@ -594,7 +678,7 @@ class PageTest extends TestCase
     function testSetProperty()
     {
         $sut = $this->systemUnderTest();
-        $properties = AccessHelper::GetMockProperty(Page::class, $sut, 'properties');
+        $properties = ah::GetMockProperty(Page::class, $sut, 'properties');
         $this->assertSame(null, $properties->GetOrDefault('theme', null));
         $this->assertSame($sut, $sut->SetProperty('theme', 'dark'));
         $this->assertSame('dark', $properties->GetOrDefault('theme', null));
@@ -644,4 +728,35 @@ class PageTest extends TestCase
     }
 
     #endregion CsrfTokenValue
+
+    #region Data Providers -----------------------------------------------------
+
+    static function requireLoginRedirectsDataProvider()
+    {
+        return [
+            'invalid vs Editor' => [99, Role::Editor],
+            'invalid vs Admin'  => [99, Role::Admin],
+            'null vs Editor'    => [null, Role::Editor],
+            'null vs Admin'     => [null, Role::Admin],
+            'None vs Editor'    => [0, Role::Editor],
+            'None vs Admin'     => [0, Role::Admin],
+            'Editor vs Admin'   => [10, Role::Admin],
+        ];
+    }
+
+    static function requireLoginPassesDataProvider()
+    {
+        return [
+            'invalid vs None'   => [99, Role::None],
+            'null vs None'      => [null, Role::None],
+            'None vs None'      => [0, Role::None],
+            'Editor vs None'    => [10, Role::None],
+            'Editor vs Editor'  => [10, Role::Editor],
+            'Admin vs None'     => [20, Role::None],
+            'Admin vs Editor'   => [20, Role::Editor],
+            'Admin vs Admin'    => [20, Role::Admin],
+        ];
+    }
+
+    #endregion Data Providers
 }
