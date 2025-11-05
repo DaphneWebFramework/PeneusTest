@@ -151,7 +151,8 @@ class AccountServiceTest extends TestCase
     {
         $sut = $this->systemUnderTest(
             'loadAccountFromSession',
-            'rotatePersistentLoginIfNeeded'
+            'rotatePersistentLoginIfNeeded',
+            'tryPersistentLogin'
         );
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
@@ -162,6 +163,8 @@ class AccountServiceTest extends TestCase
         $sut->expects($this->once())
             ->method('rotatePersistentLoginIfNeeded')
             ->with($accountView->id);
+        $sut->expects($this->never())
+            ->method('tryPersistentLogin');
 
         $this->assertSame($accountView, $sut->SessionAccount());
     }
@@ -205,6 +208,29 @@ class AccountServiceTest extends TestCase
             ->willReturn(null);
 
         $this->assertNull($sut->SessionAccount());
+    }
+
+    function testSessionAccountReturnsCachedValue()
+    {
+        $sut = $this->systemUnderTest(
+            'loadAccountFromSession',
+            'rotatePersistentLoginIfNeeded',
+            'tryPersistentLogin'
+        );
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 42;
+
+        $sut->expects($this->once())
+            ->method('loadAccountFromSession')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('rotatePersistentLoginIfNeeded')
+            ->with($accountView->id);
+        $sut->expects($this->never())
+            ->method('tryPersistentLogin');
+
+        $this->assertSame($accountView, $sut->SessionAccount());
+        $this->assertSame($accountView, $sut->SessionAccount()); // from cache
     }
 
     #endregion SessionAccount
