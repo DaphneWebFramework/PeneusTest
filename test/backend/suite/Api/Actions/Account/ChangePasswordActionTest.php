@@ -66,15 +66,37 @@ class ChangePasswordActionTest extends TestCase
         ah::CallMethod($sut, 'onExecute');
     }
 
+    function testOnExecuteThrowsIfAccountIsNotLocal()
+    {
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount');
+        $accountView = $this->createStub(AccountView::class);
+
+        $sut->expects($this->once())
+            ->method('ensureLoggedIn')
+            ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('ensureLocalAccount')
+            ->with($accountView)
+            ->willThrowException(new \RuntimeException('Expected message.'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Expected message.');
+        ah::CallMethod($sut, 'onExecute');
+    }
+
     function testOnExecuteThrowsIfAccountNotFound()
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount');
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
+            'findAccount');
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
 
         $sut->expects($this->once())
             ->method('ensureLoggedIn')
             ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('ensureLocalAccount')
+            ->with($accountView);
         $sut->expects($this->once())
             ->method('findAccount')
             ->with($accountView->id)
@@ -87,8 +109,8 @@ class ChangePasswordActionTest extends TestCase
 
     function testOnExecuteThrowsIfRequestValidationFails()
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
-            'validateRequest');
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
+            'findAccount', 'validateRequest');
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
         $account = $this->createStub(Account::class);
@@ -96,6 +118,9 @@ class ChangePasswordActionTest extends TestCase
         $sut->expects($this->once())
             ->method('ensureLoggedIn')
             ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('ensureLocalAccount')
+            ->with($accountView);
         $sut->expects($this->once())
             ->method('findAccount')
             ->with($accountView->id)
@@ -111,8 +136,8 @@ class ChangePasswordActionTest extends TestCase
 
     function testOnExecuteThrowsIfCurrentPasswordVerificationFails()
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
-            'validateRequest', 'verifyCurrentPassword');
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
+            'findAccount', 'validateRequest', 'verifyCurrentPassword');
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
         $account = $this->createStub(Account::class);
@@ -125,6 +150,9 @@ class ChangePasswordActionTest extends TestCase
         $sut->expects($this->once())
             ->method('ensureLoggedIn')
             ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('ensureLocalAccount')
+            ->with($accountView);
         $sut->expects($this->once())
             ->method('findAccount')
             ->with($accountView->id)
@@ -144,8 +172,9 @@ class ChangePasswordActionTest extends TestCase
 
     function testOnExecuteThrowsIfDoChangeFails()
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
-            'validateRequest', 'verifyCurrentPassword', 'doChange');
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
+            'findAccount', 'validateRequest', 'verifyCurrentPassword',
+            'doChange');
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
         $account = $this->createStub(Account::class);
@@ -158,6 +187,9 @@ class ChangePasswordActionTest extends TestCase
         $sut->expects($this->once())
             ->method('ensureLoggedIn')
             ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('ensureLocalAccount')
+            ->with($accountView);
         $sut->expects($this->once())
             ->method('findAccount')
             ->with($accountView->id)
@@ -180,8 +212,9 @@ class ChangePasswordActionTest extends TestCase
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
-            'validateRequest', 'verifyCurrentPassword', 'doChange');
+        $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
+            'findAccount', 'validateRequest', 'verifyCurrentPassword',
+            'doChange');
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
         $account = $this->createStub(Account::class);
@@ -194,6 +227,9 @@ class ChangePasswordActionTest extends TestCase
         $sut->expects($this->once())
             ->method('ensureLoggedIn')
             ->willReturn($accountView);
+        $sut->expects($this->once())
+            ->method('ensureLocalAccount')
+            ->with($accountView);
         $sut->expects($this->once())
             ->method('findAccount')
             ->with($accountView->id)
@@ -245,6 +281,33 @@ class ChangePasswordActionTest extends TestCase
     }
 
     #endregion ensureLoggedIn
+
+    #region ensureLocalAccount -------------------------------------------------
+
+    function testEnsureLocalAccountThrowsIfAccountIsNotLocal()
+    {
+        $sut = $this->systemUnderTest();
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->isLocal = false;
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(
+            "This account does not have a local password.");
+        $this->expectExceptionCode(StatusCode::Forbidden->value);
+        ah::CallMethod($sut, 'ensureLocalAccount', [$accountView]);
+    }
+
+    function testEnsureLocalAccountSucceedsIfAccountIsLocal()
+    {
+        $sut = $this->systemUnderTest();
+        $accountView = $this->createStub(AccountView::class);
+        $accountView->isLocal = true;
+
+        $this->expectNotToPerformAssertions();
+        ah::CallMethod($sut, 'ensureLocalAccount', [$accountView]);
+    }
+
+    #endregion ensureLocalAccount
 
     #region findAccount --------------------------------------------------------
 
