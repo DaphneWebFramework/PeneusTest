@@ -263,7 +263,7 @@ class AddRecordActionTest extends TestCase
                     'displayName' => 'John',
                     'timeActivated' => '01-01-2025'
                 ],
-                'exceptionMessage' => "Field 'timeActivated' must match the datetime format: Y-m-d H:i:s"
+                'exceptionMessage' => "Field 'timeActivated' must match the exact datetime format: Y-m-d H:i:s"
             ],
             'account: timeLastLogin missing' => [
                 'table' => 'account',
@@ -284,7 +284,7 @@ class AddRecordActionTest extends TestCase
                     'timeActivated' => '2025-01-01 00:00:00',
                     'timeLastLogin' => 'not-a-datetime'
                 ],
-                'exceptionMessage' => "Field 'timeLastLogin' must match the datetime format: Y-m-d H:i:s"
+                'exceptionMessage' => "Field 'timeLastLogin' must match the exact datetime format: Y-m-d H:i:s"
             ],
             #endregion Account
             #region AccountRole
@@ -411,7 +411,7 @@ class AddRecordActionTest extends TestCase
                     'activationCode' => \str_repeat('a', 64),
                     'timeRegistered' => 'not-a-datetime'
                 ],
-                'exceptionMessage' => "Field 'timeRegistered' must match the datetime format: Y-m-d H:i:s"
+                'exceptionMessage' => "Field 'timeRegistered' must match the exact datetime format: Y-m-d H:i:s"
             ],
             #endregion PendingAccount
             #region PasswordReset
@@ -466,7 +466,7 @@ class AddRecordActionTest extends TestCase
                     'resetCode' => \str_repeat('a', 64),
                     'timeRequested' => 'not-a-datetime'
                 ],
-                'exceptionMessage' => "Field 'timeRequested' must match the datetime format: Y-m-d H:i:s"
+                'exceptionMessage' => "Field 'timeRequested' must match the exact datetime format: Y-m-d H:i:s"
             ],
             #endregion PasswordReset
             #region PersistentLogin
@@ -561,7 +561,7 @@ class AddRecordActionTest extends TestCase
                     'tokenHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
                     'timeExpires' => 'not-a-datetime'
                 ],
-                'exceptionMessage' => "Field 'timeExpires' must match the datetime format: Y-m-d H:i:s"
+                'exceptionMessage' => "Field 'timeExpires' must match the exact datetime format: Y-m-d H:i:s"
             ],
             #endregion PersistentLogin
         ];
