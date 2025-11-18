@@ -163,9 +163,12 @@ class DispatcherTest extends TestCase
             ->method('HandleAction')
             ->with('action1')
             ->willReturn(null);
-        $response->expects($this->once())
-            ->method('SetStatusCode')
-            ->with(StatusCode::NoContent);
+        $response->expects($this->never())
+            ->method('SetStatusCode');
+        $response->expects($this->never())
+            ->method('SetHeader');
+        $response->expects($this->never())
+            ->method('SetBody');
 
         AccessHelper::SetProperty($sut, 'response', $response); // Inject
         $sut->DispatchRequest();
