@@ -72,17 +72,14 @@ class LoginActionTest extends TestCase
         ah::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfRequestValidationFails()
+    function testOnExecuteThrowsIfPayloadValidationFails()
     {
-        $sut = $this->systemUnderTest(
-            'ensureNotLoggedIn',
-            'validateRequest'
-        );
+        $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload');
 
         $sut->expects($this->once())
             ->method('ensureNotLoggedIn');
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
@@ -92,21 +89,19 @@ class LoginActionTest extends TestCase
 
     function testOnExecuteThrowsIfAccountAuthenticationFails()
     {
-        $sut = $this->systemUnderTest(
-            'ensureNotLoggedIn',
-            'validateRequest',
-            'findAndAuthenticateAccount'
-        );
+        $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload',
+            'findAndAuthenticateAccount');
+        $payload = (object)[
+            'email' => 'john@example.com',
+            'password' => 'pass1234',
+            'keepLoggedIn' => false
+        ];
 
         $sut->expects($this->once())
             ->method('ensureNotLoggedIn');
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'email' => 'john@example.com',
-                'password' => 'pass1234',
-                'keepLoggedIn' => false
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findAndAuthenticateAccount')
             ->with('john@example.com', 'pass1234')
@@ -119,25 +114,21 @@ class LoginActionTest extends TestCase
 
     function testOnExecuteThrowsIfDoLogInFails()
     {
-        $sut = $this->systemUnderTest(
-            'ensureNotLoggedIn',
-            'validateRequest',
-            'findAndAuthenticateAccount',
-            'doLogIn',
-            'logOut'
-        );
+        $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload',
+            'findAndAuthenticateAccount', 'doLogIn', 'logOut');
+        $payload = (object)[
+            'email' => 'john@example.com',
+            'password' => 'pass1234',
+            'keepLoggedIn' => false
+        ];
         $account = $this->createStub(Account::class);
         $database = Database::Instance();
 
         $sut->expects($this->once())
             ->method('ensureNotLoggedIn');
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'email' => 'john@example.com',
-                'password' => 'pass1234',
-                'keepLoggedIn' => false
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findAndAuthenticateAccount')
             ->with('john@example.com', 'pass1234')
@@ -161,13 +152,13 @@ class LoginActionTest extends TestCase
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest(
-            'ensureNotLoggedIn',
-            'validateRequest',
-            'findAndAuthenticateAccount',
-            'doLogIn',
-            'logOut'
-        );
+        $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload',
+            'findAndAuthenticateAccount', 'doLogIn', 'logOut');
+        $payload = (object)[
+            'email' => 'john@example.com',
+            'password' => 'pass1234',
+            'keepLoggedIn' => true
+        ];
         $account = $this->createStub(Account::class);
         $database = Database::Instance();
         $cookieService = CookieService::Instance();
@@ -175,12 +166,8 @@ class LoginActionTest extends TestCase
         $sut->expects($this->once())
             ->method('ensureNotLoggedIn');
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'email' => 'john@example.com',
-                'password' => 'pass1234',
-                'keepLoggedIn' => true
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findAndAuthenticateAccount')
             ->with('john@example.com', 'pass1234')
@@ -235,31 +222,10 @@ class LoginActionTest extends TestCase
 
     #endregion ensureNotLoggedIn
 
-    #region validateRequest ----------------------------------------------------
+    #region validatePayload ----------------------------------------------------
 
     #[DataProvider('invalidPayloadProvider')]
-    function testValidateRequestThrows(
-        array $data,
-        string $exceptionMessage
-    ) {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($data);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        ah::CallMethod($sut, 'validateRequest');
-    }
-
-    #[DataProvider('validPayloadProvider')]
-    function testValidateRequest($expected, $data)
+    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
@@ -270,12 +236,31 @@ class LoginActionTest extends TestCase
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn($data);
+            ->willReturn($payload);
 
-        $this->assertEquals($expected, ah::CallMethod($sut, 'validateRequest'));
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage($exceptionMessage);
+        ah::CallMethod($sut, 'validatePayload');
     }
 
-    #endregion validateRequest
+    #[DataProvider('validPayloadProvider')]
+    function testValidatePayload($expected, $payload)
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($payload);
+
+        $this->assertEquals($expected, ah::CallMethod($sut, 'validatePayload'));
+    }
+
+    #endregion validatePayload
 
     #region findAndAuthenticateAccount -----------------------------------------
 
@@ -441,11 +426,7 @@ class LoginActionTest extends TestCase
             ->with($account->id);
 
         ah::CallMethod($sut, 'doLogIn', [$account, $keepLoggedIn]);
-        $this->assertEqualsWithDelta(
-            \time(),
-            $account->timeLastLogin->getTimestamp(),
-            1
-        );
+        $this->assertEqualsWithDelta(\time(), $account->timeLastLogin->getTimestamp(), 1);
     }
 
     #endregion doLogIn
@@ -471,37 +452,37 @@ class LoginActionTest extends TestCase
     {
         return [
             'email missing' => [
-                'data' => [],
+                'payload' => [],
                 'exceptionMessage' => "Required field 'email' is missing."
             ],
             'email invalid' => [
-                'data' => [
+                'payload' => [
                     'email' => 'invalid-email'
                 ],
                 'exceptionMessage' => "Field 'email' must be a valid email address."
             ],
             'password missing' => [
-                'data' => [
+                'payload' => [
                     'email' => 'john@example.com'
                 ],
                 'exceptionMessage' => "Required field 'password' is missing."
             ],
             'password too short' => [
-                'data' => [
+                'payload' => [
                     'email' => 'john@example.com',
                     'password' => '1234567'
                 ],
                 'exceptionMessage' => "Field 'password' must have a minimum length of 8 characters."
             ],
             'password too long' => [
-                'data' => [
+                'payload' => [
                     'email' => 'john@example.com',
                     'password' => str_repeat('a', 73)
                 ],
                 'exceptionMessage' => "Field 'password' must have a maximum length of 72 characters."
             ],
             'keepLoggedIn not a string' => [
-                'data' => [
+                'payload' => [
                     'email' => 'john@example.com',
                     'password' => 'pass1234',
                     'keepLoggedIn' => 42
@@ -509,7 +490,7 @@ class LoginActionTest extends TestCase
                 'exceptionMessage' => "Field 'keepLoggedIn' must be a string."
             ],
             'keepLoggedIn invalid' => [
-                'data' => [
+                'payload' => [
                     'email' => 'john@example.com',
                     'password' => 'pass1234',
                     'keepLoggedIn' => 'invalid-value'
@@ -528,7 +509,7 @@ class LoginActionTest extends TestCase
                     'password' => 'pass1234',
                     'keepLoggedIn' => false
                 ],
-                'data' => [
+                'payload' => [
                     'email' => 'john@example.com',
                     'password' => 'pass1234'
                 ]
@@ -539,7 +520,7 @@ class LoginActionTest extends TestCase
                     'password' => 'pass1234',
                     'keepLoggedIn' => true
                 ],
-                'data' => [
+                'payload' => [
                     'email' => 'john@example.com',
                     'password' => 'pass1234',
                     'keepLoggedIn' => 'on'

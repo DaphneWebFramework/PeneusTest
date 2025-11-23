@@ -80,10 +80,10 @@ class ChangeDisplayNameActionTest extends TestCase
         ah::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfRequestValidationFails()
+    function testOnExecuteThrowsIfPayloadValidationFails()
     {
         $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
-            'validateRequest');
+            'validatePayload');
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
         $account = $this->createStub(Account::class);
@@ -96,7 +96,7 @@ class ChangeDisplayNameActionTest extends TestCase
             ->with($accountView->id)
             ->willReturn($account);
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
@@ -107,7 +107,7 @@ class ChangeDisplayNameActionTest extends TestCase
     function testOnExecuteThrowsIfDoChangeFails()
     {
         $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
-            'validateRequest', 'doChange');
+            'validatePayload', 'doChange');
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
         $account = $this->createStub(Account::class);
@@ -123,7 +123,7 @@ class ChangeDisplayNameActionTest extends TestCase
             ->with($accountView->id)
             ->willReturn($account);
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('doChange')
@@ -138,7 +138,7 @@ class ChangeDisplayNameActionTest extends TestCase
     function testOnExecuteSucceeds()
     {
         $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
-            'validateRequest', 'doChange');
+            'validatePayload', 'doChange');
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
         $account = $this->createStub(Account::class);
@@ -154,7 +154,7 @@ class ChangeDisplayNameActionTest extends TestCase
             ->with($accountView->id)
             ->willReturn($account);
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('doChange')
@@ -253,13 +253,11 @@ class ChangeDisplayNameActionTest extends TestCase
 
     #endregion findAccount
 
-    #region validateRequest ----------------------------------------------------
+    #region validatePayload ----------------------------------------------------
 
     #[DataProvider('invalidPayloadProvider')]
-    function testValidateRequestThrows(
-        array $payload,
-        string $exceptionMessage
-    ) {
+    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
+    {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -273,10 +271,10 @@ class ChangeDisplayNameActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        ah::CallMethod($sut, 'validateRequest');
+        ah::CallMethod($sut, 'validatePayload');
     }
 
-    function testValidateRequestSucceeds()
+    function testValidatePayloadSucceeds()
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
@@ -293,11 +291,11 @@ class ChangeDisplayNameActionTest extends TestCase
             ->method('ToArray')
             ->willReturn($payload);
 
-        $actual = ah::CallMethod($sut, 'validateRequest');
+        $actual = ah::CallMethod($sut, 'validatePayload');
         $this->assertEquals($expected, $actual);
     }
 
-    #endregion validateRequest
+    #endregion validatePayload
 
     #region doChange -----------------------------------------------------------
 

@@ -59,12 +59,12 @@ class ResetPasswordActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfRequestValidationFails()
+    function testOnExecuteThrowsIfPayloadValidationFails()
     {
-        $sut = $this->systemUnderTest('validateRequest');
+        $sut = $this->systemUnderTest('validatePayload');
 
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
@@ -74,16 +74,15 @@ class ResetPasswordActionTest extends TestCase
 
     function testOnExecuteThrowsIfAccountAndPasswordResetNotFound()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'findAccountAndPasswordReset'
-        );
+        $sut = $this->systemUnderTest('validatePayload',
+            'findAccountAndPasswordReset');
+        $payload = (object)[
+            'resetCode' => 'code1234'
+        ];
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'resetCode' => 'code1234'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findAccountAndPasswordReset')
             ->with('code1234')
@@ -96,21 +95,19 @@ class ResetPasswordActionTest extends TestCase
 
     function testOnExecuteThrowsIfDoResetFails()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'findAccountAndPasswordReset',
-            'doReset'
-        );
+        $sut = $this->systemUnderTest('validatePayload',
+            'findAccountAndPasswordReset', 'doReset');
+        $payload = (object)[
+            'resetCode' => 'code1234',
+            'newPassword' => 'pass1234'
+        ];
         $account = $this->createStub(Account::class);
         $pr = $this->createStub(PasswordReset::class);
         $database = Database::Instance();
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'resetCode' => 'code1234',
-                'newPassword' => 'pass1234'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findAccountAndPasswordReset')
             ->with('code1234')
@@ -132,11 +129,12 @@ class ResetPasswordActionTest extends TestCase
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'findAccountAndPasswordReset',
-            'doReset'
-        );
+        $sut = $this->systemUnderTest('validatePayload',
+            'findAccountAndPasswordReset', 'doReset');
+        $payload = (object)[
+            'resetCode' => 'code1234',
+            'newPassword' => 'pass1234'
+        ];
         $account = $this->createStub(Account::class);
         $pr = $this->createStub(PasswordReset::class);
         $database = Database::Instance();
@@ -145,11 +143,8 @@ class ResetPasswordActionTest extends TestCase
         $resource = Resource::Instance();
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'resetCode' => 'code1234',
-                'newPassword' => 'pass1234'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findAccountAndPasswordReset')
             ->with('code1234')
@@ -177,51 +172,49 @@ class ResetPasswordActionTest extends TestCase
 
     #endregion onExecute
 
-    #region validateRequest ----------------------------------------------------
+    #region validatePayload ----------------------------------------------------
 
     #[DataProvider('invalidPayloadProvider')]
-    function testValidateRequestThrows(
-        array $data,
-        string $exceptionMessage
-    ) {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($data);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        ah::CallMethod($sut, 'validateRequest');
-    }
-
-    function testValidateRequestSucceeds()
+    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
-        $data = [
-            'resetCode' => \str_repeat('0123456789AbCdEf', 4),
-            'newPassword' => 'pass1234'
-        ];
-        $expected = (object)$data;
 
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn($data);
+            ->willReturn($payload);
 
-        $this->assertEquals($expected, ah::CallMethod($sut, 'validateRequest'));
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage($exceptionMessage);
+        ah::CallMethod($sut, 'validatePayload');
     }
 
-    #endregion validateRequest
+    function testValidatePayloadSucceeds()
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $payload = [
+            'resetCode' => \str_repeat('0123456789AbCdEf', 4),
+            'newPassword' => 'pass1234'
+        ];
+        $expected = (object)$payload;
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($payload);
+
+        $this->assertEquals($expected, ah::CallMethod($sut, 'validatePayload'));
+    }
+
+    #endregion validatePayload
 
     #region findAccountAndPasswordReset ----------------------------------------
 
@@ -469,30 +462,30 @@ class ResetPasswordActionTest extends TestCase
     {
         return [
             'resetCode missing' => [
-                'data' => [],
+                'payload' => [],
                 'exceptionMessage' => 'Reset code is required.'
             ],
             'resetCode invalid' => [
-                'data' => [
+                'payload' => [
                     'resetCode' => 'invalid-code'
                 ],
                 'exceptionMessage' => 'Reset code format is invalid.'
             ],
             'newPassword missing' => [
-                'data' => [
+                'payload' => [
                     'resetCode' => str_repeat('a', 64)
                 ],
                 'exceptionMessage' => "Required field 'newPassword' is missing."
             ],
             'newPassword too short' => [
-                'data' => [
+                'payload' => [
                     'resetCode' => str_repeat('a', 64),
                     'newPassword' => '1234567'
                 ],
                 'exceptionMessage' => "Field 'newPassword' must have a minimum length of 8 characters."
             ],
             'newPassword too long' => [
-                'data' => [
+                'payload' => [
                     'resetCode' => str_repeat('a', 64),
                     'newPassword' => str_repeat('a', 73)
                 ],

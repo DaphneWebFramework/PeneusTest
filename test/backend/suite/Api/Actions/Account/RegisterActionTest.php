@@ -64,12 +64,12 @@ class RegisterActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfRequestValidationFails()
+    function testOnExecuteThrowsIfPayloadValidationFails()
     {
-        $sut = $this->systemUnderTest('validateRequest');
+        $sut = $this->systemUnderTest('validatePayload');
 
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
@@ -79,16 +79,14 @@ class RegisterActionTest extends TestCase
 
     function testOnExecuteThrowsIfAlreadyRegistered()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'ensureNotRegistered'
-        );
+        $sut = $this->systemUnderTest('validatePayload', 'ensureNotRegistered');
+        $payload = (object)[
+            'email' => 'john@example.com'
+        ];
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'email' => 'john@example.com'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('ensureNotRegistered')
             ->with('john@example.com')
@@ -101,17 +99,15 @@ class RegisterActionTest extends TestCase
 
     function testOnExecuteThrowsIfAlreadyPending()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'ensureNotRegistered',
-            'ensureNotPending'
-        );
+        $sut = $this->systemUnderTest('validatePayload', 'ensureNotRegistered',
+            'ensureNotPending');
+        $payload = (object)[
+            'email' => 'john@example.com'
+        ];
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'email' => 'john@example.com'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('ensureNotRegistered')
             ->with('john@example.com');
@@ -127,21 +123,18 @@ class RegisterActionTest extends TestCase
 
     function testOnExecuteThrowsIfDoRegisterFails()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'ensureNotRegistered',
-            'ensureNotPending',
-            'doRegister'
-        );
+        $sut = $this->systemUnderTest('validatePayload', 'ensureNotRegistered',
+            'ensureNotPending', 'doRegister');
+        $payload = (object)[
+            'email' => 'john@example.com',
+            'password' => 'pass1234',
+            'displayName' => 'John'
+        ];
         $database = Database::Instance();
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'email' => 'john@example.com',
-                'password' => 'pass1234',
-                'displayName' => 'John'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('ensureNotRegistered')
             ->with('john@example.com');
@@ -150,7 +143,7 @@ class RegisterActionTest extends TestCase
             ->with('john@example.com');
         $sut->expects($this->once())
             ->method('doRegister')
-            ->with('john@example.com', 'pass1234', 'John')
+            ->with($payload)
             ->willThrowException(new \RuntimeException());
         $database->expects($this->once())
             ->method('WithTransaction')
@@ -166,22 +159,19 @@ class RegisterActionTest extends TestCase
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'ensureNotRegistered',
-            'ensureNotPending',
-            'doRegister'
-        );
+        $sut = $this->systemUnderTest('validatePayload', 'ensureNotRegistered',
+            'ensureNotPending', 'doRegister');
+        $payload = (object)[
+            'email' => 'john@example.com',
+            'password' => 'pass1234',
+            'displayName' => 'John'
+        ];
         $database = Database::Instance();
         $cookieService = CookieService::Instance();
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'email' => 'john@example.com',
-                'password' => 'pass1234',
-                'displayName' => 'John'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('ensureNotRegistered')
             ->with('john@example.com');
@@ -190,7 +180,7 @@ class RegisterActionTest extends TestCase
             ->with('john@example.com');
         $sut->expects($this->once())
             ->method('doRegister')
-            ->with('john@example.com', 'pass1234', 'John');
+            ->with($payload);
         $database->expects($this->once())
             ->method('WithTransaction')
             ->willReturnCallback(function($callback) {
@@ -210,52 +200,50 @@ class RegisterActionTest extends TestCase
 
     #endregion onExecute
 
-    #region validateRequest ----------------------------------------------------
+    #region validatePayload ----------------------------------------------------
 
     #[DataProvider('invalidPayloadProvider')]
-    function testValidateRequestThrows(
-        array $data,
-        string $exceptionMessage
-    ) {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($data);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        ah::CallMethod($sut, 'validateRequest');
-    }
-
-    function testValidateRequestSucceeds()
+    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
-        $data = [
-            'email' => 'john@example.com',
-            'password' => 'pass1234',
-            'displayName' => 'John'
-        ];
-        $expected = (object)$data;
 
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn($data);
+            ->willReturn($payload);
 
-        $this->assertEquals($expected, ah::CallMethod($sut, 'validateRequest'));
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage($exceptionMessage);
+        ah::CallMethod($sut, 'validatePayload');
     }
 
-    #endregion validateRequest
+    function testValidatePayloadSucceeds()
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $payload = [
+            'email' => 'john@example.com',
+            'password' => 'pass1234',
+            'displayName' => 'John'
+        ];
+        $expected = (object)$payload;
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($payload);
+
+        $this->assertEquals($expected, ah::CallMethod($sut, 'validatePayload'));
+    }
+
+    #endregion validatePayload
 
     #region ensureNotRegistered ------------------------------------------------
 
@@ -347,6 +335,11 @@ class RegisterActionTest extends TestCase
     {
         $sut = $this->systemUnderTest('constructPendingAccount');
         $securityService = SecurityService::Instance();
+        $payload = (object)[
+            'email' => 'john@example.com',
+            'password' => 'pass1234',
+            'displayName' => 'John'
+        ];
         $pa = $this->createMock(PendingAccount::class);
 
         $securityService->expects($this->once())
@@ -354,7 +347,7 @@ class RegisterActionTest extends TestCase
             ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('constructPendingAccount')
-            ->with('john@example.com', 'pass1234', 'John', 'code1234')
+            ->with($payload, 'code1234')
             ->willReturn($pa);
         $pa->expects($this->once())
             ->method('Save')
@@ -362,20 +355,18 @@ class RegisterActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save pending account.");
-        ah::CallMethod($sut, 'doRegister', [
-            'john@example.com',
-            'pass1234',
-            'John'
-        ]);
+        ah::CallMethod($sut, 'doRegister', [$payload]);
     }
 
     function testDoRegisterThrowsIfSendEmailFails()
     {
-        $sut = $this->systemUnderTest(
-            'constructPendingAccount',
-            'sendEmail'
-        );
+        $sut = $this->systemUnderTest('constructPendingAccount', 'sendEmail');
         $securityService = SecurityService::Instance();
+        $payload = (object)[
+            'email' => 'john@example.com',
+            'password' => 'pass1234',
+            'displayName' => 'John'
+        ];
         $pa = $this->createMock(PendingAccount::class);
 
         $securityService->expects($this->once())
@@ -383,7 +374,7 @@ class RegisterActionTest extends TestCase
             ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('constructPendingAccount')
-            ->with('john@example.com', 'pass1234', 'John', 'code1234')
+            ->with($payload, 'code1234')
             ->willReturn($pa);
         $pa->expects($this->once())
             ->method('Save')
@@ -395,20 +386,18 @@ class RegisterActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to send email.");
-        ah::CallMethod($sut, 'doRegister', [
-            'john@example.com',
-            'pass1234',
-            'John'
-        ]);
+        ah::CallMethod($sut, 'doRegister', [$payload]);
     }
 
     function testDoRegisterSucceeds()
     {
-        $sut = $this->systemUnderTest(
-            'constructPendingAccount',
-            'sendEmail'
-        );
+        $sut = $this->systemUnderTest('constructPendingAccount', 'sendEmail');
         $securityService = SecurityService::Instance();
+        $payload = (object)[
+            'email' => 'john@example.com',
+            'password' => 'pass1234',
+            'displayName' => 'John'
+        ];
         $pa = $this->createMock(PendingAccount::class);
 
         $securityService->expects($this->once())
@@ -416,7 +405,7 @@ class RegisterActionTest extends TestCase
             ->willReturn('code1234');
         $sut->expects($this->once())
             ->method('constructPendingAccount')
-            ->with('john@example.com', 'pass1234', 'John', 'code1234')
+            ->with($payload, 'code1234')
             ->willReturn($pa);
         $pa->expects($this->once())
             ->method('Save')
@@ -426,11 +415,7 @@ class RegisterActionTest extends TestCase
             ->with('john@example.com', 'John', 'code1234')
             ->willReturn(true);
 
-        ah::CallMethod($sut, 'doRegister', [
-            'john@example.com',
-            'pass1234',
-            'John'
-        ]);
+        ah::CallMethod($sut, 'doRegister', [$payload]);
     }
 
     #endregion doRegister
@@ -441,28 +426,25 @@ class RegisterActionTest extends TestCase
     {
         $sut = $this->systemUnderTest();
         $securityService = SecurityService::Instance();
+        $payload = (object)[
+            'email' => 'john@example.com',
+            'password' => 'pass1234',
+            'displayName' => 'John'
+        ];
 
         $securityService->expects($this->once())
             ->method('HashPassword')
             ->with('pass1234')
             ->willReturn('hash1234');
 
-        $pa = ah::CallMethod($sut, 'constructPendingAccount', [
-            'john@example.com',
-            'pass1234',
-            'John',
-            'code1234'
-        ]);
+        $pa = ah::CallMethod($sut, 'constructPendingAccount', [$payload, 'code1234']);
         $this->assertInstanceOf(PendingAccount::class, $pa);
-        $this->assertSame('john@example.com', $pa->email);
+        $this->assertSame(0, $pa->id);
+        $this->assertSame($payload->email, $pa->email);
         $this->assertSame('hash1234', $pa->passwordHash);
-        $this->assertSame('John', $pa->displayName);
+        $this->assertSame($payload->displayName, $pa->displayName);
         $this->assertSame('code1234', $pa->activationCode);
-        $this->assertEqualsWithDelta(
-            \time(),
-            $pa->timeRegistered->getTimestamp(),
-            1
-        );
+        $this->assertEqualsWithDelta(\time(), $pa->timeRegistered->getTimestamp(), 1);
     }
 
     #endregion constructPendingAccount
@@ -533,44 +515,44 @@ class RegisterActionTest extends TestCase
     {
         return [
             'email missing' => [
-                'data' => [],
+                'payload' => [],
                 'exceptionMessage' => "Required field 'email' is missing."
             ],
             'email invalid' => [
-                'data' => [
+                'payload' => [
                     'email' => 'invalid-email'
                 ],
                 'exceptionMessage' => "Field 'email' must be a valid email address."
             ],
             'password missing' => [
-                'data' => [
+                'payload' => [
                     'email' => 'john@example.com'
                 ],
                 'exceptionMessage' => "Required field 'password' is missing."
             ],
             'password too short' => [
-                'data' => [
+                'payload' => [
                     'email' => 'john@example.com',
                     'password' => '1234567'
                 ],
                 'exceptionMessage' => "Field 'password' must have a minimum length of 8 characters."
             ],
             'password too long' => [
-                'data' => [
+                'payload' => [
                     'email' => 'john@example.com',
                     'password' => str_repeat('a', 73)
                 ],
                 'exceptionMessage' => "Field 'password' must have a maximum length of 72 characters."
             ],
             'displayName missing' => [
-                'data' => [
+                'payload' => [
                     'email' => 'john@example.com',
                     'password' => 'pass1234'
                 ],
                 'exceptionMessage' => "Required field 'displayName' is missing."
             ],
             'displayName invalid' => [
-                'data' => [
+                'payload' => [
                     'email' => 'john@example.com',
                     'password' => 'pass1234',
                     'displayName' => '<invalid-display-name>'

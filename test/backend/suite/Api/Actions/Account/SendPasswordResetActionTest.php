@@ -65,12 +65,12 @@ class SendPasswordResetActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfRequestValidationFails()
+    function testOnExecuteThrowsIfPayloadValidationFails()
     {
-        $sut = $this->systemUnderTest('validateRequest');
+        $sut = $this->systemUnderTest('validatePayload');
 
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
@@ -80,19 +80,17 @@ class SendPasswordResetActionTest extends TestCase
 
     function testOnExecuteBypassesDatabaseTransactionIfAccountNotFound()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'findAccount',
-            'doSend'
-        );
+        $sut = $this->systemUnderTest('validatePayload', 'findAccount',
+            'doSend');
+        $payload = (object)[
+            'email' => 'john@example.com'
+        ];
         $database = Database::Instance();
         $cookieService = CookieService::Instance();
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'email' => 'john@example.com'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findAccount')
             ->with('john@example.com')
@@ -116,19 +114,17 @@ class SendPasswordResetActionTest extends TestCase
 
     function testOnExecuteThrowsIfDoSendFails()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'findAccount',
-            'doSend'
-        );
+        $sut = $this->systemUnderTest('validatePayload', 'findAccount',
+            'doSend');
+        $payload = (object)[
+            'email' => 'john@example.com'
+        ];
         $account = $this->createStub(Account::class);
         $database = Database::Instance();
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'email' => 'john@example.com'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findAccount')
             ->with('john@example.com')
@@ -152,20 +148,18 @@ class SendPasswordResetActionTest extends TestCase
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'findAccount',
-            'doSend'
-        );
+        $sut = $this->systemUnderTest('validatePayload', 'findAccount',
+            'doSend');
+        $payload = (object)[
+            'email' => 'john@example.com'
+        ];
         $account = $this->createStub(Account::class);
         $database = Database::Instance();
         $cookieService = CookieService::Instance();
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'email' => 'john@example.com'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findAccount')
             ->with('john@example.com')
@@ -193,50 +187,48 @@ class SendPasswordResetActionTest extends TestCase
 
     #endregion onExecute
 
-    #region validateRequest ----------------------------------------------------
+    #region validatePayload ----------------------------------------------------
 
     #[DataProvider('invalidPayloadProvider')]
-    function testValidateRequestThrows(
-        array $data,
-        string $exceptionMessage
-    ) {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($data);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        ah::CallMethod($sut, 'validateRequest');
-    }
-
-    function testValidateRequestSucceeds()
+    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
-        $data = [
-            'email' => 'john@example.com'
-        ];
-        $expected = (object)$data;
 
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn($data);
+            ->willReturn($payload);
 
-        $this->assertEquals($expected, ah::CallMethod($sut, 'validateRequest'));
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage($exceptionMessage);
+        ah::CallMethod($sut, 'validatePayload');
     }
 
-    #endregion validateRequest
+    function testValidatePayloadSucceeds()
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $payload = [
+            'email' => 'john@example.com'
+        ];
+        $expected = (object)$payload;
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($payload);
+
+        $this->assertEquals($expected, ah::CallMethod($sut, 'validatePayload'));
+    }
+
+    #endregion validatePayload
 
     #region findAccount --------------------------------------------------------
 
@@ -297,10 +289,7 @@ class SendPasswordResetActionTest extends TestCase
 
     function testDoSendThrowsIfPasswordResetSaveFails()
     {
-        $sut = $this->systemUnderTest(
-            'findOrConstructPasswordReset',
-            'sendEmail'
-        );
+        $sut = $this->systemUnderTest('findOrConstructPasswordReset', 'sendEmail');
         $account = $this->createStub(Account::class);
         $account->id = 42;
         $securityService = SecurityService::Instance();
@@ -326,10 +315,7 @@ class SendPasswordResetActionTest extends TestCase
 
     function testDoSendThrowsIfSendEmailFails()
     {
-        $sut = $this->systemUnderTest(
-            'findOrConstructPasswordReset',
-            'sendEmail'
-        );
+        $sut = $this->systemUnderTest('findOrConstructPasswordReset', 'sendEmail');
         $account = $this->createStub(Account::class);
         $account->id = 42;
         $account->email = 'john@example.com';
@@ -359,10 +345,7 @@ class SendPasswordResetActionTest extends TestCase
 
     function testDoSendSucceeds()
     {
-        $sut = $this->systemUnderTest(
-            'findOrConstructPasswordReset',
-            'sendEmail'
-        );
+        $sut = $this->systemUnderTest('findOrConstructPasswordReset', 'sendEmail');
         $account = $this->createStub(Account::class);
         $account->id = 42;
         $account->email = 'john@example.com';
@@ -394,10 +377,7 @@ class SendPasswordResetActionTest extends TestCase
 
     function testFindOrConstructPasswordResetWithExistingRecord()
     {
-        $sut = $this->systemUnderTest(
-            'findPasswordReset',
-            'constructPasswordReset'
-        );
+        $sut = $this->systemUnderTest('findPasswordReset', 'constructPasswordReset');
         $pr = $this->createStub(PasswordReset::class);
 
         $sut->expects($this->once())
@@ -416,10 +396,7 @@ class SendPasswordResetActionTest extends TestCase
 
     function testFindOrConstructPasswordResetWithNonExistingRecord()
     {
-        $sut = $this->systemUnderTest(
-            'findPasswordReset',
-            'constructPasswordReset'
-        );
+        $sut = $this->systemUnderTest('findPasswordReset', 'constructPasswordReset');
         $pr = $this->createStub(PasswordReset::class);
 
         $sut->expects($this->once())
@@ -568,11 +545,11 @@ class SendPasswordResetActionTest extends TestCase
     {
         return [
             'email missing' => [
-                'data' => [],
+                'payload' => [],
                 'exceptionMessage' => "Required field 'email' is missing."
             ],
             'email invalid' => [
-                'data' => ['email' => 'invalid-email'],
+                'payload' => ['email' => 'invalid-email'],
                 'exceptionMessage' => "Field 'email' must be a valid email address."
             ]
         ];

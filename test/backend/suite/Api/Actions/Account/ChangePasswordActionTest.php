@@ -107,10 +107,10 @@ class ChangePasswordActionTest extends TestCase
         ah::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfRequestValidationFails()
+    function testOnExecuteThrowsIfPayloadValidationFails()
     {
         $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
-            'findAccount', 'validateRequest');
+            'findAccount', 'validatePayload');
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
         $account = $this->createStub(Account::class);
@@ -126,7 +126,7 @@ class ChangePasswordActionTest extends TestCase
             ->with($accountView->id)
             ->willReturn($account);
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
@@ -137,7 +137,7 @@ class ChangePasswordActionTest extends TestCase
     function testOnExecuteThrowsIfCurrentPasswordVerificationFails()
     {
         $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
-            'findAccount', 'validateRequest', 'verifyCurrentPassword');
+            'findAccount', 'validatePayload', 'verifyCurrentPassword');
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
         $account = $this->createStub(Account::class);
@@ -158,7 +158,7 @@ class ChangePasswordActionTest extends TestCase
             ->with($accountView->id)
             ->willReturn($account);
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('verifyCurrentPassword')
@@ -173,7 +173,7 @@ class ChangePasswordActionTest extends TestCase
     function testOnExecuteThrowsIfDoChangeFails()
     {
         $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
-            'findAccount', 'validateRequest', 'verifyCurrentPassword',
+            'findAccount', 'validatePayload', 'verifyCurrentPassword',
             'doChange');
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
@@ -195,7 +195,7 @@ class ChangePasswordActionTest extends TestCase
             ->with($accountView->id)
             ->willReturn($account);
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('verifyCurrentPassword')
@@ -213,7 +213,7 @@ class ChangePasswordActionTest extends TestCase
     function testOnExecuteSucceeds()
     {
         $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
-            'findAccount', 'validateRequest', 'verifyCurrentPassword',
+            'findAccount', 'validatePayload', 'verifyCurrentPassword',
             'doChange');
         $accountView = $this->createStub(AccountView::class);
         $accountView->id = 42;
@@ -235,7 +235,7 @@ class ChangePasswordActionTest extends TestCase
             ->with($accountView->id)
             ->willReturn($account);
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('verifyCurrentPassword')
@@ -364,13 +364,11 @@ class ChangePasswordActionTest extends TestCase
 
     #endregion findAccount
 
-    #region validateRequest ----------------------------------------------------
+    #region validatePayload ----------------------------------------------------
 
     #[DataProvider('invalidPayloadProvider')]
-    function testValidateRequestThrows(
-        array $payload,
-        string $exceptionMessage
-    ) {
+    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
+    {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
@@ -384,10 +382,10 @@ class ChangePasswordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
-        ah::CallMethod($sut, 'validateRequest');
+        ah::CallMethod($sut, 'validatePayload');
     }
 
-    function testValidateRequestSucceeds()
+    function testValidatePayloadSucceeds()
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
@@ -405,11 +403,11 @@ class ChangePasswordActionTest extends TestCase
             ->method('ToArray')
             ->willReturn($payload);
 
-        $actual = ah::CallMethod($sut, 'validateRequest');
+        $actual = ah::CallMethod($sut, 'validatePayload');
         $this->assertEquals($expected, $actual);
     }
 
-    #endregion validateRequest
+    #endregion validatePayload
 
     #region verifyCurrentPassword ----------------------------------------------
 

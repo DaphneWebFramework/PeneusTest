@@ -83,17 +83,14 @@ class SignInWithGoogleActionTest extends TestCase
         ah::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfRequestValidationFails()
+    function testOnExecuteThrowsIfPayloadValidationFails()
     {
-        $sut = $this->systemUnderTest(
-            'ensureNotLoggedIn',
-            'validateRequest'
-        );
+        $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload');
 
         $sut->expects($this->once())
             ->method('ensureNotLoggedIn');
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
@@ -103,22 +100,20 @@ class SignInWithGoogleActionTest extends TestCase
 
     function testOnExecuteThrowsIfCredentialDecodeAndValidationFails()
     {
-        $sut = $this->systemUnderTest(
-            'ensureNotLoggedIn',
-            'validateRequest',
-            'decodeAndValidateCredential'
-        );
+        $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload',
+            'decodeAndValidateCredential');
+        $payload = (object)[
+            'credential' => 'cred1234'
+        ];
 
         $sut->expects($this->once())
             ->method('ensureNotLoggedIn');
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'credential' => 'credential-value'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('decodeAndValidateCredential')
-            ->with('credential-value')
+            ->with('cred1234')
             ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
@@ -128,34 +123,31 @@ class SignInWithGoogleActionTest extends TestCase
 
     function testOnExecuteThrowsIfDoLogInFails()
     {
-        $sut = $this->systemUnderTest(
-            'ensureNotLoggedIn',
-            'validateRequest',
-            'decodeAndValidateCredential',
-            'findOrConstructAccount',
-            'doLogIn',
-            'logOut'
-        );
+        $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload',
+            'decodeAndValidateCredential', 'findOrConstructAccount', 'doLogIn',
+            'logOut');
+        $payload = (object)[
+            'credential' => 'cred1234'
+        ];
+        $profile = (object)[
+            'email' => 'john@example.com',
+            'displayName' => 'John'
+        ];
         $account = $this->createStub(Account::class);
         $database = Database::Instance();
 
         $sut->expects($this->once())
             ->method('ensureNotLoggedIn');
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'credential' => 'credential-value'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('decodeAndValidateCredential')
-            ->with('credential-value')
-            ->willReturn((object)[
-                'email' => 'john@example.com',
-                'displayName' => 'John'
-            ]);
+            ->with('cred1234')
+            ->willReturn($profile);
         $sut->expects($this->once())
             ->method('findOrConstructAccount')
-            ->with('john@example.com', 'John')
+            ->with($profile)
             ->willReturn($account);
         $sut->expects($this->once())
             ->method('doLogIn')
@@ -176,14 +168,16 @@ class SignInWithGoogleActionTest extends TestCase
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest(
-            'ensureNotLoggedIn',
-            'validateRequest',
-            'decodeAndValidateCredential',
-            'findOrConstructAccount',
-            'doLogIn',
-            'logOut'
-        );
+        $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload',
+            'decodeAndValidateCredential', 'findOrConstructAccount', 'doLogIn',
+            'logOut');
+        $payload = (object)[
+            'credential' => 'cred1234'
+        ];
+        $profile = (object)[
+            'email' => 'john@example.com',
+            'displayName' => 'John'
+        ];
         $account = $this->createStub(Account::class);
         $database = Database::Instance();
         $cookieService = CookieService::Instance();
@@ -193,20 +187,15 @@ class SignInWithGoogleActionTest extends TestCase
         $sut->expects($this->once())
             ->method('ensureNotLoggedIn');
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'credential' => 'credential-value'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('decodeAndValidateCredential')
-            ->with('credential-value')
-            ->willReturn((object)[
-                'email' => 'john@example.com',
-                'displayName' => 'John'
-            ]);
+            ->with('cred1234')
+            ->willReturn($profile);
         $sut->expects($this->once())
             ->method('findOrConstructAccount')
-            ->with('john@example.com', 'John')
+            ->with($profile)
             ->willReturn($account);
         $sut->expects($this->once())
             ->method('doLogIn')
@@ -265,50 +254,47 @@ class SignInWithGoogleActionTest extends TestCase
 
     #endregion ensureNotLoggedIn
 
-    #region validateRequest ----------------------------------------------------
+    #region validatePayload ----------------------------------------------------
 
     #[DataProvider('invalidPayloadProvider')]
-    function testValidateRequestThrows(
-        array $data,
-        string $exceptionMessage
-    ) {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($data);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        ah::CallMethod($sut, 'validateRequest');
-    }
-
-    function testValidateRequestSucceeds()
+    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
-        $data = [
-            'credential' => 'credential-value'
-        ];
-        $expected = (object)$data;
 
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn($data);
+            ->willReturn($payload);
 
-        $this->assertEquals($expected, ah::CallMethod($sut, 'validateRequest'));
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage($exceptionMessage);
+        ah::CallMethod($sut, 'validatePayload');
     }
 
-    #endregion validateRequest
+    function testValidatePayloadSucceeds()
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $payload = [
+            'credential' => 'cred1234'
+        ];
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($payload);
+
+        $this->assertEquals((object)$payload, ah::CallMethod($sut, 'validatePayload'));
+    }
+
+    #endregion validatePayload
 
     #region decodeAndValidateCredential ----------------------------------------
 
@@ -348,8 +334,8 @@ class SignInWithGoogleActionTest extends TestCase
     function testDecodeAndValidateCredentialSucceeds()
     {
         $sut = $this->systemUnderTest('decodeCredential', 'validateClaims');
-        $claims = ['key' => 'value'];
-        $data = (object)['key' => 'value'];
+        $claims = ['foo' => 'bar'];
+        $profile = (object)['baz' => 'qux'];
 
         $sut->expects($this->once())
             ->method('decodeCredential')
@@ -358,10 +344,10 @@ class SignInWithGoogleActionTest extends TestCase
         $sut->expects($this->once())
             ->method('validateClaims')
             ->with($claims)
-            ->willReturn($data);
+            ->willReturn($profile);
 
         $this->assertSame(
-            $data,
+            $profile,
             ah::CallMethod($sut, 'decodeAndValidateCredential', ['credential'])
         );
     }
@@ -503,7 +489,7 @@ class SignInWithGoogleActionTest extends TestCase
             'email' => 'john@example.com',
             'name' => 'John'
         ];
-        $expected = (object)[
+        $profile = (object)[
             'email' => 'john@example.com',
             'displayName' => 'John'
         ];
@@ -517,8 +503,10 @@ class SignInWithGoogleActionTest extends TestCase
             ->with('John', 'john@example.com', '1234567890')
             ->willReturn('John');
 
-        $actual = ah::CallMethod($sut, 'validateClaims', [$claims]);
-        $this->assertEquals($expected, $actual);
+        $this->assertEquals(
+            $profile,
+            ah::CallMethod($sut, 'validateClaims', [$claims])
+        );
     }
 
     #endregion validateClaims
@@ -549,6 +537,10 @@ class SignInWithGoogleActionTest extends TestCase
     function testFindOrConstructAccountWithExistingRecord()
     {
         $sut = $this->systemUnderTest('findAccount', 'constructAccount');
+        $profile = (object)[
+            'email' => 'john@example.com',
+            'displayName' => 'John'
+        ];
         $account = $this->createStub(Account::class);
 
         $sut->expects($this->once())
@@ -560,16 +552,17 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->assertSame(
             $account,
-            ah::CallMethod($sut, 'findOrConstructAccount', [
-                'john@example.com',
-                'John'
-            ])
+            ah::CallMethod($sut, 'findOrConstructAccount', [$profile])
         );
     }
 
     function testFindOrConstructAccountWithNonExistingRecord()
     {
         $sut = $this->systemUnderTest('findAccount', 'constructAccount');
+        $profile = (object)[
+            'email' => 'john@example.com',
+            'displayName' => 'John'
+        ];
         $account = $this->createStub(Account::class);
 
         $sut->expects($this->once())
@@ -578,15 +571,12 @@ class SignInWithGoogleActionTest extends TestCase
             ->willReturn(null);
         $sut->expects($this->once())
             ->method('constructAccount')
-            ->with('john@example.com', 'John')
+            ->with($profile)
             ->willReturn($account);
 
         $this->assertSame(
             $account,
-            ah::CallMethod($sut, 'findOrConstructAccount', [
-                'john@example.com',
-                'John'
-            ])
+            ah::CallMethod($sut, 'findOrConstructAccount', [$profile])
         );
     }
 
@@ -652,15 +642,17 @@ class SignInWithGoogleActionTest extends TestCase
     function testConstructAccount()
     {
         $sut = $this->systemUnderTest();
+        $profile = (object)[
+            'email' => 'john@example.com',
+            'displayName' => 'John'
+        ];
 
-        $account = ah::CallMethod($sut, 'constructAccount', [
-            'john@example.com',
-            'John'
-        ]);
+        $account = ah::CallMethod($sut, 'constructAccount', [$profile]);
         $this->assertInstanceOf(Account::class, $account);
-        $this->assertSame('john@example.com', $account->email);
+        $this->assertSame(0, $account->id);
+        $this->assertSame($profile->email, $account->email);
         $this->assertSame('', $account->passwordHash);
-        $this->assertSame('John', $account->displayName);
+        $this->assertSame($profile->displayName, $account->displayName);
         $this->assertEqualsWithDelta(\time(), $account->timeActivated->getTimestamp(), 1);
         $this->assertNull($account->timeLastLogin);
     }
@@ -702,11 +694,7 @@ class SignInWithGoogleActionTest extends TestCase
             ->with($account->id, true);
 
         ah::CallMethod($sut, 'doLogIn', [$account]);
-        $this->assertEqualsWithDelta(
-            \time(),
-            $account->timeLastLogin->getTimestamp(),
-            1
-        );
+        $this->assertEqualsWithDelta(\time(), $account->timeLastLogin->getTimestamp(), 1);
     }
 
     #endregion doLogIn
@@ -732,17 +720,17 @@ class SignInWithGoogleActionTest extends TestCase
     {
         return [
             'credential missing' => [
-                'data' => [],
+                'payload' => [],
                 'exceptionMessage' => "Required field 'credential' is missing."
             ],
             'credential not a string' => [
-                'data' => [
+                'payload' => [
                     'credential' => 42
                 ],
                 'exceptionMessage' => "Field 'credential' must be a string."
             ],
             'credential empty' => [
-                'data' => [
+                'payload' => [
                     'credential' => ''
                 ],
                 'exceptionMessage' => "Field 'credential' must have a minimum length of 1 characters."

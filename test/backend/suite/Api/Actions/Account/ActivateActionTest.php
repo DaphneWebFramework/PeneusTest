@@ -54,14 +54,12 @@ class ActivateActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfRequestValidationFails()
+    function testOnExecuteThrowsIfPayloadValidationFails()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest'
-        );
+        $sut = $this->systemUnderTest('validatePayload');
 
         $sut->expects($this->once())
-            ->method('validateRequest')
+            ->method('validatePayload')
             ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
@@ -71,16 +69,14 @@ class ActivateActionTest extends TestCase
 
     function testOnExecuteThrowsIfPendingAccountNotFound()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'findPendingAccount'
-        );
+        $sut = $this->systemUnderTest('validatePayload', 'findPendingAccount');
+        $payload = (object)[
+            'activationCode' => 'code1234'
+        ];
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'activationCode' => 'code1234'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findPendingAccount')
             ->with('code1234')
@@ -93,19 +89,17 @@ class ActivateActionTest extends TestCase
 
     function testOnExecuteThrowsIfEmailAlreadyRegistered()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'findPendingAccount',
-            'ensureNotRegistered'
-        );
+        $sut = $this->systemUnderTest('validatePayload', 'findPendingAccount',
+            'ensureNotRegistered');
+        $payload = (object)[
+            'activationCode' => 'code1234'
+        ];
         $pa = $this->createStub(PendingAccount::class);
         $pa->email = 'john@example.com';
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'activationCode' => 'code1234'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findPendingAccount')
             ->with('code1234')
@@ -122,21 +116,18 @@ class ActivateActionTest extends TestCase
 
     function testOnExecuteThrowsIfDoActivateFails()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'findPendingAccount',
-            'ensureNotRegistered',
-            'doActivate'
-        );
+        $sut = $this->systemUnderTest('validatePayload', 'findPendingAccount',
+            'ensureNotRegistered', 'doActivate');
+        $payload = (object)[
+            'activationCode' => 'code1234'
+        ];
         $pa = $this->createStub(PendingAccount::class);
         $pa->email = 'john@example.com';
         $database = Database::Instance();
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'activationCode' => 'code1234'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findPendingAccount')
             ->with('code1234')
@@ -161,12 +152,11 @@ class ActivateActionTest extends TestCase
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest(
-            'validateRequest',
-            'findPendingAccount',
-            'ensureNotRegistered',
-            'doActivate'
-        );
+        $sut = $this->systemUnderTest('validatePayload', 'findPendingAccount',
+            'ensureNotRegistered', 'doActivate');
+        $payload = (object)[
+            'activationCode' => 'code1234'
+        ];
         $pa = $this->createStub(PendingAccount::class);
         $pa->email = 'john@example.com';
         $database = Database::Instance();
@@ -175,10 +165,8 @@ class ActivateActionTest extends TestCase
         $resource = Resource::Instance();
 
         $sut->expects($this->once())
-            ->method('validateRequest')
-            ->willReturn((object)[
-                'activationCode' => 'code1234'
-            ]);
+            ->method('validatePayload')
+            ->willReturn($payload);
         $sut->expects($this->once())
             ->method('findPendingAccount')
             ->with('code1234')
@@ -209,51 +197,49 @@ class ActivateActionTest extends TestCase
 
     #endregion onExecute
 
-    #region validateRequest ----------------------------------------------------
+    #region validatePayload ----------------------------------------------------
 
     #[DataProvider('invalidPayloadProvider')]
-    function testValidateRequestThrows(
-        array $data,
-        string $exceptionMessage
-    ) {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($data);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        ah::CallMethod($sut, 'validateRequest');
-    }
-
-    function testValidateRequestSucceeds()
+    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
-        $data = [
-            'activationCode' => \str_repeat('0123456789AbCdEf', 4)
-        ];
-        $expected = (object)$data;
 
         $request->expects($this->once())
             ->method('FormParams')
             ->willReturn($formParams);
         $formParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn($data);
+            ->willReturn($payload);
 
-        $actual = ah::CallMethod($sut, 'validateRequest');
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage($exceptionMessage);
+        ah::CallMethod($sut, 'validatePayload');
+    }
+
+    function testValidatePayloadSucceeds()
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $payload = [
+            'activationCode' => \str_repeat('0123456789AbCdEf', 4)
+        ];
+        $expected = (object)$payload;
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($payload);
+
+        $actual = ah::CallMethod($sut, 'validatePayload');
         $this->assertEquals($expected, $actual);
     }
 
-    #endregion validateRequest
+    #endregion validatePayload
 
     #region findPendingAccount -------------------------------------------------
 
@@ -427,6 +413,7 @@ class ActivateActionTest extends TestCase
     {
         $sut = $this->systemUnderTest();
         $pa = $this->createStub(PendingAccount::class);
+        $pa->id = 1;
         $pa->email = 'john@example.com';
         $pa->passwordHash = 'hash1234';
         $pa->displayName = 'John';
@@ -435,9 +422,10 @@ class ActivateActionTest extends TestCase
 
         $account = ah::CallMethod($sut, 'constructAccount', [$pa]);
         $this->assertInstanceOf(Account::class, $account);
-        $this->assertSame('john@example.com', $account->email);
-        $this->assertSame('hash1234', $account->passwordHash);
-        $this->assertSame('John', $account->displayName);
+        $this->assertSame(0, $account->id);
+        $this->assertSame($pa->email, $account->email);
+        $this->assertSame($pa->passwordHash, $account->passwordHash);
+        $this->assertSame($pa->displayName, $account->displayName);
         $this->assertEqualsWithDelta(\time(), $account->timeActivated->getTimestamp(), 1);
         $this->assertNull($account->timeLastLogin);
     }
@@ -450,11 +438,11 @@ class ActivateActionTest extends TestCase
     {
         return [
             'activationCode missing' => [
-                'data' => [],
+                'payload' => [],
                 'exceptionMessage' => "Activation code is required."
             ],
             'activationCode invalid' => [
-                'data' => [
+                'payload' => [
                     'activationCode' => 'invalid-code'
                 ],
                 'exceptionMessage' => "Activation code format is invalid."
