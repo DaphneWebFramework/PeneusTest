@@ -9,6 +9,7 @@ use \Peneus\Api\Actions\Account\SignInWithGoogleAction;
 use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Core\CUrl;
+use \Harmonia\Http\Client;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
@@ -23,6 +24,7 @@ use \TestToolkit\AccessHelper as ah;
 #[CoversClass(SignInWithGoogleAction::class)]
 class SignInWithGoogleActionTest extends TestCase
 {
+    private ?Client $client = null;
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
     private ?Config $originalConfig = null;
@@ -32,6 +34,7 @@ class SignInWithGoogleActionTest extends TestCase
 
     protected function setUp(): void
     {
+        $this->client = $this->createMock(Client::class);
         $this->originalRequest =
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalDatabase =
@@ -48,6 +51,7 @@ class SignInWithGoogleActionTest extends TestCase
 
     protected function tearDown(): void
     {
+        $this->client = null;
         Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
         Config::ReplaceInstance($this->originalConfig);
@@ -59,6 +63,7 @@ class SignInWithGoogleActionTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): SignInWithGoogleAction
     {
         return $this->getMockBuilder(SignInWithGoogleAction::class)
+            ->setConstructorArgs([$this->client])
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
@@ -362,6 +367,89 @@ class SignInWithGoogleActionTest extends TestCase
     }
 
     #endregion decodeAndValidateCredential
+
+    #region decodeCredential ---------------------------------------------------
+
+    function testDecodeCredentialReturnsNullIfClientSendFails()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->client->expects($this->once())
+            ->method('Url')
+            ->with('https://oauth2.googleapis.com/tokeninfo?id_token=cred1234')
+            ->willReturnSelf();
+        $this->client->expects($this->once())
+            ->method('Send')
+            ->willReturn(false);
+
+        $claims = ah::CallMethod($sut, 'decodeCredential', ['cred1234']);
+        $this->assertNull($claims);
+    }
+
+    function testDecodeCredentialReturnsNullIfClientStatusCodeIsNot200()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->client->expects($this->once())
+            ->method('Url')
+            ->with('https://oauth2.googleapis.com/tokeninfo?id_token=cred1234')
+            ->willReturnSelf();
+        $this->client->expects($this->once())
+            ->method('Send')
+            ->willReturn(true);
+        $this->client->expects($this->once())
+            ->method('StatusCode')
+            ->willReturn(400);
+
+        $claims = ah::CallMethod($sut, 'decodeCredential', ['cred1234']);
+        $this->assertNull($claims);
+    }
+
+    function testDecodeCredentialReturnsNullIfClientBodyCannotBeDecoded()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->client->expects($this->once())
+            ->method('Url')
+            ->with('https://oauth2.googleapis.com/tokeninfo?id_token=cred1234')
+            ->willReturnSelf();
+        $this->client->expects($this->once())
+            ->method('Send')
+            ->willReturn(true);
+        $this->client->expects($this->once())
+            ->method('StatusCode')
+            ->willReturn(200);
+        $this->client->expects($this->once())
+            ->method('Body')
+            ->willReturn('{invalid');
+
+        $claims = ah::CallMethod($sut, 'decodeCredential', ['cred1234']);
+        $this->assertNull($claims);
+    }
+
+    function testDecodeCredentialSucceeds()
+    {
+        $sut = $this->systemUnderTest();
+
+        $this->client->expects($this->once())
+            ->method('Url')
+            ->with('https://oauth2.googleapis.com/tokeninfo?id_token=cred1234')
+            ->willReturnSelf();
+        $this->client->expects($this->once())
+            ->method('Send')
+            ->willReturn(true);
+        $this->client->expects($this->once())
+            ->method('StatusCode')
+            ->willReturn(200);
+        $this->client->expects($this->once())
+            ->method('Body')
+            ->willReturn('{"foo":"bar"}');
+
+        $claims = ah::CallMethod($sut, 'decodeCredential', ['cred1234']);
+        $this->assertSame(['foo' => 'bar'], $claims);
+    }
+
+    #endregion decodeCredential
 
     #region validateClaims -----------------------------------------------------
 
