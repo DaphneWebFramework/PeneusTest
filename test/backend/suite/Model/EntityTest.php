@@ -72,7 +72,7 @@ class EntityTest extends TestCase
         $sut->__construct(null);
     }
 
-    function testConstructorCallsPopulateWhenDataIsProvided()
+    function testConstructorCallsPopulateWhenArrayDataIsProvided()
     {
         $sut = $this->getMockBuilder(TestEntity::class)
             ->disableOriginalConstructor()
@@ -86,6 +86,25 @@ class EntityTest extends TestCase
             'aString' => 'Hello, World!',
             'aDateTime' => '2025-07-22 14:35:00'
         ];
+        $sut->expects($this->once())
+            ->method('Populate')
+            ->with($data);
+        $sut->__construct($data);
+    }
+
+    function testConstructorCallsPopulateWhenObjectDataIsProvided()
+    {
+        $sut = $this->getMockBuilder(TestEntity::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['Populate'])
+            ->getMock();
+        $data = new \stdClass();
+        $data->id = 1;
+        $data->aBool = true;
+        $data->anInt = 42;
+        $data->aFloat = 3.14;
+        $data->aString = 'Hello, World!';
+        $data->aDateTime = '2025-07-22 14:35:00';
         $sut->expects($this->once())
             ->method('Populate')
             ->with($data);
@@ -442,6 +461,56 @@ class EntityTest extends TestCase
         };
         $sut->Populate(['aDateTime' => '2025-07-22']);
         $this->assertSame('2025-07-22 00:00:00', $sut->aDateTime->format('Y-m-d H:i:s'));
+    }
+
+    function testPopulateAcceptsObjectData()
+    {
+        $sut = new class extends Entity {
+            public bool $aBool;
+            public int $anInt;
+            public float $aFloat;
+            public string $aString;
+            public \DateTime $aDateTime;
+        };
+        $data = new \stdClass();
+        $data->aBool = true;
+        $data->anInt = 42;
+        $data->aFloat = 3.14;
+        $data->aString = 'Hello, World!';
+        $data->aDateTime = '2025-07-22 14:35:00';
+        $sut->Populate($data);
+        $this->assertSame(0, $sut->id);
+        $this->assertSame($data->aBool, $sut->aBool);
+        $this->assertSame($data->anInt, $sut->anInt);
+        $this->assertSame($data->aFloat, $sut->aFloat);
+        $this->assertSame($data->aString, $sut->aString);
+        $this->assertSame($data->aDateTime, $sut->aDateTime->format('Y-m-d H:i:s'));
+    }
+
+    function testPopulateSkipsPrivateOrStaticPropertiesInObjectData()
+    {
+        $sut = new class extends Entity {
+            public bool $aBool;
+            public int $anInt;
+            public float $aFloat;
+            public string $aString;
+            public \DateTime $aDateTime;
+        };
+        $data = new class {
+            public int $id = 1;
+            public bool $aBool = true;
+            private int $anInt = 42; // private
+            public float $aFloat = 3.14;
+            public static string $aString = 'Hello, World!'; // static
+            public string $aDateTime = '2025-07-22 14:35:00';
+        };
+        $sut->Populate($data);
+        $this->assertSame(1, $sut->id);
+        $this->assertSame($data->aBool, $sut->aBool);
+        $this->assertSame(0, $sut->anInt); // should not be assigned
+        $this->assertSame($data->aFloat, $sut->aFloat);
+        $this->assertSame('', $sut->aString); // should not be assigned
+        $this->assertSame($data->aDateTime, $sut->aDateTime->format('Y-m-d H:i:s'));
     }
 
     #endregion Populate
