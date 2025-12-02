@@ -44,6 +44,7 @@ class AccountServiceTest extends TestCase
 
     protected function tearDown(): void
     {
+        $this->plm = null;
         SecurityService::ReplaceInstance($this->originalSecurityService);
         CookieService::ReplaceInstance($this->originalCookieService);
         Session::ReplaceInstance($this->originalSession);
