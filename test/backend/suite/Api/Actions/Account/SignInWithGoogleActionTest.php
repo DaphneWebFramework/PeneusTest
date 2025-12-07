@@ -101,7 +101,7 @@ class SignInWithGoogleActionTest extends TestCase
     function testOnExecuteThrowsIfCredentialDecodeAndValidationFails()
     {
         $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload',
-            'decodeAndValidateCredential');
+            'decodeProfile');
         $payload = (object)[
             'credential' => 'cred1234'
         ];
@@ -112,7 +112,7 @@ class SignInWithGoogleActionTest extends TestCase
             ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
-            ->method('decodeAndValidateCredential')
+            ->method('decodeProfile')
             ->with('cred1234')
             ->willThrowException(new \RuntimeException('Expected message.'));
 
@@ -124,8 +124,7 @@ class SignInWithGoogleActionTest extends TestCase
     function testOnExecuteThrowsIfDoLogInFails()
     {
         $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload',
-            'decodeAndValidateCredential', 'findOrConstructAccount', 'doLogIn',
-            'logOut');
+            'decodeProfile', 'findOrConstructAccount', 'doLogIn', 'logOut');
         $payload = (object)[
             'credential' => 'cred1234'
         ];
@@ -142,7 +141,7 @@ class SignInWithGoogleActionTest extends TestCase
             ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
-            ->method('decodeAndValidateCredential')
+            ->method('decodeProfile')
             ->with('cred1234')
             ->willReturn($profile);
         $sut->expects($this->once())
@@ -169,8 +168,7 @@ class SignInWithGoogleActionTest extends TestCase
     function testOnExecuteSucceeds()
     {
         $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload',
-            'decodeAndValidateCredential', 'findOrConstructAccount', 'doLogIn',
-            'logOut');
+            'decodeProfile', 'findOrConstructAccount', 'doLogIn', 'logOut');
         $payload = (object)[
             'credential' => 'cred1234'
         ];
@@ -190,7 +188,7 @@ class SignInWithGoogleActionTest extends TestCase
             ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
-            ->method('decodeAndValidateCredential')
+            ->method('decodeProfile')
             ->with('cred1234')
             ->willReturn($profile);
         $sut->expects($this->once())
@@ -296,9 +294,9 @@ class SignInWithGoogleActionTest extends TestCase
 
     #endregion validatePayload
 
-    #region decodeAndValidateCredential ----------------------------------------
+    #region decodeProfile ------------------------------------------------------
 
-    function testDecodeAndValidateCredentialThrowsIfCredentialDecodeFails()
+    function testDecodeProfileThrowsIfCredentialDecodeFails()
     {
         $sut = $this->systemUnderTest('decodeCredential');
 
@@ -309,10 +307,10 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Invalid credential.");
-        ah::CallMethod($sut, 'decodeAndValidateCredential', ['credential']);
+        ah::CallMethod($sut, 'decodeProfile', ['credential']);
     }
 
-    function testDecodeAndValidateCredentialThrowsIfClaimsValidationFails()
+    function testDecodeProfileThrowsIfClaimsValidationFails()
     {
         $sut = $this->systemUnderTest('decodeCredential', 'validateClaims');
         $claims = ['key' => 'value'];
@@ -328,10 +326,10 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Invalid claims.");
-        ah::CallMethod($sut, 'decodeAndValidateCredential', ['credential']);
+        ah::CallMethod($sut, 'decodeProfile', ['credential']);
     }
 
-    function testDecodeAndValidateCredentialSucceeds()
+    function testDecodeProfileSucceeds()
     {
         $sut = $this->systemUnderTest('decodeCredential', 'validateClaims');
         $claims = ['foo' => 'bar'];
@@ -348,11 +346,11 @@ class SignInWithGoogleActionTest extends TestCase
 
         $this->assertSame(
             $profile,
-            ah::CallMethod($sut, 'decodeAndValidateCredential', ['credential'])
+            ah::CallMethod($sut, 'decodeProfile', ['credential'])
         );
     }
 
-    #endregion decodeAndValidateCredential
+    #endregion decodeProfile
 
     #region decodeCredential ---------------------------------------------------
 
