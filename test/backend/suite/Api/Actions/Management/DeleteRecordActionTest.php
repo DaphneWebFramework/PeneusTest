@@ -94,10 +94,11 @@ class DeleteRecordActionTest extends TestCase
             ->willReturn($queryParams);
         $queryParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn(['table' => 'not-allowed']);
+            ->willReturn(['table' => 'table-name']);
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage("Table 'not-allowed' is not allowed.");
+        $this->expectExceptionMessage(
+            "Unable to resolve entity class for table: table-name");
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
