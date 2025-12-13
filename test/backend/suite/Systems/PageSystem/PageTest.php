@@ -2,6 +2,7 @@
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
+use \PHPUnit\Framework\Attributes\TestWith;
 
 use \Peneus\Systems\PageSystem\Page;
 
@@ -728,6 +729,25 @@ class PageTest extends TestCase
     }
 
     #endregion CsrfTokenValue
+
+    #region When ---------------------------------------------------------------
+
+    #[TestWith([true])]
+    #[TestWith([false])]
+    function testWhen(bool $condition)
+    {
+        $sut = $this->systemUnderTest();
+        $called = false;
+        $callback = function($arg) use($sut, &$called) {
+            $this->assertSame($sut, $arg);
+            $called = true;
+        };
+
+        $this->assertSame($sut, $sut->When($condition, $callback));
+        $this->assertSame($condition, $called);
+    }
+
+    #endregion When
 
     #region Data Providers -----------------------------------------------------
 
