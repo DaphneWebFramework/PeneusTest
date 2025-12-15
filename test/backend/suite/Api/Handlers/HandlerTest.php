@@ -4,6 +4,7 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\Handlers\Handler;
 
+use \Harmonia\Http\StatusCode;
 use \Peneus\Api\Actions\Action;
 
 #[CoversClass(Handler::class)]
@@ -28,7 +29,7 @@ class HandlerTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Action not found: action1');
-        $this->expectExceptionCode(404);
+        $this->expectExceptionCode(StatusCode::NotFound->value);
         $sut->HandleAction('action1');
     }
 

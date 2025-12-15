@@ -7,6 +7,7 @@ use \Peneus\Api\Actions\Management\ListRecordsAction;
 
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
+use \Harmonia\Http\StatusCode;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
@@ -61,6 +62,7 @@ class ListRecordsActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Required field 'table' is missing.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -82,6 +84,7 @@ class ListRecordsActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'table' must be a string.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -104,6 +107,7 @@ class ListRecordsActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'page' must be an integer.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -126,6 +130,7 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             "Field 'page' must have a minimum value of 1.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -148,6 +153,7 @@ class ListRecordsActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'pagesize' must be an integer.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -170,6 +176,7 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             "Field 'pagesize' must have a minimum value of 1.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -192,6 +199,7 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             "Field 'pagesize' must have a maximum value of 100.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -214,6 +222,7 @@ class ListRecordsActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'search' must be a string.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -236,6 +245,7 @@ class ListRecordsActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'sortkey' must be a string.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -258,6 +268,7 @@ class ListRecordsActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'sortdir' must be a string.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -279,6 +290,7 @@ class ListRecordsActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'sortdir' failed custom validation.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 

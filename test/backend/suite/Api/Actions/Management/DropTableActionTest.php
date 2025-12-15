@@ -7,6 +7,7 @@ use \Peneus\Api\Actions\Management\DropTableAction;
 
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
+use \Harmonia\Http\StatusCode;
 use \Peneus\Model\Entity;
 use \Peneus\Model\ViewEntity;
 use \TestToolkit\AccessHelper;
@@ -55,6 +56,7 @@ class DropTableActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 

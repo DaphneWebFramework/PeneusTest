@@ -4,6 +4,7 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\Actions\Action;
 
+use \Harmonia\Http\StatusCode;
 use \Peneus\Api\Guards\IGuard;
 
 class DummyAction extends Action {
@@ -38,7 +39,7 @@ class ActionTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage(
             'You do not have permission to perform this action.');
-        $this->expectExceptionCode(401);
+        $this->expectExceptionCode(StatusCode::Unauthorized->value);
         $sut->Execute();
     }
 
@@ -60,7 +61,7 @@ class ActionTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage(
             'You do not have permission to perform this action.');
-        $this->expectExceptionCode(401);
+        $this->expectExceptionCode(StatusCode::Unauthorized->value);
         $sut->Execute();
     }
 

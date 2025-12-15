@@ -240,6 +240,7 @@ class LoginActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         ah::CallMethod($sut, 'validatePayload');
     }
 

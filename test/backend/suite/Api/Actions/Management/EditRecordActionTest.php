@@ -8,6 +8,7 @@ use \Peneus\Api\Actions\Management\EditRecordAction;
 
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
+use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
@@ -61,6 +62,7 @@ class EditRecordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Required field 'table' is missing.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -82,6 +84,7 @@ class EditRecordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'table' must be a string.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -126,6 +129,7 @@ class EditRecordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 

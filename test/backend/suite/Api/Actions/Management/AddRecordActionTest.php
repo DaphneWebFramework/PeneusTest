@@ -8,6 +8,7 @@ use \Peneus\Api\Actions\Management\AddRecordAction;
 
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
+use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\SecurityService;
 use \Peneus\Model\AccountRole; // sample
 use \Peneus\Services\AccountService;
@@ -55,6 +56,7 @@ class AddRecordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Required field 'table' is missing.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -76,6 +78,7 @@ class AddRecordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'table' must be a string.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -120,6 +123,7 @@ class AddRecordActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
