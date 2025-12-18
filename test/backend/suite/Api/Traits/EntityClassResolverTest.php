@@ -9,6 +9,7 @@ use \Peneus\Api\Traits\EntityClassResolver;
 
 use \Peneus\Model\Account;
 use \Peneus\Model\AccountRole;
+use \Peneus\Model\AccountView;
 use \Peneus\Model\PasswordReset;
 use \Peneus\Model\PendingAccount;
 use \Peneus\Model\PersistentLogin;
@@ -97,6 +98,7 @@ class EntityClassResolverTest extends TestCase
         return [
             'Account'         => [Account::class],
             'AccountRole'     => [AccountRole::class],
+            'AccountView'     => [AccountView::class],
             'PendingAccount'  => [PendingAccount::class],
             'PasswordReset'   => [PasswordReset::class],
             'PersistentLogin' => [PersistentLogin::class],
