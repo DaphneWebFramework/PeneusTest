@@ -8,8 +8,8 @@ use \Peneus\Api\Actions\Account\ActivateAction;
 use \Peneus\Api\Actions\Account\ChangeDisplayNameAction;
 use \Peneus\Api\Actions\Account\ChangePasswordAction;
 use \Peneus\Api\Actions\Account\DeleteAction;
-use \Peneus\Api\Actions\Account\LoginAction;
-use \Peneus\Api\Actions\Account\LogoutAction;
+use \Peneus\Api\Actions\Account\LogInAction;
+use \Peneus\Api\Actions\Account\LogOutAction;
 use \Peneus\Api\Actions\Account\RegisterAction;
 use \Peneus\Api\Actions\Account\ResetPasswordAction;
 use \Peneus\Api\Actions\Account\SendPasswordResetAction;
@@ -57,8 +57,8 @@ class AccountHandlerTest extends TestCase
     function testCreateActionWithLogin()
     {
         $handler = new AccountHandler;
-        $action = AccessHelper::CallMethod($handler, 'createAction', ['login']);
-        $this->assertInstanceOf(LoginAction::class, $action);
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['log-in']);
+        $this->assertInstanceOf(LogInAction::class, $action);
         $guards = AccessHelper::GetProperty($action, 'guards');
         $this->assertCount(1, $guards);
         $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);
@@ -67,8 +67,8 @@ class AccountHandlerTest extends TestCase
     function testCreateActionWithLogout()
     {
         $handler = new AccountHandler;
-        $action = AccessHelper::CallMethod($handler, 'createAction', ['logout']);
-        $this->assertInstanceOf(LogoutAction::class, $action);
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['log-out']);
+        $this->assertInstanceOf(LogOutAction::class, $action);
         $guards = AccessHelper::GetProperty($action, 'guards');
         $this->assertCount(1, $guards);
         $this->assertInstanceOf(SessionGuard::class, $guards[0]);

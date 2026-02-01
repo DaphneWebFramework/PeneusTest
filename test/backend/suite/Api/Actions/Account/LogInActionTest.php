@@ -4,7 +4,7 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
 use \PHPUnit\Framework\Attributes\TestWith;
 
-use \Peneus\Api\Actions\Account\LoginAction;
+use \Peneus\Api\Actions\Account\LogInAction;
 
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
@@ -18,8 +18,8 @@ use \Peneus\Model\AccountView;
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as ah;
 
-#[CoversClass(LoginAction::class)]
-class LoginActionTest extends TestCase
+#[CoversClass(LogInAction::class)]
+class LogInActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
@@ -50,9 +50,9 @@ class LoginActionTest extends TestCase
         CookieService::ReplaceInstance($this->originalCookieService);
     }
 
-    private function systemUnderTest(string ...$mockedMethods): LoginAction
+    private function systemUnderTest(string ...$mockedMethods): LogInAction
     {
-        return $this->getMockBuilder(LoginAction::class)
+        return $this->getMockBuilder(LogInAction::class)
             ->onlyMethods($mockedMethods)
             ->getMock();
     }

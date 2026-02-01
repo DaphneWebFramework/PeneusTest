@@ -2,13 +2,13 @@
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 
-use \Peneus\Api\Actions\Account\LogoutAction;
+use \Peneus\Api\Actions\Account\LogOutAction;
 
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as ah;
 
-#[CoversClass(LogoutAction::class)]
-class LogoutActionTest extends TestCase
+#[CoversClass(LogOutAction::class)]
+class LogOutActionTest extends TestCase
 {
     private ?AccountService $originalAccountService = null;
 
@@ -23,9 +23,9 @@ class LogoutActionTest extends TestCase
         AccountService::ReplaceInstance($this->originalAccountService);
     }
 
-    private function systemUnderTest(string ...$mockedMethods): LogoutAction
+    private function systemUnderTest(string ...$mockedMethods): LogOutAction
     {
-        return $this->getMockBuilder(LogoutAction::class)
+        return $this->getMockBuilder(LogOutAction::class)
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
