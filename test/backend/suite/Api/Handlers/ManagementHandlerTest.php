@@ -5,13 +5,13 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 use \Peneus\Api\Handlers\ManagementHandler;
 
 use \Harmonia\Resource;
-use \Peneus\Api\Actions\Management\AddRecordAction;
+use \Peneus\Api\Actions\Management\CreateRecordAction;
 use \Peneus\Api\Actions\Management\CreateTableAction;
 use \Peneus\Api\Actions\Management\DeleteRecordAction;
 use \Peneus\Api\Actions\Management\DropTableAction;
-use \Peneus\Api\Actions\Management\EditRecordAction;
 use \Peneus\Api\Actions\Management\ListEntityMappingsAction;
 use \Peneus\Api\Actions\Management\ListRecordsAction;
+use \Peneus\Api\Actions\Management\UpdateRecordAction;
 use \Peneus\Api\Guards\SessionGuard;
 use \Peneus\Model\Role;
 use \TestToolkit\AccessHelper;
@@ -79,22 +79,22 @@ class ManagementHandlerTest extends TestCase
         $this->assertSame(Role::Admin, AccessHelper::GetProperty($guards[0], 'minimumRole'));
     }
 
-    function testCreateActionWithAddRecord()
+    function testCreateActionWithCreateRecord()
     {
         $handler = new ManagementHandler;
-        $action = AccessHelper::CallMethod($handler, 'createAction', ['add-record']);
-        $this->assertInstanceOf(AddRecordAction::class, $action);
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['create-record']);
+        $this->assertInstanceOf(CreateRecordAction::class, $action);
         $guards = AccessHelper::GetProperty($action, 'guards');
         $this->assertCount(1, $guards);
         $this->assertInstanceOf(SessionGuard::class, $guards[0]);
         $this->assertSame(Role::Admin, AccessHelper::GetProperty($guards[0], 'minimumRole'));
     }
 
-    function testCreateActionWithEditRecord()
+    function testCreateActionWithUpdateRecord()
     {
         $handler = new ManagementHandler;
-        $action = AccessHelper::CallMethod($handler, 'createAction', ['edit-record']);
-        $this->assertInstanceOf(EditRecordAction::class, $action);
+        $action = AccessHelper::CallMethod($handler, 'createAction', ['update-record']);
+        $this->assertInstanceOf(UpdateRecordAction::class, $action);
         $guards = AccessHelper::GetProperty($action, 'guards');
         $this->assertCount(1, $guards);
         $this->assertInstanceOf(SessionGuard::class, $guards[0]);

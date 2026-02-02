@@ -54,7 +54,7 @@ class AccountHandlerTest extends TestCase
         $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);
     }
 
-    function testCreateActionWithLogin()
+    function testCreateActionWithLogIn()
     {
         $handler = new AccountHandler;
         $action = AccessHelper::CallMethod($handler, 'createAction', ['log-in']);
@@ -64,7 +64,7 @@ class AccountHandlerTest extends TestCase
         $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);
     }
 
-    function testCreateActionWithLogout()
+    function testCreateActionWithLogOut()
     {
         $handler = new AccountHandler;
         $action = AccessHelper::CallMethod($handler, 'createAction', ['log-out']);

@@ -4,42 +4,36 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
-use \Peneus\Api\Actions\Management\EditRecordAction;
+use \Peneus\Api\Actions\Management\CreateRecordAction;
 
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\SecurityService;
-use \Harmonia\Systems\DatabaseSystem\Database;
-use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\AccountRole; // sample
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper;
 use \TestToolkit\DataHelper;
 
-#[CoversClass(EditRecordAction::class)]
-class EditRecordActionTest extends TestCase
+#[CoversClass(CreateRecordAction::class)]
+class CreateRecordActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
-    private ?Database $originalDatabase = null;
 
     protected function setUp(): void
     {
         $this->originalRequest =
             Request::ReplaceInstance($this->createMock(Request::class));
-        $this->originalDatabase =
-            Database::ReplaceInstance(new FakeDatabase());
     }
 
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
-        Database::ReplaceInstance($this->originalDatabase);
     }
 
-    private function systemUnderTest(string ...$mockedMethods): EditRecordAction
+    private function systemUnderTest(string ...$mockedMethods): CreateRecordAction
     {
-        return $this->getMockBuilder(EditRecordAction::class)
+        return $this->getMockBuilder(CreateRecordAction::class)
             ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
@@ -133,44 +127,12 @@ class EditRecordActionTest extends TestCase
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfEntityNotFound()
-    {
-        $sut = $this->systemUnderTest('findEntity');
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-        $data = [
-            'id' => 42,
-            'accountId' => 1,
-            'role' => 10
-        ];
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['table' => 'accountrole']);
-        $request->expects($this->once())
-            ->method('JsonBody')
-            ->willReturn($data);
-        $sut->expects($this->once())
-            ->method('findEntity')
-            ->with(AccountRole::class, 42)
-            ->willReturn(null);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Record with ID 42 not found in table 'accountrole'.");
-        AccessHelper::CallMethod($sut, 'onExecute');
-    }
-
     function testOnExecuteThrowsIfEntitySaveFails()
     {
-        $sut = $this->systemUnderTest('findEntity');
+        $sut = $this->systemUnderTest('createEntity');
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $data = [
-            'id' => 42,
             'accountId' => 1,
             'role' => 10
         ];
@@ -186,29 +148,25 @@ class EditRecordActionTest extends TestCase
             ->method('JsonBody')
             ->willReturn($data);
         $sut->expects($this->once())
-            ->method('findEntity')
-            ->with(AccountRole::class, 42)
+            ->method('createEntity')
+            ->with(AccountRole::class, $data)
             ->willReturn($entity);
-        $entity->expects($this->once())
-            ->method('Populate')
-            ->with($data);
         $entity->expects($this->once())
             ->method('Save')
             ->willReturn(false);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
-            "Failed to edit record with ID 42 in table 'accountrole'.");
+            "Failed to add record to table 'accountrole'.");
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteReturnsNullWhenEntitySaveSucceeds()
+    function testOnExecuteReturnsIdWhenEntitySaveSucceeds()
     {
-        $sut = $this->systemUnderTest('findEntity');
+        $sut = $this->systemUnderTest('createEntity');
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
         $data = [
-            'id' => 42,
             'accountId' => 1,
             'role' => 10
         ];
@@ -224,71 +182,21 @@ class EditRecordActionTest extends TestCase
             ->method('JsonBody')
             ->willReturn($data);
         $sut->expects($this->once())
-            ->method('findEntity')
-            ->with(AccountRole::class, 42)
+            ->method('createEntity')
+            ->with(AccountRole::class, $data)
             ->willReturn($entity);
-        $entity->expects($this->once())
-            ->method('Populate')
-            ->with($data);
         $entity->expects($this->once())
             ->method('Save')
             ->willReturn(true);
+        $entity->id = 42;
 
-        $this->assertNull(AccessHelper::CallMethod($sut, 'onExecute'));
+        $this->assertSame(
+            ['id' => 42],
+            AccessHelper::CallMethod($sut, 'onExecute')
+        );
     }
 
     #endregion onExecute
-
-    #region findEntity ---------------------------------------------------------
-
-    function testFindEntityReturnsNullWhenNotFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = Database::Instance();
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: null,
-            times: 1
-        );
-
-        $entity = AccessHelper::CallMethod(
-            $sut,
-            'findEntity',
-            [AccountRole::class, 42]
-        );
-        $this->assertNull($entity);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testFindEntityReturnsEntityWhenFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = Database::Instance();
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: [[
-                'id' => 42,
-                'accountId' => 99,
-                'role' => 10
-            ]],
-            times: 1
-        );
-
-        $entity = AccessHelper::CallMethod(
-            $sut,
-            'findEntity',
-            [AccountRole::class, 42]
-        );
-        $this->assertInstanceOf(AccountRole::class, $entity);
-        $this->assertSame(42, $entity->id);
-        $this->assertSame(99, $entity->accountId);
-        $this->assertSame(10, $entity->role);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    #endregion findEntity
 
     #region Data Providers -----------------------------------------------------
 
@@ -296,36 +204,15 @@ class EditRecordActionTest extends TestCase
     {
         return [
             #region Account
-            'account: id missing' => [
-                'table' => 'account',
-                'data' => [],
-                'exceptionMessage' => "Required field 'id' is missing."
-            ],
-            'account: id not an integer' => [
-                'table' => 'account',
-                'data' => [
-                    'id' => 'not-an-integer'
-                ],
-                'exceptionMessage' => "Field 'id' must be an integer."
-            ],
-            'account: id less than one' => [
-                'table' => 'account',
-                'data' => [
-                    'id' => 0
-                ],
-                'exceptionMessage' => "Field 'id' must have a minimum value of 1."
-            ],
             'account: email missing' => [
                 'table' => 'account',
                 'data' => [
-                    'id' => 42
                 ],
                 'exceptionMessage' => "Required field 'email' is missing."
             ],
             'account: email invalid' => [
                 'table' => 'account',
                 'data' => [
-                    'id' => 42,
                     'email' => 'invalid-email'
                 ],
                 'exceptionMessage' => "Field 'email' must be a valid email address."
@@ -333,7 +220,6 @@ class EditRecordActionTest extends TestCase
             'account: passwordHash missing' => [
                 'table' => 'account',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com'
                 ],
                 'exceptionMessage' => "Required field 'passwordHash' is missing."
@@ -341,7 +227,6 @@ class EditRecordActionTest extends TestCase
             'account: passwordHash invalid' => [
                 'table' => 'account',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => 'invalid-hash'
                 ],
@@ -351,7 +236,6 @@ class EditRecordActionTest extends TestCase
             'account: displayName missing' => [
                 'table' => 'account',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123'
                 ],
@@ -360,7 +244,6 @@ class EditRecordActionTest extends TestCase
             'account: displayName invalid' => [
                 'table' => 'account',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
                     'displayName' => '<invalid-display-name>'
@@ -371,7 +254,6 @@ class EditRecordActionTest extends TestCase
             'account: timeActivated missing' => [
                 'table' => 'account',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
                     'displayName' => 'John'
@@ -381,7 +263,6 @@ class EditRecordActionTest extends TestCase
             'account: timeActivated invalid' => [
                 'table' => 'account',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
                     'displayName' => 'John',
@@ -392,7 +273,6 @@ class EditRecordActionTest extends TestCase
             'account: timeLastLogin missing' => [
                 'table' => 'account',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
                     'displayName' => 'John',
@@ -403,7 +283,6 @@ class EditRecordActionTest extends TestCase
             'account: timeLastLogin invalid' => [
                 'table' => 'account',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
                     'displayName' => 'John',
@@ -414,36 +293,15 @@ class EditRecordActionTest extends TestCase
             ],
             #endregion Account
             #region AccountRole
-            'accountRole: id missing' => [
-                'table' => 'accountrole',
-                'data' => [],
-                'exceptionMessage' => "Required field 'id' is missing."
-            ],
-            'accountRole: id not an integer' => [
-                'table' => 'accountrole',
-                'data' => [
-                    'id' => 'not-an-integer'
-                ],
-                'exceptionMessage' => "Field 'id' must be an integer."
-            ],
-            'accountRole: id less than one' => [
-                'table' => 'accountrole',
-                'data' => [
-                    'id' => 0
-                ],
-                'exceptionMessage' => "Field 'id' must have a minimum value of 1."
-            ],
             'accountRole: accountId missing' => [
                 'table' => 'accountrole',
                 'data' => [
-                    'id' => 42
                 ],
                 'exceptionMessage' => "Required field 'accountId' is missing."
             ],
             'accountRole: accountId not an integer' => [
                 'table' => 'accountrole',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 'not-an-integer'
                 ],
                 'exceptionMessage' => "Field 'accountId' must be an integer."
@@ -451,7 +309,6 @@ class EditRecordActionTest extends TestCase
             'accountRole: accountId less than one' => [
                 'table' => 'accountrole',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 0
                 ],
                 'exceptionMessage' => "Field 'accountId' must have a minimum value of 1."
@@ -459,7 +316,6 @@ class EditRecordActionTest extends TestCase
             'accountRole: role missing' => [
                 'table' => 'accountrole',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1
                 ],
                 'exceptionMessage' => "Required field 'role' is missing."
@@ -467,7 +323,6 @@ class EditRecordActionTest extends TestCase
             'accountRole: role invalid enum value' => [
                 'table' => 'accountrole',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1,
                     'role' => 999
                 ],
@@ -475,36 +330,15 @@ class EditRecordActionTest extends TestCase
             ],
             #endregion AccountRole
             #region PendingAccount
-            'pendingAccount: id missing' => [
-                'table' => 'pendingaccount',
-                'data' => [],
-                'exceptionMessage' => "Required field 'id' is missing."
-            ],
-            'pendingAccount: id not an integer' => [
-                'table' => 'pendingaccount',
-                'data' => [
-                    'id' => 'not-an-integer'
-                ],
-                'exceptionMessage' => "Field 'id' must be an integer."
-            ],
-            'pendingAccount: id less than one' => [
-                'table' => 'pendingaccount',
-                'data' => [
-                    'id' => 0
-                ],
-                'exceptionMessage' => "Field 'id' must have a minimum value of 1."
-            ],
             'pendingAccount: email missing' => [
                 'table' => 'pendingaccount',
                 'data' => [
-                    'id' => 42
                 ],
                 'exceptionMessage' => "Required field 'email' is missing."
             ],
             'pendingAccount: email invalid' => [
                 'table' => 'pendingaccount',
                 'data' => [
-                    'id' => 42,
                     'email' => 'invalid-email'
                 ],
                 'exceptionMessage' => "Field 'email' must be a valid email address."
@@ -512,7 +346,6 @@ class EditRecordActionTest extends TestCase
             'pendingAccount: passwordHash missing' => [
                 'table' => 'pendingaccount',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                 ],
                 'exceptionMessage' => "Required field 'passwordHash' is missing."
@@ -520,7 +353,6 @@ class EditRecordActionTest extends TestCase
             'pendingAccount: passwordHash invalid' => [
                 'table' => 'pendingaccount',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => 'invalid-hash'
                 ],
@@ -530,7 +362,6 @@ class EditRecordActionTest extends TestCase
             'pendingAccount: displayName missing' => [
                 'table' => 'pendingaccount',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123'
                 ],
@@ -539,7 +370,6 @@ class EditRecordActionTest extends TestCase
             'pendingAccount: displayName invalid' => [
                 'table' => 'pendingaccount',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
                     'displayName' => '<invalid-display-name>'
@@ -550,7 +380,6 @@ class EditRecordActionTest extends TestCase
             'pendingAccount: activationCode missing' => [
                 'table' => 'pendingaccount',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
                     'displayName' => 'John'
@@ -560,7 +389,6 @@ class EditRecordActionTest extends TestCase
             'pendingAccount: activationCode invalid' => [
                 'table' => 'pendingaccount',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
                     'displayName' => 'John',
@@ -572,7 +400,6 @@ class EditRecordActionTest extends TestCase
             'pendingAccount: timeRegistered missing' => [
                 'table' => 'pendingaccount',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
                     'displayName' => 'John',
@@ -583,7 +410,6 @@ class EditRecordActionTest extends TestCase
             'pendingAccount: timeRegistered invalid' => [
                 'table' => 'pendingaccount',
                 'data' => [
-                    'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
                     'displayName' => 'John',
@@ -594,36 +420,15 @@ class EditRecordActionTest extends TestCase
             ],
             #endregion PendingAccount
             #region PasswordReset
-            'passwordReset: id missing' => [
-                'table' => 'passwordreset',
-                'data' => [],
-                'exceptionMessage' => "Required field 'id' is missing."
-            ],
-            'passwordReset: id not an integer' => [
-                'table' => 'passwordreset',
-                'data' => [
-                    'id' => 'not-an-integer'
-                ],
-                'exceptionMessage' => "Field 'id' must be an integer."
-            ],
-            'passwordReset: id less than one' => [
-                'table' => 'passwordreset',
-                'data' => [
-                    'id' => 0
-                ],
-                'exceptionMessage' => "Field 'id' must have a minimum value of 1."
-            ],
             'passwordReset: accountId missing' => [
                 'table' => 'passwordreset',
                 'data' => [
-                    'id' => 42
                 ],
                 'exceptionMessage' => "Required field 'accountId' is missing."
             ],
             'passwordReset: accountId not an integer' => [
                 'table' => 'passwordreset',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 'not-an-integer'
                 ],
                 'exceptionMessage' => "Field 'accountId' must be an integer."
@@ -631,7 +436,6 @@ class EditRecordActionTest extends TestCase
             'passwordReset: accountId less than one' => [
                 'table' => 'passwordreset',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 0
                 ],
                 'exceptionMessage' => "Field 'accountId' must have a minimum value of 1."
@@ -639,7 +443,6 @@ class EditRecordActionTest extends TestCase
             'passwordReset: resetCode missing' => [
                 'table' => 'passwordreset',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1
                 ],
                 'exceptionMessage' => "Required field 'resetCode' is missing."
@@ -647,7 +450,6 @@ class EditRecordActionTest extends TestCase
             'passwordReset: resetCode invalid' => [
                 'table' => 'passwordreset',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1,
                     'resetCode' => 'invalid-token'
                 ],
@@ -657,7 +459,6 @@ class EditRecordActionTest extends TestCase
             'passwordReset: timeRequested missing' => [
                 'table' => 'passwordreset',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1,
                     'resetCode' => \str_repeat('a', 64)
                 ],
@@ -666,7 +467,6 @@ class EditRecordActionTest extends TestCase
             'passwordReset: timeRequested invalid' => [
                 'table' => 'passwordreset',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1,
                     'resetCode' => \str_repeat('a', 64),
                     'timeRequested' => 'not-a-datetime'
@@ -675,36 +475,15 @@ class EditRecordActionTest extends TestCase
             ],
             #endregion PasswordReset
             #region PersistentLogin
-            'persistentLogin: id missing' => [
-                'table' => 'persistentlogin',
-                'data' => [],
-                'exceptionMessage' => "Required field 'id' is missing."
-            ],
-            'persistentLogin: id not an integer' => [
-                'table' => 'persistentlogin',
-                'data' => [
-                    'id' => 'not-an-integer'
-                ],
-                'exceptionMessage' => "Field 'id' must be an integer."
-            ],
-            'persistentLogin: id less than one' => [
-                'table' => 'persistentlogin',
-                'data' => [
-                    'id' => 0
-                ],
-                'exceptionMessage' => "Field 'id' must have a minimum value of 1."
-            ],
             'persistentLogin: accountId missing' => [
                 'table' => 'persistentlogin',
                 'data' => [
-                    'id' => 42
                 ],
                 'exceptionMessage' => "Required field 'accountId' is missing."
             ],
             'persistentLogin: accountId not an integer' => [
                 'table' => 'persistentlogin',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 'not-an-integer'
                 ],
                 'exceptionMessage' => "Field 'accountId' must be an integer."
@@ -712,7 +491,6 @@ class EditRecordActionTest extends TestCase
             'persistentLogin: accountId less than one' => [
                 'table' => 'persistentlogin',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 0
                 ],
                 'exceptionMessage' => "Field 'accountId' must have a minimum value of 1."
@@ -720,7 +498,6 @@ class EditRecordActionTest extends TestCase
             'persistentLogin: clientSignature missing' => [
                 'table' => 'persistentlogin',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1
                 ],
                 'exceptionMessage' => "Required field 'clientSignature' is missing."
@@ -728,7 +505,6 @@ class EditRecordActionTest extends TestCase
             'persistentLogin: clientSignature invalid' => [
                 'table' => 'persistentlogin',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => 'invalid-signature'
                 ],
@@ -737,7 +513,6 @@ class EditRecordActionTest extends TestCase
             'persistentLogin: lookupKey missing' => [
                 'table' => 'persistentlogin',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => \str_repeat('a', 22)
                 ],
@@ -746,7 +521,6 @@ class EditRecordActionTest extends TestCase
             'persistentLogin: lookupKey invalid' => [
                 'table' => 'persistentlogin',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => \str_repeat('a', 22),
                     'lookupKey' => 'invalid-key'
@@ -756,7 +530,6 @@ class EditRecordActionTest extends TestCase
             'persistentLogin: tokenHash missing' => [
                 'table' => 'persistentlogin',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => \str_repeat('a', 22),
                     'lookupKey' => \str_repeat('a', 16)
@@ -766,7 +539,6 @@ class EditRecordActionTest extends TestCase
             'persistentLogin: tokenHash invalid' => [
                 'table' => 'persistentlogin',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => \str_repeat('a', 22),
                     'lookupKey' => \str_repeat('a', 16),
@@ -778,7 +550,6 @@ class EditRecordActionTest extends TestCase
             'persistentLogin: timeExpires missing' => [
                 'table' => 'persistentlogin',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => \str_repeat('a', 22),
                     'lookupKey' => \str_repeat('a', 16),
@@ -789,7 +560,6 @@ class EditRecordActionTest extends TestCase
             'persistentLogin: timeExpires invalid' => [
                 'table' => 'persistentlogin',
                 'data' => [
-                    'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => \str_repeat('a', 22),
                     'lookupKey' => \str_repeat('a', 16),
