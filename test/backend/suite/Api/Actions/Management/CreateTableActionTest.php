@@ -31,7 +31,6 @@ class CreateTableActionTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): CreateTableAction
     {
         return $this->getMockBuilder(CreateTableAction::class)
-            ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
@@ -80,7 +79,6 @@ class CreateTableActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             "Failed to create table for: $entityClass");
-        $sut->__construct();
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -101,7 +99,6 @@ class CreateTableActionTest extends TestCase
             ->method('ToArray')
             ->willReturn(['entityClass' => $entityClass]);
 
-        $sut->__construct();
         $result = AccessHelper::CallMethod($sut, 'onExecute');
         $this->assertNull($result);
     }

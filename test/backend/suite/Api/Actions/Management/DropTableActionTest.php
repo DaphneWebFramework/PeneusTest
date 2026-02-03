@@ -31,7 +31,6 @@ class DropTableActionTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): DropTableAction
     {
         return $this->getMockBuilder(DropTableAction::class)
-            ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
@@ -80,7 +79,6 @@ class DropTableActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             "Failed to drop table for: $entityClass");
-        $sut->__construct();
         AccessHelper::CallMethod($sut, 'onExecute');
     }
 
@@ -101,7 +99,6 @@ class DropTableActionTest extends TestCase
             ->method('ToArray')
             ->willReturn(['entityClass' => $entityClass]);
 
-        $sut->__construct();
         $result = AccessHelper::CallMethod($sut, 'onExecute');
         $this->assertNull($result);
     }

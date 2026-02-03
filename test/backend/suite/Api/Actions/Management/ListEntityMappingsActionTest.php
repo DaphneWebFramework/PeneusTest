@@ -29,6 +29,14 @@ class ListEntityMappingsActionTest extends TestCase
             CFileSystem::ReplaceInstance($this->createMock(CFileSystem::class));
         $this->originalDatabase =
             Database::ReplaceInstance(new FakeDatabase());
+        // Configure the mocked Resource to ensure that when the constructor
+        // is called by systemUnderTest, the $backendPath property is populated
+        // with a CPath mock. Later in tests, $backendPath can be obtained via
+        // AccessHelper::GetProperty($sut, 'backendPath').
+        Resource::Instance()->expects($this->once())
+            ->method('AppSubdirectoryPath')
+            ->with('backend')
+            ->willReturn($this->createMock(CPath::class));
     }
 
     protected function tearDown(): void
@@ -41,7 +49,6 @@ class ListEntityMappingsActionTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): ListEntityMappingsAction
     {
         return $this->getMockBuilder(ListEntityMappingsAction::class)
-            ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
@@ -196,19 +203,13 @@ class ListEntityMappingsActionTest extends TestCase
     function testFindModulesReturnsEmptyArrayWhenScandirFails()
     {
         $sut = $this->systemUnderTest();
-        $resource = Resource::Instance();
-        $backendPath = $this->createMock(CPath::class);
+        $backendPath = AccessHelper::GetProperty($sut, 'backendPath');
 
-        $resource->expects($this->once())
-            ->method('AppSubdirectoryPath')
-            ->with('backend')
-            ->willReturn($backendPath);
         $backendPath->expects($this->once())
             ->method('Call')
             ->with('\scandir')
             ->willReturn(false);
 
-        $sut->__construct();
         $result = AccessHelper::CallMethod($sut, 'findModules');
         $this->assertSame([], $result);
     }
@@ -216,19 +217,13 @@ class ListEntityMappingsActionTest extends TestCase
     function testFindModulesSkipsDotAndDotDot()
     {
         $sut = $this->systemUnderTest();
-        $resource = Resource::Instance();
-        $backendPath = $this->createMock(CPath::class);
+        $backendPath = AccessHelper::GetProperty($sut, 'backendPath');
 
-        $resource->expects($this->once())
-            ->method('AppSubdirectoryPath')
-            ->with('backend')
-            ->willReturn($backendPath);
         $backendPath->expects($this->once())
             ->method('Call')
             ->with('\scandir')
             ->willReturn(['.', '..']);
 
-        $sut->__construct();
         $result = AccessHelper::CallMethod($sut, 'findModules');
         $this->assertSame([], $result);
     }
@@ -236,18 +231,13 @@ class ListEntityMappingsActionTest extends TestCase
     function testFindModulesReturnsOnlyDirectoryPaths()
     {
         $sut = $this->systemUnderTest();
-        $resource = Resource::Instance();
-        $backendPath = $this->createMock(CPath::class);
+        $backendPath = AccessHelper::GetProperty($sut, 'backendPath');
         $moduleNames = ['Module1', 'Module2'];
         $modulePaths = [
             $this->createMock(CPath::class),
             $this->createMock(CPath::class)
         ];
 
-        $resource->expects($this->once())
-            ->method('AppSubdirectoryPath')
-            ->with('backend')
-            ->willReturn($backendPath);
         $backendPath->expects($this->once())
             ->method('Call')
             ->with('\scandir')
@@ -277,7 +267,6 @@ class ListEntityMappingsActionTest extends TestCase
             ->with('\is_dir')
             ->willReturn(false);
 
-        $sut->__construct();
         $result = AccessHelper::CallMethod($sut, 'findModules');
         $this->assertSame([$modulePaths[0]], $result);
     }
@@ -301,7 +290,6 @@ class ListEntityMappingsActionTest extends TestCase
             ->with('\is_dir')
             ->willReturn(false);
 
-        $sut->__construct();
         $result = AccessHelper::CallMethod($sut, 'findEntities', [$modulePath]);
         $this->assertSame([], $result);
     }
@@ -328,7 +316,6 @@ class ListEntityMappingsActionTest extends TestCase
                 yield from [];
             });
 
-        $sut->__construct();
         $result = AccessHelper::CallMethod($sut, 'findEntities', [$modulePath]);
         $this->assertSame([], $result);
     }
@@ -356,7 +343,6 @@ class ListEntityMappingsActionTest extends TestCase
                 yield from $entityPaths;
             });
 
-        $sut->__construct();
         $result = AccessHelper::CallMethod($sut, 'findEntities', [$modulePath]);
         $this->assertCount(2, $result);
         $this->assertEquals($entityPaths[0], $result[0]);
@@ -370,20 +356,14 @@ class ListEntityMappingsActionTest extends TestCase
     function testEntityClassFromThrowsWhenPathIsOutsideBackend()
     {
         $sut = $this->systemUnderTest();
-        $resource = Resource::Instance();
-        $backendPath = $this->createStub(CPath::class);
+        $backendPath = AccessHelper::GetProperty($sut, 'backendPath');
         $entityPath = $this->createMock(CPath::class);
 
-        $resource->expects($this->once())
-            ->method('AppSubdirectoryPath')
-            ->with('backend')
-            ->willReturn($backendPath);
         $entityPath->expects($this->once())
             ->method('StartsWith')
             ->with($backendPath)
             ->willReturn(false);
 
-        $sut->__construct();
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(
             'Entity path must be within the backend directory.');
@@ -393,16 +373,11 @@ class ListEntityMappingsActionTest extends TestCase
     function testEntityClassFromReturnsFullyQualifiedClassName()
     {
         $sut = $this->systemUnderTest();
-        $resource = Resource::Instance();
-        $backendPath = $this->createMock(CPath::class);
+        $backendPath = AccessHelper::GetProperty($sut, 'backendPath');
         $entityPath = $this->createMock(CPath::class);
         $backendPathLength = 7;
         $relativePath = $this->createMock(CPath::class);
 
-        $resource->expects($this->once())
-            ->method('AppSubdirectoryPath')
-            ->with('backend')
-            ->willReturn($backendPath);
         $entityPath->expects($this->once())
             ->method('StartsWith')
             ->with($backendPath)
@@ -422,7 +397,6 @@ class ListEntityMappingsActionTest extends TestCase
                 'filename' => 'Bar'
             ]);
 
-        $sut->__construct();
         $result = AccessHelper::CallMethod($sut, 'entityClassFrom', [$entityPath]);
         $this->assertSame('\\Module\\Foo\\Bar', $result);
     }
@@ -472,7 +446,6 @@ class ListEntityMappingsActionTest extends TestCase
             times: 1
         );
 
-        $sut->__construct();
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Failed to retrieve columns for: account');
         AccessHelper::CallMethod($sut, 'tableMetadata', ['account']);
@@ -515,7 +488,6 @@ class ListEntityMappingsActionTest extends TestCase
             times: 1
         );
 
-        $sut->__construct();
         $result = AccessHelper::CallMethod($sut, 'tableMetadata', ['account']);
         $this->assertSame([
             ['name' => 'id', 'type' => 'INT', 'nullable' => false],

@@ -34,7 +34,6 @@ class CreateRecordActionTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): CreateRecordAction
     {
         return $this->getMockBuilder(CreateRecordAction::class)
-            ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
     }

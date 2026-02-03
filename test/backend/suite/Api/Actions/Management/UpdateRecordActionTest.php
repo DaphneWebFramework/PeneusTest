@@ -40,7 +40,6 @@ class UpdateRecordActionTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): UpdateRecordAction
     {
         return $this->getMockBuilder(UpdateRecordAction::class)
-            ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
     }

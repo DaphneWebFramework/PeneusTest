@@ -38,7 +38,6 @@ class DeleteRecordActionTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): DeleteRecordAction
     {
         return $this->getMockBuilder(DeleteRecordAction::class)
-            ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
     }

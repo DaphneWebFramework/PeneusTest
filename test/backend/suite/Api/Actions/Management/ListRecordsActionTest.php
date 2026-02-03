@@ -40,7 +40,6 @@ class ListRecordsActionTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): ListRecordsAction
     {
         return $this->getMockBuilder(ListRecordsAction::class)
-            ->disableOriginalConstructor()
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
