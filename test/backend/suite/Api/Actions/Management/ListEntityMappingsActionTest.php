@@ -368,7 +368,7 @@ class ListEntityMappingsActionTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Entity path must be within the backend directory.');
+            "Entity path must be within the backend directory.");
         ah::CallMethod($sut, 'entityClassFrom', [$entityPath]);
     }
 
@@ -449,7 +449,7 @@ class ListEntityMappingsActionTest extends TestCase
         );
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Failed to retrieve columns for: account');
+        $this->expectExceptionMessage("Failed to retrieve columns for: account");
         ah::CallMethod($sut, 'tableMetadata', ['account']);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
