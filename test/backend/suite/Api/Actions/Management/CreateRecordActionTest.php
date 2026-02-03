@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Management;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
@@ -12,8 +14,8 @@ use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\SecurityService;
 use \Peneus\Model\AccountRole; // sample
 use \Peneus\Services\AccountService;
-use \TestToolkit\AccessHelper;
-use \TestToolkit\DataHelper;
+use \TestToolkit\AccessHelper as ah;
+use \TestToolkit\DataHelper as dh;
 
 #[CoversClass(CreateRecordAction::class)]
 class CreateRecordActionTest extends TestCase
@@ -56,10 +58,10 @@ class CreateRecordActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Required field 'table' is missing.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
-    #[DataProviderExternal(DataHelper::class, 'NonStringProvider')]
+    #[DataProviderExternal(dh::class, 'NonStringProvider')]
     function testOnExecuteThrowsIfTableNameIsNotString($value)
     {
         $sut = $this->systemUnderTest();
@@ -78,7 +80,7 @@ class CreateRecordActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'table' must be a string.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfModelResolutionFails()
@@ -97,7 +99,7 @@ class CreateRecordActionTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(
             "Unable to resolve entity class for table: table-name");
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     #[DataProvider('invalidModelDataProvider')]
@@ -123,7 +125,7 @@ class CreateRecordActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfEntitySaveFails()
@@ -157,7 +159,7 @@ class CreateRecordActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             "Failed to add record to table 'accountrole'.");
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteReturnsIdWhenEntitySaveSucceeds()
@@ -189,10 +191,8 @@ class CreateRecordActionTest extends TestCase
             ->willReturn(true);
         $entity->id = 42;
 
-        $this->assertSame(
-            ['id' => 42],
-            AccessHelper::CallMethod($sut, 'onExecute')
-        );
+        $result = ah::CallMethod($sut, 'onExecute');
+        $this->assertSame(['id' => 42], $result);
     }
 
     #endregion onExecute

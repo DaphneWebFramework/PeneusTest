@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Management;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProviderExternal;
@@ -14,8 +16,8 @@ use \Peneus\Model\Account;
 use \Peneus\Model\AccountRole;
 use \Peneus\Model\PasswordReset;
 use \Peneus\Model\PendingAccount;
-use \TestToolkit\AccessHelper;
-use \TestToolkit\DataHelper;
+use \TestToolkit\AccessHelper as ah;
+use \TestToolkit\DataHelper as dh;
 
 #[CoversClass(ListRecordsAction::class)]
 class ListRecordsActionTest extends TestCase
@@ -62,10 +64,10 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Required field 'table' is missing.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
-    #[DataProviderExternal(DataHelper::class, 'NonStringProvider')]
+    #[DataProviderExternal(dh::class, 'NonStringProvider')]
     function testOnExecuteThrowsIfTableNameIsNotString($value)
     {
         $sut = $this->systemUnderTest();
@@ -84,10 +86,10 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'table' must be a string.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
-    #[DataProviderExternal(DataHelper::class, 'NonIntegerExcludingNumericStringProvider')]
+    #[DataProviderExternal(dh::class, 'NonIntegerExcludingNumericStringProvider')]
     function testOnExecuteThrowsIfPageNumberIsNotInteger($value)
     {
         $sut = $this->systemUnderTest();
@@ -107,7 +109,7 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'page' must be an integer.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfPageNumberIsLessThanOne()
@@ -130,10 +132,10 @@ class ListRecordsActionTest extends TestCase
         $this->expectExceptionMessage(
             "Field 'page' must have a minimum value of 1.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
-    #[DataProviderExternal(DataHelper::class, 'NonIntegerExcludingNumericStringProvider')]
+    #[DataProviderExternal(dh::class, 'NonIntegerExcludingNumericStringProvider')]
     function testOnExecuteThrowsIfPageSizeIsNotInteger($value)
     {
         $sut = $this->systemUnderTest();
@@ -153,7 +155,7 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'pagesize' must be an integer.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfPageSizeIsLessThanOne()
@@ -176,7 +178,7 @@ class ListRecordsActionTest extends TestCase
         $this->expectExceptionMessage(
             "Field 'pagesize' must have a minimum value of 1.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfPageSizeIsGreaterThanHundred()
@@ -199,10 +201,10 @@ class ListRecordsActionTest extends TestCase
         $this->expectExceptionMessage(
             "Field 'pagesize' must have a maximum value of 100.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
-    #[DataProviderExternal(DataHelper::class, 'NonStringProvider')]
+    #[DataProviderExternal(dh::class, 'NonStringProvider')]
     function testOnExecuteThrowsIfSearchTermIsNotString($value)
     {
         $sut = $this->systemUnderTest();
@@ -222,10 +224,10 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'search' must be a string.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
-    #[DataProviderExternal(DataHelper::class, 'NonStringProvider')]
+    #[DataProviderExternal(dh::class, 'NonStringProvider')]
     function testOnExecuteThrowsIfSortKeyIsNotString($value)
     {
         $sut = $this->systemUnderTest();
@@ -245,10 +247,10 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'sortkey' must be a string.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
-    #[DataProviderExternal(DataHelper::class, 'NonStringProvider')]
+    #[DataProviderExternal(dh::class, 'NonStringProvider')]
     function testOnExecuteThrowsIfSortDirectionIsNotString($value)
     {
         $sut = $this->systemUnderTest();
@@ -268,7 +270,7 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'sortdir' must be a string.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfSortDirectionIsInvalid()
@@ -290,7 +292,7 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'sortdir' failed custom validation.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfModelResolutionFails()
@@ -309,7 +311,7 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(
             "Unable to resolve entity class for table: table-name");
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteReturnsFirstPageForAccountTableWithDefaults()
@@ -355,7 +357,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertCount(2, $result['data']);
         $this->assertInstanceOf(Account::class, $result['data'][0]);
           $this->assertSame(1, $result['data'][0]->id);
@@ -405,7 +407,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertCount(3, $result['data']);
         $this->assertInstanceOf(AccountRole::class, $result['data'][0]);
           $this->assertSame(1, $result['data'][0]->id);
@@ -462,7 +464,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertCount(2, $result['data']);
         $this->assertInstanceOf(PasswordReset::class, $result['data'][0]);
           $this->assertSame(1, $result['data'][0]->id);
@@ -521,7 +523,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertCount(2, $result['data']);
         $this->assertInstanceOf(PendingAccount::class, $result['data'][0]);
           $this->assertSame(1, $result['data'][0]->id);
@@ -571,7 +573,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertCount(1, $result['data']);
         $this->assertInstanceOf(AccountRole::class, $result['data'][0]);
           $this->assertSame(42, $result['data'][0]->id);
@@ -636,7 +638,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertCount(1, $result['data']);
         $this->assertInstanceOf(Account::class, $result['data'][0]);
           $this->assertSame(1, $result['data'][0]->id);
@@ -668,7 +670,7 @@ class ListRecordsActionTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(
             "Table 'accountrole' does not have a column named 'not-a-column'.");
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteWithSortKey()
@@ -700,7 +702,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertCount(1, $result['data']);
         $this->assertInstanceOf(AccountRole::class, $result['data'][0]);
           $this->assertSame(5, $result['data'][0]->id);
@@ -740,7 +742,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertCount(1, $result['data']);
         $this->assertInstanceOf(AccountRole::class, $result['data'][0]);
           $this->assertSame(7, $result['data'][0]->id);
@@ -793,7 +795,7 @@ class ListRecordsActionTest extends TestCase
             times: 1
         );
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertCount(1, $result['data']);
         $this->assertInstanceOf(AccountRole::class, $result['data'][0]);
           $this->assertSame(10, $result['data'][0]->id);

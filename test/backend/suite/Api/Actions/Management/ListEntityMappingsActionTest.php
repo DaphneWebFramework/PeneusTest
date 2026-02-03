@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Management;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
@@ -12,7 +14,7 @@ use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Entity;
 use \Peneus\Model\ViewEntity;
-use \TestToolkit\AccessHelper;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(ListEntityMappingsAction::class)]
 class ListEntityMappingsActionTest extends TestCase
@@ -32,7 +34,7 @@ class ListEntityMappingsActionTest extends TestCase
         // Configure the mocked Resource to ensure that when the constructor
         // is called by systemUnderTest, the $backendPath property is populated
         // with a CPath mock. Later in tests, $backendPath can be obtained via
-        // AccessHelper::GetProperty($sut, 'backendPath').
+        // ah::GetProperty($sut, 'backendPath').
         Resource::Instance()->expects($this->once())
             ->method('AppSubdirectoryPath')
             ->with('backend')
@@ -63,7 +65,7 @@ class ListEntityMappingsActionTest extends TestCase
             ->method('findModules')
             ->willReturn([]);
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertSame(['data' => []], $result);
     }
 
@@ -90,7 +92,7 @@ class ListEntityMappingsActionTest extends TestCase
                 }
             });
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertSame(['data' => []], $result);
     }
 
@@ -122,7 +124,7 @@ class ListEntityMappingsActionTest extends TestCase
             ->with($entityClass)
             ->willReturn(false);
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertSame(['data' => []], $result);
     }
 
@@ -185,7 +187,7 @@ class ListEntityMappingsActionTest extends TestCase
                 ->method('tableMetadata');
         }
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertCount(1, $result['data']);
         $this->assertSame([
             'entityClass' => $entityClass,
@@ -203,35 +205,35 @@ class ListEntityMappingsActionTest extends TestCase
     function testFindModulesReturnsEmptyArrayWhenScandirFails()
     {
         $sut = $this->systemUnderTest();
-        $backendPath = AccessHelper::GetProperty($sut, 'backendPath');
+        $backendPath = ah::GetProperty($sut, 'backendPath');
 
         $backendPath->expects($this->once())
             ->method('Call')
             ->with('\scandir')
             ->willReturn(false);
 
-        $result = AccessHelper::CallMethod($sut, 'findModules');
+        $result = ah::CallMethod($sut, 'findModules');
         $this->assertSame([], $result);
     }
 
     function testFindModulesSkipsDotAndDotDot()
     {
         $sut = $this->systemUnderTest();
-        $backendPath = AccessHelper::GetProperty($sut, 'backendPath');
+        $backendPath = ah::GetProperty($sut, 'backendPath');
 
         $backendPath->expects($this->once())
             ->method('Call')
             ->with('\scandir')
             ->willReturn(['.', '..']);
 
-        $result = AccessHelper::CallMethod($sut, 'findModules');
+        $result = ah::CallMethod($sut, 'findModules');
         $this->assertSame([], $result);
     }
 
     function testFindModulesReturnsOnlyDirectoryPaths()
     {
         $sut = $this->systemUnderTest();
-        $backendPath = AccessHelper::GetProperty($sut, 'backendPath');
+        $backendPath = ah::GetProperty($sut, 'backendPath');
         $moduleNames = ['Module1', 'Module2'];
         $modulePaths = [
             $this->createMock(CPath::class),
@@ -267,7 +269,7 @@ class ListEntityMappingsActionTest extends TestCase
             ->with('\is_dir')
             ->willReturn(false);
 
-        $result = AccessHelper::CallMethod($sut, 'findModules');
+        $result = ah::CallMethod($sut, 'findModules');
         $this->assertSame([$modulePaths[0]], $result);
     }
 
@@ -290,7 +292,7 @@ class ListEntityMappingsActionTest extends TestCase
             ->with('\is_dir')
             ->willReturn(false);
 
-        $result = AccessHelper::CallMethod($sut, 'findEntities', [$modulePath]);
+        $result = ah::CallMethod($sut, 'findEntities', [$modulePath]);
         $this->assertSame([], $result);
     }
 
@@ -316,7 +318,7 @@ class ListEntityMappingsActionTest extends TestCase
                 yield from [];
             });
 
-        $result = AccessHelper::CallMethod($sut, 'findEntities', [$modulePath]);
+        $result = ah::CallMethod($sut, 'findEntities', [$modulePath]);
         $this->assertSame([], $result);
     }
 
@@ -343,7 +345,7 @@ class ListEntityMappingsActionTest extends TestCase
                 yield from $entityPaths;
             });
 
-        $result = AccessHelper::CallMethod($sut, 'findEntities', [$modulePath]);
+        $result = ah::CallMethod($sut, 'findEntities', [$modulePath]);
         $this->assertCount(2, $result);
         $this->assertEquals($entityPaths[0], $result[0]);
         $this->assertEquals($entityPaths[1], $result[1]);
@@ -356,7 +358,7 @@ class ListEntityMappingsActionTest extends TestCase
     function testEntityClassFromThrowsWhenPathIsOutsideBackend()
     {
         $sut = $this->systemUnderTest();
-        $backendPath = AccessHelper::GetProperty($sut, 'backendPath');
+        $backendPath = ah::GetProperty($sut, 'backendPath');
         $entityPath = $this->createMock(CPath::class);
 
         $entityPath->expects($this->once())
@@ -367,13 +369,13 @@ class ListEntityMappingsActionTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(
             'Entity path must be within the backend directory.');
-        AccessHelper::CallMethod($sut, 'entityClassFrom', [$entityPath]);
+        ah::CallMethod($sut, 'entityClassFrom', [$entityPath]);
     }
 
     function testEntityClassFromReturnsFullyQualifiedClassName()
     {
         $sut = $this->systemUnderTest();
-        $backendPath = AccessHelper::GetProperty($sut, 'backendPath');
+        $backendPath = ah::GetProperty($sut, 'backendPath');
         $entityPath = $this->createMock(CPath::class);
         $backendPathLength = 7;
         $relativePath = $this->createMock(CPath::class);
@@ -397,7 +399,7 @@ class ListEntityMappingsActionTest extends TestCase
                 'filename' => 'Bar'
             ]);
 
-        $result = AccessHelper::CallMethod($sut, 'entityClassFrom', [$entityPath]);
+        $result = ah::CallMethod($sut, 'entityClassFrom', [$entityPath]);
         $this->assertSame('\\Module\\Foo\\Bar', $result);
     }
 
@@ -409,7 +411,7 @@ class ListEntityMappingsActionTest extends TestCase
     {
         $sut = $this->systemUnderTest();
 
-        $result = AccessHelper::CallMethod($sut, 'isValidEntity', [\stdClass::class]);
+        $result = ah::CallMethod($sut, 'isValidEntity', [\stdClass::class]);
         $this->assertFalse($result);
     }
 
@@ -417,7 +419,7 @@ class ListEntityMappingsActionTest extends TestCase
     {
         $sut = $this->systemUnderTest();
 
-        $result = AccessHelper::CallMethod($sut, 'isValidEntity', [ViewEntity::class]);
+        $result = ah::CallMethod($sut, 'isValidEntity', [ViewEntity::class]);
         $this->assertFalse($result);
     }
 
@@ -427,7 +429,7 @@ class ListEntityMappingsActionTest extends TestCase
         $entity = new class() extends Entity {};
         $entityClass = \get_class($entity);
 
-        $result = AccessHelper::CallMethod($sut, 'isValidEntity', [$entityClass]);
+        $result = ah::CallMethod($sut, 'isValidEntity', [$entityClass]);
         $this->assertTrue($result);
     }
 
@@ -448,7 +450,7 @@ class ListEntityMappingsActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Failed to retrieve columns for: account');
-        AccessHelper::CallMethod($sut, 'tableMetadata', ['account']);
+        ah::CallMethod($sut, 'tableMetadata', ['account']);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
@@ -488,7 +490,7 @@ class ListEntityMappingsActionTest extends TestCase
             times: 1
         );
 
-        $result = AccessHelper::CallMethod($sut, 'tableMetadata', ['account']);
+        $result = ah::CallMethod($sut, 'tableMetadata', ['account']);
         $this->assertSame([
             ['name' => 'id', 'type' => 'INT', 'nullable' => false],
             ['name' => 'email', 'type' => 'TEXT', 'nullable' => false],

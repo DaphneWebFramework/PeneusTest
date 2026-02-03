@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Management;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
@@ -10,7 +12,7 @@ use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Peneus\Model\Entity;
 use \Peneus\Model\ViewEntity;
-use \TestToolkit\AccessHelper;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(DropTableAction::class)]
 class DropTableActionTest extends TestCase
@@ -56,7 +58,7 @@ class DropTableActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsWhenDropTableFails()
@@ -79,7 +81,7 @@ class DropTableActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             "Failed to drop table for: $entityClass");
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteReturnsNullWhenDropTableSucceeds()
@@ -99,7 +101,7 @@ class DropTableActionTest extends TestCase
             ->method('ToArray')
             ->willReturn(['entityClass' => $entityClass]);
 
-        $result = AccessHelper::CallMethod($sut, 'onExecute');
+        $result = ah::CallMethod($sut, 'onExecute');
         $this->assertNull($result);
     }
 

@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Management;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
@@ -12,8 +14,8 @@ use \Harmonia\Http\StatusCode;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\AccountRole;
-use \TestToolkit\AccessHelper;
-use \TestToolkit\DataHelper;
+use \TestToolkit\AccessHelper as ah;
+use \TestToolkit\DataHelper as dh;
 
 #[CoversClass(DeleteRecordAction::class)]
 class DeleteRecordActionTest extends TestCase
@@ -60,10 +62,10 @@ class DeleteRecordActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Required field 'table' is missing.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
-    #[DataProviderExternal(DataHelper::class, 'NonStringProvider')]
+    #[DataProviderExternal(dh::class, 'NonStringProvider')]
     function testOnExecuteThrowsIfTableNameIsNotString($value)
     {
         $sut = $this->systemUnderTest();
@@ -82,7 +84,7 @@ class DeleteRecordActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Field 'table' must be a string.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfModelResolutionFails()
@@ -101,7 +103,7 @@ class DeleteRecordActionTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(
             "Unable to resolve entity class for table: table-name");
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     #[DataProvider('invalidModelDataProvider')]
@@ -127,7 +129,7 @@ class DeleteRecordActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfEntityNotFound()
@@ -156,7 +158,7 @@ class DeleteRecordActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             "Record with ID 42 not found in table 'accountrole'.");
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfEntityDeleteFails()
@@ -189,7 +191,7 @@ class DeleteRecordActionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
             "Failed to delete record with ID 42 from table 'accountrole'.");
-        AccessHelper::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteReturnsNullWhenEntityDeleteSucceeds()
@@ -219,7 +221,8 @@ class DeleteRecordActionTest extends TestCase
             ->method('Delete')
             ->willReturn(true);
 
-        $this->assertNull(AccessHelper::CallMethod($sut, 'onExecute'));
+        $result = ah::CallMethod($sut, 'onExecute');
+        $this->assertNull($result);
     }
 
     #endregion onExecute
@@ -237,11 +240,7 @@ class DeleteRecordActionTest extends TestCase
             times: 1
         );
 
-        $entity = AccessHelper::CallMethod(
-            $sut,
-            'findEntity',
-            [AccountRole::class, 42]
-        );
+        $entity = ah::CallMethod($sut, 'findEntity', [AccountRole::class, 42]);
         $this->assertNull($entity);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -261,11 +260,7 @@ class DeleteRecordActionTest extends TestCase
             times: 1
         );
 
-        $entity = AccessHelper::CallMethod(
-            $sut,
-            'findEntity',
-            [AccountRole::class, 42]
-        );
+        $entity = ah::CallMethod($sut, 'findEntity', [AccountRole::class, 42]);
         $this->assertInstanceOf(AccountRole::class, $entity);
         $this->assertSame(42, $entity->id);
         $this->assertSame(99, $entity->accountId);
