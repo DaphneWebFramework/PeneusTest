@@ -3,7 +3,7 @@ namespace suite\Api\Actions\Management;
 
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
-use \PHPUnit\Framework\Attributes\DataProviderExternal;
+use \PHPUnit\Framework\Attributes\DataProvider;
 
 use \Peneus\Api\Actions\Management\ListRecordsAction;
 
@@ -14,10 +14,7 @@ use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\AccountRole;
-use \Peneus\Model\PasswordReset;
-use \Peneus\Model\PendingAccount;
 use \TestToolkit\AccessHelper as ah;
-use \TestToolkit\DataHelper as dh;
 
 #[CoversClass(ListRecordsAction::class)]
 class ListRecordsActionTest extends TestCase
@@ -48,287 +45,59 @@ class ListRecordsActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfTableNameIsMissing()
+    function testOnExecuteThrowsIfPayloadValidationFails()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload');
 
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([]);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Required field 'table' is missing.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    #[DataProviderExternal(dh::class, 'NonStringProvider')]
-    function testOnExecuteThrowsIfTableNameIsNotString($value)
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => $value
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'table' must be a string.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    #[DataProviderExternal(dh::class, 'NonIntegerExcludingNumericStringProvider')]
-    function testOnExecuteThrowsIfPageNumberIsNotInteger($value)
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'account',
-                'page' => $value
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'page' must be an integer.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPageNumberIsLessThanOne()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'account',
-                'page' => 0
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'page' must have a minimum value of 1.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    #[DataProviderExternal(dh::class, 'NonIntegerExcludingNumericStringProvider')]
-    function testOnExecuteThrowsIfPageSizeIsNotInteger($value)
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'account',
-                'pagesize' => $value
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'pagesize' must be an integer.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPageSizeIsLessThanOne()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'account',
-                'pagesize' => 0
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'pagesize' must have a minimum value of 1.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPageSizeIsGreaterThanHundred()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'account',
-                'pagesize' => 101
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Field 'pagesize' must have a maximum value of 100.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    #[DataProviderExternal(dh::class, 'NonStringProvider')]
-    function testOnExecuteThrowsIfSearchTermIsNotString($value)
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'account',
-                'search' => $value
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'search' must be a string.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    #[DataProviderExternal(dh::class, 'NonStringProvider')]
-    function testOnExecuteThrowsIfSortKeyIsNotString($value)
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'account',
-                'sortkey' => $value
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'sortkey' must be a string.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    #[DataProviderExternal(dh::class, 'NonStringProvider')]
-    function testOnExecuteThrowsIfSortDirectionIsNotString($value)
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'account',
-                'sortdir' => $value
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'sortdir' must be a string.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfSortDirectionIsInvalid()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'account',
-                'sortdir' => 'up'
-            ]);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'sortdir' failed custom validation.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
+        $this->expectExceptionMessage('Expected message.');
         ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteThrowsIfModelResolutionFails()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $payload = (object)[
+            'table' => 'not-a-table'
+        ];
 
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['table' => 'table-name']);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('resolveEntityClass')
+            ->with('not-a-table')
+            ->willThrowException(new \InvalidArgumentException('Expected message.'));
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            "Unable to resolve entity class for table: table-name");
+        $this->expectExceptionMessage('Expected message.');
         ah::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteReturnsFirstPageForAccountTableWithDefaults()
+    function testOnExecuteWithDefaults()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $payload = (object)[
+            'table'   => 'account',
+            'limit'   => 10,
+            'offset'  => 0,
+            'search'  => null,
+            'sortkey' => null,
+            'sortdir' => null
+        ];
         $fakeDatabase = Database::Instance();
 
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'account'
-            ]);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('resolveEntityClass')
+            ->with('account')
+            ->willReturn(Account::class);
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `account` LIMIT 10 OFFSET 0',
             result: [
@@ -377,191 +146,28 @@ class ListRecordsActionTest extends TestCase
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
-    function testOnExecuteReturnsFirstPageForAccountRoleTableWithDefaults()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-        $fakeDatabase = Database::Instance();
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'accountrole'
-            ]);
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` LIMIT 10 OFFSET 0',
-            result: [
-                ['id' => 1, 'accountId' => 101, 'role' => 0],
-                ['id' => 2, 'accountId' => 102, 'role' => 10],
-                ['id' => 3, 'accountId' => 103, 'role' => 20]
-            ],
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `accountrole`',
-            result: [[3]],
-            times: 1
-        );
-
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertCount(3, $result['data']);
-        $this->assertInstanceOf(AccountRole::class, $result['data'][0]);
-          $this->assertSame(1, $result['data'][0]->id);
-          $this->assertSame(101, $result['data'][0]->accountId);
-          $this->assertSame(0, $result['data'][0]->role);
-        $this->assertInstanceOf(AccountRole::class, $result['data'][1]);
-          $this->assertSame(2, $result['data'][1]->id);
-          $this->assertSame(102, $result['data'][1]->accountId);
-          $this->assertSame(10, $result['data'][1]->role);
-        $this->assertInstanceOf(AccountRole::class, $result['data'][2]);
-          $this->assertSame(3, $result['data'][2]->id);
-          $this->assertSame(103, $result['data'][2]->accountId);
-          $this->assertSame(20, $result['data'][2]->role);
-        $this->assertSame(3, $result['total']);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testOnExecuteReturnsFirstPageForPasswordResetTableWithDefaults()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-        $fakeDatabase = Database::Instance();
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'passwordreset'
-            ]);
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `passwordreset` LIMIT 10 OFFSET 0',
-            result: [
-                [
-                    'id' => 1,
-                    'accountId' => 101,
-                    'resetCode' => 'abc123',
-                    'timeRequested' => '2024-04-01 12:30:00'
-                ],
-                [
-                    'id' => 2,
-                    'accountId' => 102,
-                    'resetCode' => 'def456',
-                    'timeRequested' => '2024-04-02 13:00:00'
-                ]
-            ],
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `passwordreset`',
-            result: [[2]],
-            times: 1
-        );
-
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertCount(2, $result['data']);
-        $this->assertInstanceOf(PasswordReset::class, $result['data'][0]);
-          $this->assertSame(1, $result['data'][0]->id);
-          $this->assertSame(101, $result['data'][0]->accountId);
-          $this->assertSame('abc123', $result['data'][0]->resetCode);
-          $this->assertSame('2024-04-01 12:30:00', $result['data'][0]->timeRequested->format('Y-m-d H:i:s'));
-        $this->assertInstanceOf(PasswordReset::class, $result['data'][1]);
-          $this->assertSame(2, $result['data'][1]->id);
-          $this->assertSame(102, $result['data'][1]->accountId);
-          $this->assertSame('def456', $result['data'][1]->resetCode);
-          $this->assertSame('2024-04-02 13:00:00', $result['data'][1]->timeRequested->format('Y-m-d H:i:s'));
-        $this->assertSame(2, $result['total']);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testOnExecuteReturnsFirstPageForPendingAccountTableWithDefaults()
-    {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-        $fakeDatabase = Database::Instance();
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'pendingaccount'
-            ]);
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `pendingaccount` LIMIT 10 OFFSET 0',
-            result: [
-                [
-                    'id' => 1,
-                    'email' => 'alice@example.com',
-                    'passwordHash' => 'abc123',
-                    'displayName' => 'Alice',
-                    'activationCode' => 'ACT-001',
-                    'timeRegistered' => '2024-05-01 10:00:00'
-                ],
-                [
-                    'id' => 2,
-                    'email' => 'bob@example.com',
-                    'passwordHash' => 'def456',
-                    'displayName' => 'Bob',
-                    'activationCode' => 'ACT-002',
-                    'timeRegistered' => '2024-05-02 11:00:00'
-                ]
-            ],
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `pendingaccount`',
-            result: [[2]],
-            times: 1
-        );
-
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertCount(2, $result['data']);
-        $this->assertInstanceOf(PendingAccount::class, $result['data'][0]);
-          $this->assertSame(1, $result['data'][0]->id);
-          $this->assertSame('alice@example.com', $result['data'][0]->email);
-          $this->assertSame('abc123', $result['data'][0]->passwordHash);
-          $this->assertSame('Alice', $result['data'][0]->displayName);
-          $this->assertSame('ACT-001', $result['data'][0]->activationCode);
-          $this->assertSame('2024-05-01 10:00:00', $result['data'][0]->timeRegistered->format('Y-m-d H:i:s'));
-        $this->assertInstanceOf(PendingAccount::class, $result['data'][1]);
-          $this->assertSame(2, $result['data'][1]->id);
-          $this->assertSame('bob@example.com', $result['data'][1]->email);
-          $this->assertSame('def456', $result['data'][1]->passwordHash);
-          $this->assertSame('Bob', $result['data'][1]->displayName);
-          $this->assertSame('ACT-002', $result['data'][1]->activationCode);
-          $this->assertSame('2024-05-02 11:00:00', $result['data'][1]->timeRegistered->format('Y-m-d H:i:s'));
-        $this->assertSame(2, $result['total']);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
     function testOnExecuteWithPageNumberAndPageSize()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $payload = (object)[
+            'table'   => 'accountrole',
+            'limit'   => 5,
+            'offset'  => 10,
+            'search'  => null,
+            'sortkey' => null,
+            'sortdir' => null
+        ];
         $fakeDatabase = Database::Instance();
 
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'accountrole',
-                'page' => 3,
-                'pagesize' => 5
-            ]);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('resolveEntityClass')
+            ->with('accountrole')
+            ->willReturn(AccountRole::class);
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` LIMIT 5 OFFSET 10', // (3 - 1) * 5
+            sql: 'SELECT * FROM `accountrole` LIMIT 5 OFFSET 10',
             result: [
                 ['id' => 42, 'accountId' => 101, 'role' => 99]
             ],
@@ -585,26 +191,29 @@ class ListRecordsActionTest extends TestCase
 
     function testOnExecuteWithSearchTerm()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-        $fakeDatabase = Database::Instance();
-        $searchTerm = '100%_core\dev';
-        $escapedSearchTerm = '%' . \strtr($searchTerm, [
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $payload = (object)[
+            'table'   => 'account',
+            'limit'   => 10,
+            'offset'  => 0,
+            'search'  => '100%_core\dev',
+            'sortkey' => null,
+            'sortdir' => null
+        ];
+        $escapedSearchTerm = '%' . \strtr($payload->search, [
             '\\' => '\\\\',
             '%'  => '\%',
             '_'  => '\_'
         ]) . '%';
+        $fakeDatabase = Database::Instance();
 
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'account',
-                'search' => $searchTerm
-            ]);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('resolveEntityClass')
+            ->with('account')
+            ->willReturn(Account::class);
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `account` WHERE '
                . '`id` LIKE :search OR '
@@ -653,19 +262,23 @@ class ListRecordsActionTest extends TestCase
 
     function testOnExecuteThrowsIfSortKeyDoesNotExist()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $payload = (object)[
+            'table'   => 'accountrole',
+            'limit'   => 10,
+            'offset'  => 0,
+            'search'  => null,
+            'sortkey' => 'not-a-column',
+            'sortdir' => 'ASC'
+        ];
 
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'accountrole',
-                'sortkey' => 'not-a-column'
-            ]);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('resolveEntityClass')
+            ->with('accountrole')
+            ->willReturn(AccountRole::class);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(
@@ -675,20 +288,24 @@ class ListRecordsActionTest extends TestCase
 
     function testOnExecuteWithSortKey()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $payload = (object)[
+            'table'   => 'accountrole',
+            'limit'   => 10,
+            'offset'  => 0,
+            'search'  => null,
+            'sortkey' => 'role',
+            'sortdir' => null
+        ];
         $fakeDatabase = Database::Instance();
 
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'accountrole',
-                'sortkey' => 'role'
-            ]);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('resolveEntityClass')
+            ->with('accountrole')
+            ->willReturn(AccountRole::class);
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `accountrole` ORDER BY `role` LIMIT 10 OFFSET 0',
             result: [
@@ -714,21 +331,24 @@ class ListRecordsActionTest extends TestCase
 
     function testOnExecuteWithSortKeyAndSortDirection()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $payload = (object)[
+            'table'   => 'accountrole',
+            'limit'   => 10,
+            'offset'  => 0,
+            'search'  => null,
+            'sortkey' => 'role',
+            'sortdir' => 'DESC'
+        ];
         $fakeDatabase = Database::Instance();
 
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'accountrole',
-                'sortkey' => 'role',
-                'sortdir' => 'desc'
-            ]);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('resolveEntityClass')
+            ->with('accountrole')
+            ->willReturn(AccountRole::class);
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `accountrole` ORDER BY `role` DESC LIMIT 10 OFFSET 0',
             result: [
@@ -752,26 +372,26 @@ class ListRecordsActionTest extends TestCase
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
-    function testOnExecuteWithAllQueryParameters()
+function testOnExecuteWithAllParameters()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $payload = (object)[
+            'table'   => 'accountrole',
+            'limit'   => 3,
+            'offset'  => 3,
+            'search'  => '20',
+            'sortkey' => 'role',
+            'sortdir' => 'ASC'
+        ];
         $fakeDatabase = Database::Instance();
 
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => 'accountrole',
-                'page' => 2,
-                'pagesize' => 3,
-                'search' => '20',
-                'sortkey' => 'role',
-                'sortdir' => 'asc'
-            ]);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('resolveEntityClass')
+            ->with('accountrole')
+            ->willReturn(AccountRole::class);
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `accountrole` WHERE '
                . '`id` LIKE :search OR '
@@ -806,4 +426,143 @@ class ListRecordsActionTest extends TestCase
     }
 
     #endregion onExecute
+
+    #region validatePayload ----------------------------------------------------
+
+    #[DataProvider('invalidPayloadProvider')]
+    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $queryParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
+        $queryParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($payload);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage($exceptionMessage);
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
+        ah::CallMethod($sut, 'validatePayload');
+    }
+
+    function testValidatePayloadWithMinimalInput()
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $queryParams = $this->createMock(CArray::class);
+        $payload = [
+            'table' => 'account'
+        ];
+        $expected = (object)[
+            'table'   => 'account',
+            'limit'   => 10,
+            'offset'  => 0,
+            'search'  => null,
+            'sortkey' => null,
+            'sortdir' => null
+        ];
+
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
+        $queryParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($payload);
+
+        $actual = ah::CallMethod($sut, 'validatePayload');
+        $this->assertEquals($expected, $actual);
+    }
+
+    function testValidatePayloadWithFullInput()
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $queryParams = $this->createMock(CArray::class);
+        $payload = [
+            'table'    => 'account',
+            'page'     => 3,
+            'pagesize' => 20,
+            'search'   => 'query',
+            'sortkey'  => 'id',
+            'sortdir'  => 'desc'
+        ];
+        $expected = (object)[
+            'table'   => 'account',
+            'limit'   => 20,
+            'offset'  => 40, // (3 - 1) * 20
+            'search'  => 'query',
+            'sortkey' => 'id',
+            'sortdir' => 'desc'
+        ];
+
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
+        $queryParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($payload);
+
+        $actual = ah::CallMethod($sut, 'validatePayload');
+        $this->assertEquals($expected, $actual);
+    }
+
+    #endregion validatePayload
+
+    #region Data Providers -----------------------------------------------------
+
+    static function invalidPayloadProvider()
+    {
+        return [
+            'table missing' => [
+                'payload' => [],
+                'exceptionMessage' => "Required field 'table' is missing."
+            ],
+            'table not string' => [
+                'payload' => ['table' => 123],
+                'exceptionMessage' => "Field 'table' must be a string."
+            ],
+            'page not integer' => [
+                'payload' => ['table' => 'account', 'page' => 'abc'],
+                'exceptionMessage' => "Field 'page' must be an integer."
+            ],
+            'page too low' => [
+                'payload' => ['table' => 'account', 'page' => 0],
+                'exceptionMessage' => "Field 'page' must have a minimum value of 1."
+            ],
+            'pagesize not integer' => [
+                'payload' => ['table' => 'account', 'pagesize' => 'abc'],
+                'exceptionMessage' => "Field 'pagesize' must be an integer."
+            ],
+            'pagesize too low' => [
+                'payload' => ['table' => 'account', 'pagesize' => 0],
+                'exceptionMessage' => "Field 'pagesize' must have a minimum value of 1."
+            ],
+            'pagesize too high' => [
+                'payload' => ['table' => 'account', 'pagesize' => 101],
+                'exceptionMessage' => "Field 'pagesize' must have a maximum value of 100."
+            ],
+            'search not string' => [
+                'payload' => ['table' => 'account', 'search' => 123],
+                'exceptionMessage' => "Field 'search' must be a string."
+            ],
+            'sortkey not string' => [
+                'payload' => ['table' => 'account', 'sortkey' => 123],
+                'exceptionMessage' => "Field 'sortkey' must be a string."
+            ],
+            'sortdir not string' => [
+                'payload' => ['table' => 'account', 'sortdir' => 123],
+                'exceptionMessage' => "Field 'sortdir' must be a string."
+            ],
+            'sortdir not asc or desc' => [
+                'payload' => ['table' => 'account', 'sortdir' => 'up'],
+                'exceptionMessage' => "Field 'sortdir' failed custom validation."
+            ],
+        ];
+    }
+
+    #endregion Data Providers
 }

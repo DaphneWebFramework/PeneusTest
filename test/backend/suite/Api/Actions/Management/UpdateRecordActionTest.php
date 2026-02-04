@@ -4,7 +4,6 @@ namespace suite\Api\Actions\Management;
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
-use \PHPUnit\Framework\Attributes\DataProviderExternal;
 
 use \Peneus\Api\Actions\Management\UpdateRecordAction;
 
@@ -17,7 +16,6 @@ use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\AccountRole; // sample
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as ah;
-use \TestToolkit\DataHelper as dh;
 
 #[CoversClass(UpdateRecordAction::class)]
 class UpdateRecordActionTest extends TestCase
@@ -48,70 +46,115 @@ class UpdateRecordActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfTableNameIsMissing()
+    function testOnExecuteThrowsIfPayloadValidationFails()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload');
 
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([]);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Required field 'table' is missing.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
+        $this->expectExceptionMessage('Expected message.');
         ah::CallMethod($sut, 'onExecute');
     }
 
-    #[DataProviderExternal(dh::class, 'NonStringProvider')]
-    function testOnExecuteThrowsIfTableNameIsNotString($value)
+    function testOnExecuteThrowsIfEntityNotFound()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload', 'findEntity');
+        $payload = (object)[
+            'entityClass' => AccountRole::class,
+            'data' => [
+                'id' => 42,
+                'accountId' => 1,
+                'role' => 10
+            ]
+        ];
 
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn([
-                'table' => $value
-            ]);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('findEntity')
+            ->with($payload->entityClass, 42)
+            ->willReturn(null);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Field 'table' must be a string.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
+        $this->expectExceptionMessage("Record not found.");
         ah::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsIfModelResolutionFails()
+    function testOnExecuteThrowsIfEntitySaveFails()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload', 'findEntity');
+        $payload = (object)[
+            'entityClass' => AccountRole::class,
+            'data' => [
+                'id' => 42,
+                'accountId' => 1,
+                'role' => 10
+            ]
+        ];
+        $entity = $this->createMock(AccountRole::class);
 
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['table' => 'table-name']);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('findEntity')
+            ->with($payload->entityClass, $payload->data['id'])
+            ->willReturn($entity);
+        $entity->expects($this->once())
+            ->method('Populate')
+            ->with($payload->data);
+        $entity->expects($this->once())
+            ->method('Save')
+            ->willReturn(false);
 
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            "Unable to resolve entity class for table: table-name");
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Failed to update record.");
         ah::CallMethod($sut, 'onExecute');
     }
 
-    #[DataProvider('invalidModelDataProvider')]
-    function testOnExecuteThrowsForInvalidModelData(
-        string $table,
-        array $data,
+    function testOnExecuteSucceeds()
+    {
+        $sut = $this->systemUnderTest('validatePayload', 'findEntity');
+        $payload = (object)[
+            'entityClass' => AccountRole::class,
+            'data' => [
+                'id' => 42,
+                'accountId' => 1,
+                'role' => 10
+            ]
+        ];
+        $entity = $this->createMock(AccountRole::class);
+
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
+        $sut->expects($this->once())
+            ->method('findEntity')
+            ->with($payload->entityClass, $payload->data['id'])
+            ->willReturn($entity);
+        $entity->expects($this->once())
+            ->method('Populate')
+            ->with($payload->data);
+        $entity->expects($this->once())
+            ->method('Save')
+            ->willReturn(true);
+
+        $result = ah::CallMethod($sut, 'onExecute');
+        $this->assertNull($result);
+    }
+
+    #endregion onExecute
+
+    #region validatePayload ----------------------------------------------------
+
+    #[DataProvider('invalidPayloadProvider')]
+    function testValidatePayloadThrows(
+        array $query,
+        array $body,
         string $exceptionMessage
     ) {
         $sut = $this->systemUnderTest();
@@ -123,26 +166,54 @@ class UpdateRecordActionTest extends TestCase
             ->willReturn($queryParams);
         $queryParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn(['table' => $table]);
-        $request->expects($this->once())
+            ->willReturn($query);
+        $request->expects($this->any()) // any: QueryParams validation might fail
             ->method('JsonBody')
-            ->willReturn($data);
+            ->willReturn($body);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'onExecute');
+        ah::CallMethod($sut, 'validatePayload');
     }
 
-    function testOnExecuteThrowsIfEntityNotFound()
+    function testValidatePayloadThrowsIfModelResolutionFails()
     {
-        $sut = $this->systemUnderTest('findEntity');
+        $sut = $this->systemUnderTest('resolveEntityClass');
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $data = [
+        $query = ['table' => 'not-a-table'];
+
+        $request->expects($this->once())
+            ->method('QueryParams')
+            ->willReturn($queryParams);
+        $queryParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($query);
+        $sut->expects($this->once())
+            ->method('resolveEntityClass')
+            ->with('not-a-table')
+            ->willThrowException(new \InvalidArgumentException('Expected message.'));
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Expected message.');
+        ah::CallMethod($sut, 'validatePayload');
+    }
+
+    function testValidatePayloadSucceeds()
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $queryParams = $this->createMock(CArray::class);
+        $query = ['table' => 'accountrole'];
+        $body = [
             'id' => 42,
             'accountId' => 1,
             'role' => 10
+        ];
+        $expected = (object)[
+            'entityClass' => AccountRole::class,
+            'data' => $body
         ];
 
         $request->expects($this->once())
@@ -150,103 +221,24 @@ class UpdateRecordActionTest extends TestCase
             ->willReturn($queryParams);
         $queryParams->expects($this->once())
             ->method('ToArray')
-            ->willReturn(['table' => 'accountrole']);
+            ->willReturn($query);
         $request->expects($this->once())
             ->method('JsonBody')
-            ->willReturn($data);
-        $sut->expects($this->once())
-            ->method('findEntity')
-            ->with(AccountRole::class, 42)
-            ->willReturn(null);
+            ->willReturn($body);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Record with ID 42 not found in table 'accountrole'.");
-        ah::CallMethod($sut, 'onExecute');
+        $actual = ah::CallMethod($sut, 'validatePayload');
+        $this->assertEquals($expected, $actual);
     }
 
-    function testOnExecuteThrowsIfEntitySaveFails()
-    {
-        $sut = $this->systemUnderTest('findEntity');
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-        $data = [
-            'id' => 42,
-            'accountId' => 1,
-            'role' => 10
-        ];
-        $entity = $this->createMock(AccountRole::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['table' => 'accountrole']);
-        $request->expects($this->once())
-            ->method('JsonBody')
-            ->willReturn($data);
-        $sut->expects($this->once())
-            ->method('findEntity')
-            ->with(AccountRole::class, 42)
-            ->willReturn($entity);
-        $entity->expects($this->once())
-            ->method('Populate')
-            ->with($data);
-        $entity->expects($this->once())
-            ->method('Save')
-            ->willReturn(false);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "Failed to edit record with ID 42 in table 'accountrole'.");
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteReturnsNullWhenEntitySaveSucceeds()
-    {
-        $sut = $this->systemUnderTest('findEntity');
-        $request = Request::Instance();
-        $queryParams = $this->createMock(CArray::class);
-        $data = [
-            'id' => 42,
-            'accountId' => 1,
-            'role' => 10
-        ];
-        $entity = $this->createMock(AccountRole::class);
-
-        $request->expects($this->once())
-            ->method('QueryParams')
-            ->willReturn($queryParams);
-        $queryParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['table' => 'accountrole']);
-        $request->expects($this->once())
-            ->method('JsonBody')
-            ->willReturn($data);
-        $sut->expects($this->once())
-            ->method('findEntity')
-            ->with(AccountRole::class, 42)
-            ->willReturn($entity);
-        $entity->expects($this->once())
-            ->method('Populate')
-            ->with($data);
-        $entity->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertNull($result);
-    }
-
-    #endregion onExecute
+    #endregion validatePayload
 
     #region findEntity ---------------------------------------------------------
 
-    function testFindEntityReturnsNullWhenNotFound()
+    function testFindEntityReturnsNullIfNotFound()
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = Database::Instance();
+
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `accountrole` WHERE `id` = :id LIMIT 1',
             bindings: ['id' => 42],
@@ -259,10 +251,11 @@ class UpdateRecordActionTest extends TestCase
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
-    function testFindEntityReturnsEntityWhenFound()
+    function testFindEntityReturnsEntityIfFound()
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = Database::Instance();
+
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `accountrole` WHERE `id` = :id LIMIT 1',
             bindings: ['id' => 42],
@@ -286,55 +279,65 @@ class UpdateRecordActionTest extends TestCase
 
     #region Data Providers -----------------------------------------------------
 
-    static function invalidModelDataProvider()
+    static function invalidPayloadProvider()
     {
         return [
+            'table missing' => [
+                'query' => [],
+                'body' => [],
+                'exceptionMessage' => "Required field 'table' is missing."
+            ],
+            'table not string' => [
+                'query' => ['table' => 123],
+                'body' => [],
+                'exceptionMessage' => "Field 'table' must be a string."
+            ],
             #region Account
             'account: id missing' => [
-                'table' => 'account',
-                'data' => [],
+                'query' => ['table' => 'account'],
+                'body' => [],
                 'exceptionMessage' => "Required field 'id' is missing."
             ],
             'account: id not an integer' => [
-                'table' => 'account',
-                'data' => [
+                'query' => ['table' => 'account'],
+                'body' => [
                     'id' => 'not-an-integer'
                 ],
                 'exceptionMessage' => "Field 'id' must be an integer."
             ],
             'account: id less than one' => [
-                'table' => 'account',
-                'data' => [
+                'query' => ['table' => 'account'],
+                'body' => [
                     'id' => 0
                 ],
                 'exceptionMessage' => "Field 'id' must have a minimum value of 1."
             ],
             'account: email missing' => [
-                'table' => 'account',
-                'data' => [
+                'query' => ['table' => 'account'],
+                'body' => [
                     'id' => 42
                 ],
                 'exceptionMessage' => "Required field 'email' is missing."
             ],
             'account: email invalid' => [
-                'table' => 'account',
-                'data' => [
+                'query' => ['table' => 'account'],
+                'body' => [
                     'id' => 42,
                     'email' => 'invalid-email'
                 ],
                 'exceptionMessage' => "Field 'email' must be a valid email address."
             ],
             'account: passwordHash missing' => [
-                'table' => 'account',
-                'data' => [
+                'query' => ['table' => 'account'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com'
                 ],
                 'exceptionMessage' => "Required field 'passwordHash' is missing."
             ],
             'account: passwordHash invalid' => [
-                'table' => 'account',
-                'data' => [
+                'query' => ['table' => 'account'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => 'invalid-hash'
@@ -343,8 +346,8 @@ class UpdateRecordActionTest extends TestCase
                     . SecurityService::PASSWORD_HASH_PATTERN
             ],
             'account: displayName missing' => [
-                'table' => 'account',
-                'data' => [
+                'query' => ['table' => 'account'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123'
@@ -352,8 +355,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Required field 'displayName' is missing."
             ],
             'account: displayName invalid' => [
-                'table' => 'account',
-                'data' => [
+                'query' => ['table' => 'account'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
@@ -363,8 +366,8 @@ class UpdateRecordActionTest extends TestCase
                     . AccountService::DISPLAY_NAME_PATTERN
             ],
             'account: timeActivated missing' => [
-                'table' => 'account',
-                'data' => [
+                'query' => ['table' => 'account'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
@@ -373,8 +376,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Required field 'timeActivated' is missing."
             ],
             'account: timeActivated invalid' => [
-                'table' => 'account',
-                'data' => [
+                'query' => ['table' => 'account'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
@@ -384,8 +387,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Field 'timeActivated' must match the exact datetime format: Y-m-d H:i:s"
             ],
             'account: timeLastLogin missing' => [
-                'table' => 'account',
-                'data' => [
+                'query' => ['table' => 'account'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
@@ -395,8 +398,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Required field 'timeLastLogin' is missing."
             ],
             'account: timeLastLogin invalid' => [
-                'table' => 'account',
-                'data' => [
+                'query' => ['table' => 'account'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
@@ -409,58 +412,58 @@ class UpdateRecordActionTest extends TestCase
             #endregion Account
             #region AccountRole
             'accountRole: id missing' => [
-                'table' => 'accountrole',
-                'data' => [],
+                'query' => ['table' => 'accountrole'],
+                'body' => [],
                 'exceptionMessage' => "Required field 'id' is missing."
             ],
             'accountRole: id not an integer' => [
-                'table' => 'accountrole',
-                'data' => [
+                'query' => ['table' => 'accountrole'],
+                'body' => [
                     'id' => 'not-an-integer'
                 ],
                 'exceptionMessage' => "Field 'id' must be an integer."
             ],
             'accountRole: id less than one' => [
-                'table' => 'accountrole',
-                'data' => [
+                'query' => ['table' => 'accountrole'],
+                'body' => [
                     'id' => 0
                 ],
                 'exceptionMessage' => "Field 'id' must have a minimum value of 1."
             ],
             'accountRole: accountId missing' => [
-                'table' => 'accountrole',
-                'data' => [
+                'query' => ['table' => 'accountrole'],
+                'body' => [
                     'id' => 42
                 ],
                 'exceptionMessage' => "Required field 'accountId' is missing."
             ],
             'accountRole: accountId not an integer' => [
-                'table' => 'accountrole',
-                'data' => [
+                'query' => ['table' => 'accountrole'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 'not-an-integer'
                 ],
                 'exceptionMessage' => "Field 'accountId' must be an integer."
             ],
             'accountRole: accountId less than one' => [
-                'table' => 'accountrole',
-                'data' => [
+                'query' => ['table' => 'accountrole'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 0
                 ],
                 'exceptionMessage' => "Field 'accountId' must have a minimum value of 1."
             ],
             'accountRole: role missing' => [
-                'table' => 'accountrole',
-                'data' => [
+                'query' => ['table' => 'accountrole'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1
                 ],
                 'exceptionMessage' => "Required field 'role' is missing."
             ],
             'accountRole: role invalid enum value' => [
-                'table' => 'accountrole',
-                'data' => [
+                'query' => ['table' => 'accountrole'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1,
                     'role' => 999
@@ -470,50 +473,50 @@ class UpdateRecordActionTest extends TestCase
             #endregion AccountRole
             #region PendingAccount
             'pendingAccount: id missing' => [
-                'table' => 'pendingaccount',
-                'data' => [],
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [],
                 'exceptionMessage' => "Required field 'id' is missing."
             ],
             'pendingAccount: id not an integer' => [
-                'table' => 'pendingaccount',
-                'data' => [
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [
                     'id' => 'not-an-integer'
                 ],
                 'exceptionMessage' => "Field 'id' must be an integer."
             ],
             'pendingAccount: id less than one' => [
-                'table' => 'pendingaccount',
-                'data' => [
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [
                     'id' => 0
                 ],
                 'exceptionMessage' => "Field 'id' must have a minimum value of 1."
             ],
             'pendingAccount: email missing' => [
-                'table' => 'pendingaccount',
-                'data' => [
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [
                     'id' => 42
                 ],
                 'exceptionMessage' => "Required field 'email' is missing."
             ],
             'pendingAccount: email invalid' => [
-                'table' => 'pendingaccount',
-                'data' => [
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [
                     'id' => 42,
                     'email' => 'invalid-email'
                 ],
                 'exceptionMessage' => "Field 'email' must be a valid email address."
             ],
             'pendingAccount: passwordHash missing' => [
-                'table' => 'pendingaccount',
-                'data' => [
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                 ],
                 'exceptionMessage' => "Required field 'passwordHash' is missing."
             ],
             'pendingAccount: passwordHash invalid' => [
-                'table' => 'pendingaccount',
-                'data' => [
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => 'invalid-hash'
@@ -522,8 +525,8 @@ class UpdateRecordActionTest extends TestCase
                     . SecurityService::PASSWORD_HASH_PATTERN
             ],
             'pendingAccount: displayName missing' => [
-                'table' => 'pendingaccount',
-                'data' => [
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123'
@@ -531,8 +534,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Required field 'displayName' is missing."
             ],
             'pendingAccount: displayName invalid' => [
-                'table' => 'pendingaccount',
-                'data' => [
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
@@ -542,8 +545,8 @@ class UpdateRecordActionTest extends TestCase
                     . AccountService::DISPLAY_NAME_PATTERN
             ],
             'pendingAccount: activationCode missing' => [
-                'table' => 'pendingaccount',
-                'data' => [
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
@@ -552,8 +555,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Required field 'activationCode' is missing."
             ],
             'pendingAccount: activationCode invalid' => [
-                'table' => 'pendingaccount',
-                'data' => [
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
@@ -564,8 +567,8 @@ class UpdateRecordActionTest extends TestCase
                     . SecurityService::TOKEN_DEFAULT_PATTERN
             ],
             'pendingAccount: timeRegistered missing' => [
-                'table' => 'pendingaccount',
-                'data' => [
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
@@ -575,8 +578,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Required field 'timeRegistered' is missing."
             ],
             'pendingAccount: timeRegistered invalid' => [
-                'table' => 'pendingaccount',
-                'data' => [
+                'query' => ['table' => 'pendingaccount'],
+                'body' => [
                     'id' => 42,
                     'email' => 'john@example.com',
                     'passwordHash' => '$2y$10$12345678901234567890123456789012345678901234567890123',
@@ -589,58 +592,58 @@ class UpdateRecordActionTest extends TestCase
             #endregion PendingAccount
             #region PasswordReset
             'passwordReset: id missing' => [
-                'table' => 'passwordreset',
-                'data' => [],
+                'query' => ['table' => 'passwordreset'],
+                'body' => [],
                 'exceptionMessage' => "Required field 'id' is missing."
             ],
             'passwordReset: id not an integer' => [
-                'table' => 'passwordreset',
-                'data' => [
+                'query' => ['table' => 'passwordreset'],
+                'body' => [
                     'id' => 'not-an-integer'
                 ],
                 'exceptionMessage' => "Field 'id' must be an integer."
             ],
             'passwordReset: id less than one' => [
-                'table' => 'passwordreset',
-                'data' => [
+                'query' => ['table' => 'passwordreset'],
+                'body' => [
                     'id' => 0
                 ],
                 'exceptionMessage' => "Field 'id' must have a minimum value of 1."
             ],
             'passwordReset: accountId missing' => [
-                'table' => 'passwordreset',
-                'data' => [
+                'query' => ['table' => 'passwordreset'],
+                'body' => [
                     'id' => 42
                 ],
                 'exceptionMessage' => "Required field 'accountId' is missing."
             ],
             'passwordReset: accountId not an integer' => [
-                'table' => 'passwordreset',
-                'data' => [
+                'query' => ['table' => 'passwordreset'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 'not-an-integer'
                 ],
                 'exceptionMessage' => "Field 'accountId' must be an integer."
             ],
             'passwordReset: accountId less than one' => [
-                'table' => 'passwordreset',
-                'data' => [
+                'query' => ['table' => 'passwordreset'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 0
                 ],
                 'exceptionMessage' => "Field 'accountId' must have a minimum value of 1."
             ],
             'passwordReset: resetCode missing' => [
-                'table' => 'passwordreset',
-                'data' => [
+                'query' => ['table' => 'passwordreset'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1
                 ],
                 'exceptionMessage' => "Required field 'resetCode' is missing."
             ],
             'passwordReset: resetCode invalid' => [
-                'table' => 'passwordreset',
-                'data' => [
+                'query' => ['table' => 'passwordreset'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1,
                     'resetCode' => 'invalid-token'
@@ -649,8 +652,8 @@ class UpdateRecordActionTest extends TestCase
                     . SecurityService::TOKEN_DEFAULT_PATTERN
             ],
             'passwordReset: timeRequested missing' => [
-                'table' => 'passwordreset',
-                'data' => [
+                'query' => ['table' => 'passwordreset'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1,
                     'resetCode' => \str_repeat('a', 64)
@@ -658,8 +661,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Required field 'timeRequested' is missing."
             ],
             'passwordReset: timeRequested invalid' => [
-                'table' => 'passwordreset',
-                'data' => [
+                'query' => ['table' => 'passwordreset'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1,
                     'resetCode' => \str_repeat('a', 64),
@@ -670,58 +673,58 @@ class UpdateRecordActionTest extends TestCase
             #endregion PasswordReset
             #region PersistentLogin
             'persistentLogin: id missing' => [
-                'table' => 'persistentlogin',
-                'data' => [],
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [],
                 'exceptionMessage' => "Required field 'id' is missing."
             ],
             'persistentLogin: id not an integer' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 'not-an-integer'
                 ],
                 'exceptionMessage' => "Field 'id' must be an integer."
             ],
             'persistentLogin: id less than one' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 0
                 ],
                 'exceptionMessage' => "Field 'id' must have a minimum value of 1."
             ],
             'persistentLogin: accountId missing' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 42
                 ],
                 'exceptionMessage' => "Required field 'accountId' is missing."
             ],
             'persistentLogin: accountId not an integer' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 'not-an-integer'
                 ],
                 'exceptionMessage' => "Field 'accountId' must be an integer."
             ],
             'persistentLogin: accountId less than one' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 0
                 ],
                 'exceptionMessage' => "Field 'accountId' must have a minimum value of 1."
             ],
             'persistentLogin: clientSignature missing' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1
                 ],
                 'exceptionMessage' => "Required field 'clientSignature' is missing."
             ],
             'persistentLogin: clientSignature invalid' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => 'invalid-signature'
@@ -729,8 +732,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Field 'clientSignature' must match the required pattern: /^[0-9a-zA-Z+\/]{22,24}$/"
             ],
             'persistentLogin: lookupKey missing' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => \str_repeat('a', 22)
@@ -738,8 +741,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Required field 'lookupKey' is missing."
             ],
             'persistentLogin: lookupKey invalid' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => \str_repeat('a', 22),
@@ -748,8 +751,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Field 'lookupKey' must match the required pattern: /^[0-9a-fA-F]{16}$/"
             ],
             'persistentLogin: tokenHash missing' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => \str_repeat('a', 22),
@@ -758,8 +761,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Required field 'tokenHash' is missing."
             ],
             'persistentLogin: tokenHash invalid' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => \str_repeat('a', 22),
@@ -770,8 +773,8 @@ class UpdateRecordActionTest extends TestCase
                     . SecurityService::PASSWORD_HASH_PATTERN
             ],
             'persistentLogin: timeExpires missing' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => \str_repeat('a', 22),
@@ -781,8 +784,8 @@ class UpdateRecordActionTest extends TestCase
                 'exceptionMessage' => "Required field 'timeExpires' is missing."
             ],
             'persistentLogin: timeExpires invalid' => [
-                'table' => 'persistentlogin',
-                'data' => [
+                'query' => ['table' => 'persistentlogin'],
+                'body' => [
                     'id' => 42,
                     'accountId' => 1,
                     'clientSignature' => \str_repeat('a', 22),

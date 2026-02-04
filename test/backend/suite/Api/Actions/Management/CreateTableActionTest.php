@@ -39,67 +39,52 @@ class CreateTableActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    #[DataProvider('invalidFormDataProvider')]
-    function testOnExecuteThrowsForInvalidFormData(
-        array $data,
-        string $exceptionMessage
-    ) {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
+    function testOnExecuteThrowsIfPayloadValidationFails()
+    {
+        $sut = $this->systemUnderTest('validatePayload');
 
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($data);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willThrowException(new \RuntimeException('Expected message.'));
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
+        $this->expectExceptionMessage('Expected message.');
         ah::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteThrowsWhenCreateTableFails()
+    function testOnExecuteThrowsIfCreateTableFails()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload');
         $entity = new class() extends Entity {
             public static function CreateTable(): bool { return false; }
         };
-        $entityClass = \get_class($entity);
+        $payload = (object)[
+            'entityClass' => \get_class($entity)
+        ];
 
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['entityClass' => $entityClass]);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage(
-            "Failed to create table for: $entityClass");
+            "Failed to create table for: {$payload->entityClass}");
         ah::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteReturnsNullWhenCreateTableSucceeds()
+    function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
+        $sut = $this->systemUnderTest('validatePayload');
         $entity = new class() extends Entity {
             public static function CreateTable(): bool { return true; }
         };
-        $entityClass = \get_class($entity);
+        $payload = (object)[
+            'entityClass' => \get_class($entity)
+        ];
 
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn(['entityClass' => $entityClass]);
+        $sut->expects($this->once())
+            ->method('validatePayload')
+            ->willReturn($payload);
 
         $result = ah::CallMethod($sut, 'onExecute');
         $this->assertNull($result);
@@ -107,26 +92,72 @@ class CreateTableActionTest extends TestCase
 
     #endregion onExecute
 
+    #region validatePayload ----------------------------------------------------
+
+    #[DataProvider('invalidPayloadProvider')]
+    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($payload);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage($exceptionMessage);
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
+        ah::CallMethod($sut, 'validatePayload');
+    }
+
+    function testValidatePayloadSucceeds()
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $entity = new class() extends Entity {};
+        $payload = [
+            'entityClass' => \get_class($entity)
+        ];
+        $expected = (object)$payload;
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($payload);
+
+        $actual = ah::CallMethod($sut, 'validatePayload');
+        $this->assertEquals($expected, $actual);
+    }
+
+    #endregion validatePayload
+
     #region Data Providers -----------------------------------------------------
 
-    static function invalidFormDataProvider()
+    static function invalidPayloadProvider()
     {
         return [
             'entityClass missing' => [
-                [],
-                "Required field 'entityClass' is missing."
+                'payload' => [],
+                'exceptionMessage' => "Required field 'entityClass' is missing."
             ],
             'entityClass not a string' => [
-                ['entityClass' => 42],
-                "Field 'entityClass' must be a string."
+                'payload' => ['entityClass' => 42],
+                'exceptionMessage' => "Field 'entityClass' must be a string."
             ],
             'entityClass not a subclass of Entity' => [
-                ['entityClass' => \stdClass::class],
-                "Field 'entityClass' failed custom validation."
+                'payload' => ['entityClass' => \stdClass::class],
+                'exceptionMessage' => "Field 'entityClass' failed custom validation."
             ],
             'entityClass is abstract' => [
-                ['entityClass' => ViewEntity::class],
-                "Field 'entityClass' failed custom validation."
+                'payload' => ['entityClass' => ViewEntity::class],
+                'exceptionMessage' => "Field 'entityClass' failed custom validation."
             ],
         ];
     }

@@ -98,12 +98,8 @@ class ListEntityMappingsActionTest extends TestCase
 
     function testOnExecuteSkipsInvalidEntities()
     {
-        $sut = $this->systemUnderTest(
-            'findModules',
-            'findEntities',
-            'entityClassFrom',
-            'isValidEntity'
-        );
+        $sut = $this->systemUnderTest('findModules', 'findEntities',
+            'entityClassFrom', 'isValidEntity');
         $modulePath = new CPath('Module1');
         $entityPath = new CPath('Module1/Model/Invalid.php');
         $entityClass = '\\Module1\\Model\\Invalid';
@@ -137,13 +133,8 @@ class ListEntityMappingsActionTest extends TestCase
         array $tableMetadata,
         ?bool $isSync
     ) {
-        $sut = $this->systemUnderTest(
-            'findModules',
-            'findEntities',
-            'entityClassFrom',
-            'isValidEntity',
-            'tableMetadata'
-        );
+        $sut = $this->systemUnderTest('findModules', 'findEntities',
+            'entityClassFrom', 'isValidEntity', 'tableMetadata');
         $modulePath = new CPath('Module1');
         $entityPath = new CPath('Module1/Model/Foo.php');
         $entity = new class() extends Entity {
@@ -355,7 +346,7 @@ class ListEntityMappingsActionTest extends TestCase
 
     #region entityClassFrom ----------------------------------------------------
 
-    function testEntityClassFromThrowsWhenPathIsOutsideBackend()
+    function testEntityClassFromThrowsIfPathIsOutsideBackend()
     {
         $sut = $this->systemUnderTest();
         $backendPath = ah::GetProperty($sut, 'backendPath');
@@ -437,7 +428,7 @@ class ListEntityMappingsActionTest extends TestCase
 
     #region tableMetadata ------------------------------------------------------
 
-    function testTableMetadataThrowsWhenQueryFails()
+    function testTableMetadataThrowsIfQueryFails()
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = Database::Instance();
@@ -503,44 +494,40 @@ class ListEntityMappingsActionTest extends TestCase
 
     #region Data Providers -----------------------------------------------------
 
-    /**
-     * @return array<string, array<mixed>>[]
-     *   tableName, tableExists, isView, entityMetadata, tableMetadata, isSync
-     */
     static function entityMappingDataProvider()
     {
         return [
             'missing table' => [
-                'table1',
-                false,
-                false,
-                [ ['name' => 'id', 'type' => 'INT', 'nullable' => false] ],
-                [],
-                null
+                'tableName'      => 'table1',
+                'tableExists'    => false,
+                'isView'         => false,
+                'entityMetadata' => [['name' => 'id', 'type' => 'INT', 'nullable' => false]],
+                'tableMetadata'  => [],
+                'isSync'         => null
             ],
             'view table' => [
-                'view1',
-                true,
-                true,
-                [ ['name' => 'id', 'type' => 'INT', 'nullable' => false] ],
-                [ ['name' => 'id', 'type' => 'INT', 'nullable' => false] ],
-                null
+                'tableName'      => 'view1',
+                'tableExists'    => true,
+                'isView'         => true,
+                'entityMetadata' => [['name' => 'id', 'type' => 'INT', 'nullable' => false]],
+                'tableMetadata'  => [['name' => 'id', 'type' => 'INT', 'nullable' => false]],
+                'isSync'         => null
             ],
             'synced table' => [
-                'account',
-                true,
-                false,
-                [ ['name' => 'id', 'type' => 'INT', 'nullable' => false] ],
-                [ ['name' => 'id', 'type' => 'INT', 'nullable' => false] ],
-                true
+                'tableName'      => 'account',
+                'tableExists'    => true,
+                'isView'         => false,
+                'entityMetadata' => [['name' => 'id', 'type' => 'INT', 'nullable' => false]],
+                'tableMetadata'  => [['name' => 'id', 'type' => 'INT', 'nullable' => false]],
+                'isSync'         => true
             ],
             'out-of-sync table' => [
-                'account',
-                true,
-                false,
-                [ ['name' => 'id', 'type' => 'INT', 'nullable' => false] ],
-                [ ['name' => 'id', 'type' => 'VARCHAR', 'nullable' => false] ],
-                false
+                'tableName'      => 'account',
+                'tableExists'    => true,
+                'isView'         => false,
+                'entityMetadata' => [['name' => 'id', 'type' => 'INT', 'nullable' => false]],
+                'tableMetadata'  => [['name' => 'id', 'type' => 'VARCHAR', 'nullable' => false]],
+                'isSync'         => false
             ],
         ];
     }
