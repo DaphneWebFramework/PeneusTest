@@ -13,6 +13,7 @@ use \Harmonia\Services\CookieService;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
+use \Peneus\Api\Hooks\ICaptchaHook;
 use \Peneus\Model\Account;
 use \Peneus\Model\AccountView;
 use \Peneus\Services\AccountService;
@@ -21,6 +22,7 @@ use \TestToolkit\AccessHelper as ah;
 #[CoversClass(LogInAction::class)]
 class LogInActionTest extends TestCase
 {
+    private ?ICaptchaHook $captchaHook = null;
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
     private ?AccountService $originalAccountService = null;
@@ -29,6 +31,7 @@ class LogInActionTest extends TestCase
 
     protected function setUp(): void
     {
+        $this->captchaHook = $this->createMock(ICaptchaHook::class);
         $this->originalRequest =
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalDatabase =
@@ -43,6 +46,7 @@ class LogInActionTest extends TestCase
 
     protected function tearDown(): void
     {
+        $this->captchaHook = null;
         Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
         AccountService::ReplaceInstance($this->originalAccountService);
@@ -53,6 +57,7 @@ class LogInActionTest extends TestCase
     private function systemUnderTest(string ...$mockedMethods): LogInAction
     {
         return $this->getMockBuilder(LogInAction::class)
+            ->setConstructorArgs([$this->captchaHook])
             ->onlyMethods($mockedMethods)
             ->getMock();
     }
@@ -237,6 +242,8 @@ class LogInActionTest extends TestCase
         $formParams->expects($this->once())
             ->method('ToArray')
             ->willReturn($payload);
+        $this->captchaHook->expects($this->never())
+            ->method('OnVerifyCaptcha');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage($exceptionMessage);
@@ -244,8 +251,33 @@ class LogInActionTest extends TestCase
         ah::CallMethod($sut, 'validatePayload');
     }
 
+    function testValidatePayloadThrowsIfCaptchaVerificationFails()
+    {
+        $sut = $this->systemUnderTest();
+        $request = Request::Instance();
+        $formParams = $this->createMock(CArray::class);
+        $payload = [
+            'email' => 'john@example.com',
+            'password' => 'pass1234'
+        ];
+
+        $request->expects($this->once())
+            ->method('FormParams')
+            ->willReturn($formParams);
+        $formParams->expects($this->once())
+            ->method('ToArray')
+            ->willReturn($payload);
+        $this->captchaHook->expects($this->once())
+            ->method('OnVerifyCaptcha')
+            ->willThrowException(new \RuntimeException('Expected message.'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Expected message.');
+        ah::CallMethod($sut, 'validatePayload');
+    }
+
     #[DataProvider('validPayloadProvider')]
-    function testValidatePayload($expected, $payload)
+    function testValidatePayloadSucceeds(object $expected, array $payload)
     {
         $sut = $this->systemUnderTest();
         $request = Request::Instance();
@@ -257,6 +289,8 @@ class LogInActionTest extends TestCase
         $formParams->expects($this->once())
             ->method('ToArray')
             ->willReturn($payload);
+        $this->captchaHook->expects($this->once())
+            ->method('OnVerifyCaptcha');
 
         $this->assertEquals($expected, ah::CallMethod($sut, 'validatePayload'));
     }
