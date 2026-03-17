@@ -331,6 +331,80 @@ class PageTest extends TestCase
 
     #endregion Masterpage
 
+    #region SetCanonicalSuffix -------------------------------------------------
+
+    function testSetCanonicalSuffix()
+    {
+        $sut = $this->systemUnderTest();
+
+        // Test default value
+        $this->assertSame(
+            '',
+            ah::GetMockProperty(Page::class, $sut, 'canonicalSuffix')
+        );
+
+        $this->assertSame($sut, $sut->SetCanonicalSuffix('xyz'));
+        $this->assertSame(
+            'xyz',
+            ah::GetMockProperty(Page::class, $sut, 'canonicalSuffix')
+        );
+    }
+
+    #endregion SetCanonicalSuffix
+
+    #region CanonicalUrl -------------------------------------------------------
+
+    function testCanonicalUrlWithoutSuffix()
+    {
+        $sut = $this->systemUnderTest();
+        $resource = Resource::Instance();
+        $url = $this->createMock(CUrl::class);
+        $expected = 'http://example.com/pages/home/';
+
+        $resource->expects($this->once())
+            ->method('PageUrl')
+            ->with($sut->Id())
+            ->willReturn($url);
+        $url->expects($this->never())
+            ->method('Extend');
+        $url->expects($this->once())
+            ->method('EnsureTrailingSlash')
+            ->willReturn($url);
+        $url->expects($this->once())
+            ->method('__toString')
+            ->willReturn($expected);
+
+        $this->assertSame($expected, $sut->CanonicalUrl());
+    }
+
+    function testCanonicalUrlWithSuffix()
+    {
+        $sut = $this->systemUnderTest();
+        $resource = Resource::Instance();
+        $url = $this->createMock(CUrl::class);
+        $expected = 'http://example.com/pages/home/xyz/';
+
+        $sut->SetCanonicalSuffix('xyz');
+
+        $resource->expects($this->once())
+            ->method('PageUrl')
+            ->with($sut->Id())
+            ->willReturn($url);
+        $url->expects($this->once())
+            ->method('Extend')
+            ->with('xyz');
+        $url->expects($this->once())
+            ->method('EnsureTrailingSlash')
+            ->willReturn($url);
+        $url->expects($this->once())
+            ->method('__toString')
+            ->willReturn($expected);
+
+        $this->assertSame($expected, $sut->CanonicalUrl());
+    }
+
+    #endregion CanonicalUrl
+
     #region Content ------------------------------------------------------------
 
     function testContent()

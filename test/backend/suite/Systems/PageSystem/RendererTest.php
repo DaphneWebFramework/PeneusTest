@@ -182,6 +182,7 @@ class RendererTest extends TestCase
                 	<meta charset="utf-8">
                 	<title>{{Title}}</title>
                 	{{MetaTags}}
+                	<link rel="canonical" href="{{CanonicalUrl}}">
                 	<link rel="shortcut icon" href="{{AppUrl}}/favicon.ico">
                 	{{LibraryStylesheetLinks}}
                 	{{PageStylesheetLinks}}
@@ -212,6 +213,9 @@ class RendererTest extends TestCase
             ->method('metaTags')
             ->with($page->MetaItems())
             ->willReturn("\t" . '<meta name="description" content="my description">');
+        $page->expects($this->once())
+            ->method('CanonicalUrl')
+            ->willReturn('http://example.com/pages/home/');
         $sut->expects($this->once())
             ->method('libraryStylesheetLinks')
             ->with($libraries)
@@ -245,6 +249,7 @@ class RendererTest extends TestCase
                 	<meta charset="utf-8">
                 	<title>Home | MyWebsite</title>
                 	<meta name="description" content="my description">
+                	<link rel="canonical" href="http://example.com/pages/home/">
                 	<link rel="shortcut icon" href="url/to/favicon.ico">
                 	<link rel="stylesheet" href="url/to/bootstrap-4.6.2/css/bootstrap.css">
                 	<link rel="stylesheet" href="url/to/pages/home/style.css">
