@@ -392,7 +392,8 @@ class PageTest extends TestCase
             ->willReturn($url);
         $url->expects($this->once())
             ->method('Extend')
-            ->with('xyz');
+            ->with('xyz')
+            ->willReturn($url);
         $url->expects($this->once())
             ->method('EnsureTrailingSlash')
             ->willReturn($url);
