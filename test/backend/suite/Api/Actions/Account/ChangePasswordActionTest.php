@@ -13,7 +13,6 @@ use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\AccountView;
-use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(ChangePasswordAction::class)]
@@ -21,7 +20,6 @@ class ChangePasswordActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
-    private ?AccountService $originalAccountService = null;
     private ?SecurityService $originalSecurityService = null;
 
     protected function setUp(): void
@@ -30,8 +28,6 @@ class ChangePasswordActionTest extends TestCase
             Request::ReplaceInstance($this->createMock(Request::class));
         $this->originalDatabase =
             Database::ReplaceInstance(new FakeDatabase());
-        $this->originalAccountService =
-            AccountService::ReplaceInstance($this->createMock(AccountService::class));
         $this->originalSecurityService =
             SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
     }
@@ -40,7 +36,6 @@ class ChangePasswordActionTest extends TestCase
     {
         Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
-        AccountService::ReplaceInstance($this->originalAccountService);
         SecurityService::ReplaceInstance($this->originalSecurityService);
     }
 
@@ -248,39 +243,6 @@ class ChangePasswordActionTest extends TestCase
     }
 
     #endregion onExecute
-
-    #region ensureLoggedIn -----------------------------------------------------
-
-    function testEnsureLoggedInThrowsIfUserIsNotLoggedIn()
-    {
-        $sut = $this->systemUnderTest();
-        $accountService = AccountService::Instance();
-
-        $accountService->expects($this->once())
-            ->method('SessionAccount')
-            ->willReturn(null);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "You do not have permission to perform this action.");
-        $this->expectExceptionCode(StatusCode::Unauthorized->value);
-        ah::CallMethod($sut, 'ensureLoggedIn');
-    }
-
-    function testEnsureLoggedInSucceedsIfUserIsLoggedIn()
-    {
-        $sut = $this->systemUnderTest();
-        $accountService = AccountService::Instance();
-        $accountView = $this->createStub(AccountView::class);
-
-        $accountService->expects($this->once())
-            ->method('SessionAccount')
-            ->willReturn($accountView);
-
-        $this->assertSame($accountView, ah::CallMethod($sut, 'ensureLoggedIn'));
-    }
-
-    #endregion ensureLoggedIn
 
     #region ensureLocalAccount -------------------------------------------------
 

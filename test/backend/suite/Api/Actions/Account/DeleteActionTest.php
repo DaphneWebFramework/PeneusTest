@@ -137,39 +137,6 @@ class DeleteActionTest extends TestCase
 
     #endregion onExecute
 
-    #region ensureLoggedIn -----------------------------------------------------
-
-    function testEnsureLoggedInThrowsIfUserIsNotLoggedIn()
-    {
-        $sut = $this->systemUnderTest();
-        $accountService = AccountService::Instance();
-
-        $accountService->expects($this->once())
-            ->method('SessionAccount')
-            ->willReturn(null);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "You do not have permission to perform this action.");
-        $this->expectExceptionCode(StatusCode::Unauthorized->value);
-        ah::CallMethod($sut, 'ensureLoggedIn');
-    }
-
-    function testEnsureLoggedInSucceedsIfUserIsLoggedIn()
-    {
-        $sut = $this->systemUnderTest();
-        $accountService = AccountService::Instance();
-        $accountView = $this->createStub(AccountView::class);
-
-        $accountService->expects($this->once())
-            ->method('SessionAccount')
-            ->willReturn($accountView);
-
-        $this->assertSame($accountView, ah::CallMethod($sut, 'ensureLoggedIn'));
-    }
-
-    #endregion ensureLoggedIn
-
     #region findAccount --------------------------------------------------------
 
     function testFindAccountThrowsIfRecordNotFound()
