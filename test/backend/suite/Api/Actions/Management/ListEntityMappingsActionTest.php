@@ -16,6 +16,8 @@ use \Peneus\Model\Entity;
 use \Peneus\Model\ViewEntity;
 use \TestToolkit\AccessHelper as ah;
 
+trait TestTrait {}
+
 #[CoversClass(ListEntityMappingsAction::class)]
 class ListEntityMappingsActionTest extends TestCase
 {
@@ -398,7 +400,7 @@ class ListEntityMappingsActionTest extends TestCase
 
     #region isValidEntity ------------------------------------------------------
 
-    function testIsValidEntityReturnsFalseWhenNotSubclassOfEntity()
+    function testIsValidEntityReturnsFalseForNonEntitySubclass()
     {
         $sut = $this->systemUnderTest();
 
@@ -406,11 +408,19 @@ class ListEntityMappingsActionTest extends TestCase
         $this->assertFalse($result);
     }
 
-    function testIsValidEntityReturnsFalseWhenClassIsAbstract()
+    function testIsValidEntityReturnsFalseForAbstractClass()
     {
         $sut = $this->systemUnderTest();
 
         $result = ah::CallMethod($sut, 'isValidEntity', [ViewEntity::class]);
+        $this->assertFalse($result);
+    }
+
+    function testIsValidEntityReturnsFalseForTrait()
+    {
+        $sut = $this->systemUnderTest();
+
+        $result = ah::CallMethod($sut, 'isValidEntity', [TestTrait::class]);
         $this->assertFalse($result);
     }
 
