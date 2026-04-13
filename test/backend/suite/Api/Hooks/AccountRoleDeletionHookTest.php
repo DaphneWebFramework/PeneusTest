@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Hooks;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 
@@ -8,6 +10,7 @@ use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\AccountRole;
+use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(AccountRoleDeletionHook::class)]
 class AccountRoleDeletionHookTest extends TestCase
@@ -25,104 +28,158 @@ class AccountRoleDeletionHookTest extends TestCase
         Database::ReplaceInstance($this->originalDatabase);
     }
 
-    #region OnDeleteAccount ----------------------------------------------------
-
-    function testOnDeleteAccountSkipsWhenNoRolesExist()
+    private function systemUnderTest(string ...$mockedMethods): AccountRoleDeletionHook
     {
-        $sut = new AccountRoleDeletionHook();
-        $fakeDatabase = Database::Instance();
-        $account = new Account(['id' => 42]);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE accountId = :accountId',
-            bindings: ['accountId' => 42],
-            result: [],
-            times: 1
-        );
-
-        $this->expectNotToPerformAssertions();
-        $sut->OnDeleteAccount($account);
-        $fakeDatabase->VerifyAllExpectationsMet();
+        return $this->getMockBuilder(AccountRoleDeletionHook::class)
+            ->onlyMethods($mockedMethods)
+            ->getMock();
     }
 
-    function testOnDeleteAccountThrowsIfAnyDeleteFails()
-    {
-        $sut = new AccountRoleDeletionHook();
-        $fakeDatabase = Database::Instance();
-        $account = new Account(['id' => 42]);
+    #region OnDeleteAccount ----------------------------------------------------
 
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE accountId = :accountId',
-            bindings: ['accountId' => 42],
-            result: [[
-                'id' => 1,
-                'accountId' => 42
-            ], [
-                'id' => 2,
-                'accountId' => 42
-            ], [
-                'id' => 3,
-                'accountId' => 42
-            ]],
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'DELETE FROM `accountrole` WHERE `id` = :id',
-            bindings: ['id' => 1],
-            result: [],
-            lastAffectedRowCount: 1,
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'DELETE FROM `accountrole` WHERE `id` = :id',
-            bindings: ['id' => 2],
-            result: null,
-            times: 1
-        );
+    function testOnDeleteAccountDoesNothingWhenNoAccountRolesExist()
+    {
+        $sut = $this->systemUnderTest('findAccountRoles');
+        $account = new Account();
+
+        $sut->expects($this->once())
+            ->method('findAccountRoles')
+            ->with($account)
+            ->willReturn([]);
+
+        $sut->OnDeleteAccount($account);
+    }
+
+    function testOnDeleteThrowsWhenFirstAccountRoleDeleteFails()
+    {
+        $sut = $this->systemUnderTest('findAccountRoles');
+        $account = new Account();
+        $accountRoles = [
+            $this->createMock(AccountRole::class),
+            $this->createMock(AccountRole::class)
+        ];
+
+        $sut->expects($this->once())
+            ->method('findAccountRoles')
+            ->with($account)
+            ->willReturn($accountRoles);
+        $accountRoles[0]->expects($this->once())
+            ->method('Delete')
+            ->willReturn(false);
+        $accountRoles[1]->expects($this->never())
+            ->method('Delete');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to delete account role.");
+
         $sut->OnDeleteAccount($account);
-        $fakeDatabase->VerifyAllExpectationsMet();
     }
 
-    function testOnDeleteAccountSucceedsIfAllDeletesSucceed()
+    function testOnDeleteThrowsWhenSecondAccountRoleDeleteFails()
     {
-        $sut = new AccountRoleDeletionHook();
-        $fakeDatabase = Database::Instance();
-        $account = new Account(['id' => 42]);
+        $sut = $this->systemUnderTest('findAccountRoles');
+        $account = new Account();
+        $accountRoles = [
+            $this->createMock(AccountRole::class),
+            $this->createMock(AccountRole::class)
+        ];
 
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE accountId = :accountId',
-            bindings: ['accountId' => 42],
-            result: [[
-                'id' => 1,
-                'accountId' => 42
-            ], [
-                'id' => 2,
-                'accountId' => 42
-            ]],
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'DELETE FROM `accountrole` WHERE `id` = :id',
-            bindings: ['id' => 1],
-            result: [],
-            lastAffectedRowCount: 1,
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'DELETE FROM `accountrole` WHERE `id` = :id',
-            bindings: ['id' => 2],
-            result: [],
-            lastAffectedRowCount: 1,
-            times: 1
-        );
+        $sut->expects($this->once())
+            ->method('findAccountRoles')
+            ->with($account)
+            ->willReturn($accountRoles);
+        $accountRoles[0]->expects($this->once())
+            ->method('Delete')
+            ->willReturn(true);
+        $accountRoles[1]->expects($this->once())
+            ->method('Delete')
+            ->willReturn(false);
 
-        $this->expectNotToPerformAssertions();
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Failed to delete account role.");
+
         $sut->OnDeleteAccount($account);
-        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testOnDeleteSucceedsWhenAllAccountRolesDeleteSucceed()
+    {
+        $sut = $this->systemUnderTest('findAccountRoles');
+        $account = new Account();
+        $accountRoles = [
+            $this->createMock(AccountRole::class),
+            $this->createMock(AccountRole::class)
+        ];
+
+        $sut->expects($this->once())
+            ->method('findAccountRoles')
+            ->with($account)
+            ->willReturn($accountRoles);
+        $accountRoles[0]->expects($this->once())
+            ->method('Delete')
+            ->willReturn(true);
+        $accountRoles[1]->expects($this->once())
+            ->method('Delete')
+            ->willReturn(true);
+
+        $sut->OnDeleteAccount($account);
     }
 
     #endregion OnDeleteAccount
+
+    #region findAccountRoles ---------------------------------------------------
+
+    function testFindAccountRolesReturnsEmptyArrayIfNoneFound()
+    {
+        $sut = new AccountRoleDeletionHook();
+        $account = new Account(['id' => 100]);
+        $fakeDatabase = Database::Instance();
+
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM `accountrole`'
+               . ' WHERE accountId = :accountId',
+            bindings: ['accountId' => 100],
+            result: [],
+            times: 1
+        );
+
+        $actual = ah::CallMethod($sut, 'findAccountRoles', [$account]);
+
+        $this->assertSame([], $actual);
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testFindAccountRolesReturnsArrayOfEntitiesIfFound()
+    {
+        $sut = new AccountRoleDeletionHook();
+        $account = new Account(['id' => 100]);
+        $fakeDatabase = Database::Instance();
+        $data = [[
+            'id' => 10,
+            'accountId' => 100,
+            'role' => 10
+        ], [
+            'id' => 11,
+            'accountId' => 100,
+            'role' => 20
+        ]];
+        $expected = [
+            new AccountRole($data[0]),
+            new AccountRole($data[1])
+        ];
+
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM `accountrole`'
+               . ' WHERE accountId = :accountId',
+            bindings: ['accountId' => 100],
+            result: $data,
+            times: 1
+        );
+
+        $actual = ah::CallMethod($sut, 'findAccountRoles', [$account]);
+
+        $this->assertEquals($expected, $actual);
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #endregion findAccountRoles
 }

@@ -306,20 +306,19 @@ class AccountServiceTest extends TestCase
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = Database::Instance();
+        $id = 42;
 
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountview` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: null,
-            times: 1
+            sql: 'SELECT * FROM `accountview`'
+               . ' WHERE `id` = :id'
+               . ' LIMIT 1',
+            bindings: ['id' => $id],
+            result: null
         );
 
-        $accountView = ah::CallMethod(
-            $sut,
-            'findAccountById',
-            [42]
-        );
-        $this->assertNull($accountView);
+        $actual = ah::CallMethod($sut, 'findAccountById', [$id]);
+
+        $this->assertNull($actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
@@ -327,35 +326,29 @@ class AccountServiceTest extends TestCase
     {
         $sut = $this->systemUnderTest();
         $fakeDatabase = Database::Instance();
+        $id = 42;
+        $data = [
+            'id'            => $id,
+            'email'         => 'john@example.com',
+            'isLocal'       => true,
+            'displayName'   => 'John',
+            'timeActivated' => '2024-01-01 00:00:00',
+            'timeLastLogin' => '2025-01-01 00:00:00',
+            'role'          => null
+        ];
+        $expected = new AccountView($data);
 
         $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountview` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: [[
-                'id' => 42,
-                'email' => 'john@example.com',
-                'displayName' => 'John',
-                'timeActivated' => '2024-01-01 00:00:00',
-                'timeLastLogin' => '2025-01-01 00:00:00',
-                'role' => null
-            ]],
-            times: 1
+            sql: 'SELECT * FROM `accountview`'
+               . ' WHERE `id` = :id'
+               . ' LIMIT 1',
+            bindings: ['id' => $id],
+            result: [$data]
         );
 
-        $accountView = ah::CallMethod(
-            $sut,
-            'findAccountById',
-            [42]
-        );
-        $this->assertInstanceOf(AccountView::class, $accountView);
-        $this->assertSame(42, $accountView->id);
-        $this->assertSame('john@example.com', $accountView->email);
-        $this->assertSame('John', $accountView->displayName);
-        $this->assertSame('2024-01-01 00:00:00',
-                          $accountView->timeActivated->format('Y-m-d H:i:s'));
-        $this->assertSame('2025-01-01 00:00:00',
-                          $accountView->timeLastLogin->format('Y-m-d H:i:s'));
-        $this->assertNull($accountView->role);
+        $actual = ah::CallMethod($sut, 'findAccountById', [$id]);
+
+        $this->assertEquals($expected, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 

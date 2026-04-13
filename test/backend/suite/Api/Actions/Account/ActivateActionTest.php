@@ -11,7 +11,6 @@ use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Systems\DatabaseSystem\Database;
-use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\PendingAccount;
 use \Peneus\Resource;
@@ -242,107 +241,6 @@ class ActivateActionTest extends TestCase
 
     #endregion validatePayload
 
-    #region findPendingAccount -------------------------------------------------
-
-    function testFindPendingAccountThrowsIfRecordNotFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `pendingaccount`'
-               . ' WHERE activationCode = :activationCode LIMIT 1',
-            bindings: ['activationCode' => 'code1234'],
-            result: null,
-            times: 1
-        );
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            'No account is awaiting activation for the given code.');
-        $this->expectExceptionCode(StatusCode::NotFound->value);
-        ah::CallMethod($sut, 'findPendingAccount', ['code1234']);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testFindPendingAccountReturnsEntityIfRecordFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `pendingaccount`'
-               . ' WHERE activationCode = :activationCode LIMIT 1',
-            bindings: ['activationCode' => 'code1234'],
-            result: [[
-                'id' => 42,
-                'email' => 'john@example.com',
-                'passwordHash' => 'hash1234',
-                'displayName' => 'John',
-                'activationCode' => 'code1234',
-                'timeRegistered' => '2025-01-01 10:00:00'
-            ]],
-            times: 1
-        );
-
-        $pa = ah::CallMethod($sut, 'findPendingAccount', ['code1234']);
-        $this->assertInstanceOf(PendingAccount::class, $pa);
-        $this->assertSame(42, $pa->id);
-        $this->assertSame('john@example.com', $pa->email);
-        $this->assertSame('hash1234', $pa->passwordHash);
-        $this->assertSame('John', $pa->displayName);
-        $this->assertSame('code1234', $pa->activationCode);
-        $this->assertSame('2025-01-01 10:00:00',
-            $pa->timeRegistered->format('Y-m-d H:i:s'));
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    #endregion findPendingAccount
-
-    #region ensureNotRegistered ------------------------------------------------
-
-    function testEnsureNotRegisteredThrowsIfCountIsNotZero()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `account` WHERE email = :email',
-            bindings: ['email' => 'john@example.com'],
-            result: [[1]],
-            times: 1
-        );
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("This account is already registered.");
-        $this->expectExceptionCode(StatusCode::Conflict->value);
-        ah::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testEnsureNotRegisteredSucceedsIfCountIsZero()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `account` WHERE email = :email',
-            bindings: ['email' => 'john@example.com'],
-            result: [[0]],
-            times: 1
-        );
-
-        ah::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
-        $this->expectNotToPerformAssertions();
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    #endregion ensureNotRegistered
-
     #region doActivate ---------------------------------------------------------
 
     function testDoActivateThrowsIfAccountSaveFails()
@@ -435,6 +333,12 @@ class ActivateActionTest extends TestCase
 
     #region Data Providers -----------------------------------------------------
 
+    /**
+     * @return array<string, array{
+     *   payload: array<string, mixed>,
+     *   exceptionMessage: string
+     * }>
+     */
     static function invalidPayloadProvider()
     {
         return [

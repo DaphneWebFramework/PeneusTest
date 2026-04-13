@@ -4,9 +4,7 @@ use \PHPUnit\Framework\Attributes\CoversClass;
 
 use \Peneus\Api\Actions\Account\DeleteAction;
 
-use \Harmonia\Http\StatusCode;
 use \Harmonia\Systems\DatabaseSystem\Database;
-use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Api\Hooks\IAccountDeletionHook;
 use \Peneus\Model\Account;
 use \Peneus\Model\AccountView;
@@ -136,63 +134,6 @@ class DeleteActionTest extends TestCase
     }
 
     #endregion onExecute
-
-    #region findAccount --------------------------------------------------------
-
-    function testFindAccountThrowsIfRecordNotFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: null,
-            times: 1
-        );
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Account not found.");
-        $this->expectExceptionCode(StatusCode::NotFound->value);
-        ah::CallMethod($sut, 'findAccount', [42]);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testFindAccountReturnsEntityIfRecordFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: [[
-                'id' => 42,
-                'email' => 'john@example.com',
-                'passwordHash' => 'hash1234',
-                'displayName' => 'John',
-                'timeActivated' => '2024-01-01 00:00:00',
-                'timeLastLogin' => '2025-01-01 00:00:00'
-            ]],
-            times: 1
-        );
-
-        $account = ah::CallMethod($sut, 'findAccount', [42]);
-        $this->assertInstanceOf(Account::class, $account);
-        $this->assertSame(42, $account->id);
-        $this->assertSame('john@example.com', $account->email);
-        $this->assertSame('hash1234', $account->passwordHash);
-        $this->assertSame('John', $account->displayName);
-        $this->assertSame('2024-01-01 00:00:00',
-                          $account->timeActivated->format('Y-m-d H:i:s'));
-        $this->assertSame('2025-01-01 00:00:00',
-                          $account->timeLastLogin->format('Y-m-d H:i:s'));
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    #endregion findAccount
 
     #region doDelete -----------------------------------------------------------
 

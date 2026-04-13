@@ -13,7 +13,6 @@ use \Harmonia\Http\StatusCode;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
-use \Peneus\Model\AccountRole;
 use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(ListRecordsAction::class)]
@@ -41,6 +40,15 @@ class ListRecordsActionTest extends TestCase
         return $this->getMockBuilder(ListRecordsAction::class)
             ->onlyMethods($mockedMethods)
             ->getMock();
+    }
+
+    private function escapeSearchTerm(string $search): string
+    {
+        return '%' . \strtr($search, [
+            '\\' => '\\\\',
+            '%'  => '\%',
+            '_'  => '\_'
+        ]) . '%';
     }
 
     #region onExecute ----------------------------------------------------------
@@ -78,120 +86,55 @@ class ListRecordsActionTest extends TestCase
         ah::CallMethod($sut, 'onExecute');
     }
 
-    function testOnExecuteWithDefaults()
-    {
-        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
-        $payload = (object)[
-            'table'   => 'account',
-            'limit'   => 10,
-            'offset'  => 0,
-            'search'  => null,
-            'sortkey' => null,
-            'sortdir' => null
-        ];
-        $fakeDatabase = Database::Instance();
-
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('resolveEntityClass')
-            ->with('account')
-            ->willReturn(Account::class);
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `account` LIMIT 10 OFFSET 0',
-            result: [
-                [
-                    'id' => 1,
-                    'email' => 'alice@example.com',
-                    'passwordHash' => 'abc123',
-                    'displayName' => 'Alice',
-                    'timeActivated' => '2023-01-01 00:00:00',
-                    'timeLastLogin' => '2023-01-10 00:00:00'
-                ],
-                [
-                    'id' => 2,
-                    'email' => 'bob@example.com',
-                    'passwordHash' => 'def456',
-                    'displayName' => 'Bob',
-                    'timeActivated' => '2023-02-01 00:00:00',
-                    'timeLastLogin' => null
-                ]
-            ],
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `account`',
-            result: [[2]],
-            times: 1
-        );
-
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertCount(2, $result['data']);
-        $this->assertInstanceOf(Account::class, $result['data'][0]);
-          $this->assertSame(1, $result['data'][0]->id);
-          $this->assertSame('alice@example.com', $result['data'][0]->email);
-          $this->assertSame('abc123', $result['data'][0]->passwordHash);
-          $this->assertSame('Alice', $result['data'][0]->displayName);
-          $this->assertSame('2023-01-01 00:00:00', $result['data'][0]->timeActivated->format('Y-m-d H:i:s'));
-          $this->assertSame('2023-01-10 00:00:00', $result['data'][0]->timeLastLogin->format('Y-m-d H:i:s'));
-        $this->assertInstanceOf(Account::class, $result['data'][1]);
-          $this->assertSame(2, $result['data'][1]->id);
-          $this->assertSame('bob@example.com', $result['data'][1]->email);
-          $this->assertSame('def456', $result['data'][1]->passwordHash);
-          $this->assertSame('Bob', $result['data'][1]->displayName);
-          $this->assertSame('2023-02-01 00:00:00', $result['data'][1]->timeActivated->format('Y-m-d H:i:s'));
-          $this->assertNull($result['data'][1]->timeLastLogin);
-        $this->assertSame(2, $result['total']);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
     function testOnExecuteWithPageNumberAndPageSize()
     {
-        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass',
+            'findEntities', 'countEntities');
         $payload = (object)[
-            'table'   => 'accountrole',
+            'table'   => 'account',
             'limit'   => 5,
             'offset'  => 10,
             'search'  => null,
             'sortkey' => null,
             'sortdir' => null
         ];
-        $fakeDatabase = Database::Instance();
+        $expected = [
+            'data' => [new Account(), new Account()],
+            'total' => 2
+        ];
 
         $sut->expects($this->once())
             ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('resolveEntityClass')
-            ->with('accountrole')
-            ->willReturn(AccountRole::class);
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` LIMIT 5 OFFSET 10',
-            result: [
-                ['id' => 42, 'accountId' => 101, 'role' => 99]
-            ],
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `accountrole`',
-            result: [[1]],
-            times: 1
-        );
+            ->with($payload->table)
+            ->willReturn(Account::class);
+        $sut->expects($this->once())
+            ->method('findEntities')
+            ->with(
+                Account::class,
+                null,
+                null,
+                null,
+                $payload->limit,
+                $payload->offset
+            )
+            ->willReturn($expected['data']);
+        $sut->expects($this->once())
+            ->method('countEntities')
+            ->with(Account::class, null, null)
+            ->willReturn($expected['total']);
 
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertCount(1, $result['data']);
-        $this->assertInstanceOf(AccountRole::class, $result['data'][0]);
-          $this->assertSame(42, $result['data'][0]->id);
-          $this->assertSame(101, $result['data'][0]->accountId);
-          $this->assertSame(99, $result['data'][0]->role);
-        $this->assertSame(1, $result['total']);
-        $fakeDatabase->VerifyAllExpectationsMet();
+        $actual = ah::CallMethod($sut, 'onExecute');
+
+        $this->assertEquals($expected, $actual);
     }
 
     function testOnExecuteWithSearchTerm()
     {
-        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass',
+            'findEntities', 'countEntities');
         $payload = (object)[
             'table'   => 'account',
             'limit'   => 10,
@@ -200,71 +143,51 @@ class ListRecordsActionTest extends TestCase
             'sortkey' => null,
             'sortdir' => null
         ];
-        $escapedSearchTerm = '%' . \strtr($payload->search, [
-            '\\' => '\\\\',
-            '%'  => '\%',
-            '_'  => '\_'
-        ]) . '%';
-        $fakeDatabase = Database::Instance();
+        $condition = '`id` LIKE :search OR '
+                   . '`email` LIKE :search OR '
+                   . '`passwordHash` LIKE :search OR '
+                   . '`displayName` LIKE :search OR '
+                   . '`timeActivated` LIKE :search OR '
+                   . '`timeLastLogin` LIKE :search';
+        $bindings = ['search' => $this->escapeSearchTerm($payload->search)];
+        $expected = [
+            'data' => [new Account()],
+            'total' => 1
+        ];
 
         $sut->expects($this->once())
             ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('resolveEntityClass')
-            ->with('account')
+            ->with($payload->table)
             ->willReturn(Account::class);
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `account` WHERE '
-               . '`id` LIKE :search OR '
-               . '`email` LIKE :search OR '
-               . '`passwordHash` LIKE :search OR '
-               . '`displayName` LIKE :search OR '
-               . '`timeActivated` LIKE :search OR '
-               . '`timeLastLogin` LIKE :search '
-               . 'LIMIT 10 OFFSET 0',
-            bindings: ['search' => $escapedSearchTerm],
-            result: [[
-                'id' => 1,
-                'email' => 'one@example.com',
-                'passwordHash' => 'abc123',
-                'displayName' => 'Member of 100%_core\dev team',
-                'timeActivated' => '2024-01-01 00:00:00',
-                'timeLastLogin' => '2024-01-02 12:00:00'
-            ]],
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `account` WHERE '
-               . '`id` LIKE :search OR '
-               . '`email` LIKE :search OR '
-               . '`passwordHash` LIKE :search OR '
-               . '`displayName` LIKE :search OR '
-               . '`timeActivated` LIKE :search OR '
-               . '`timeLastLogin` LIKE :search',
-            bindings: ['search' => $escapedSearchTerm],
-            result: [[1]],
-            times: 1
-        );
+        $sut->expects($this->once())
+            ->method('findEntities')
+            ->with(
+                Account::class,
+                $condition,
+                $bindings,
+                null,
+                $payload->limit,
+                $payload->offset
+            )
+            ->willReturn($expected['data']);
+        $sut->expects($this->once())
+            ->method('countEntities')
+            ->with(Account::class, $condition, $bindings)
+            ->willReturn($expected['total']);
 
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertCount(1, $result['data']);
-        $this->assertInstanceOf(Account::class, $result['data'][0]);
-          $this->assertSame(1, $result['data'][0]->id);
-          $this->assertSame('one@example.com', $result['data'][0]->email);
-          $this->assertSame('abc123', $result['data'][0]->passwordHash);
-          $this->assertSame('Member of 100%_core\dev team', $result['data'][0]->displayName);
-          $this->assertSame('2024-01-01 00:00:00', $result['data'][0]->timeActivated->format('Y-m-d H:i:s'));
-          $this->assertSame('2024-01-02 12:00:00', $result['data'][0]->timeLastLogin->format('Y-m-d H:i:s'));
-        $this->assertSame(1, $result['total']);
-        $fakeDatabase->VerifyAllExpectationsMet();
+        $actual = ah::CallMethod($sut, 'onExecute');
+
+        $this->assertEquals($expected, $actual);
     }
 
     function testOnExecuteThrowsIfSortKeyDoesNotExist()
     {
         $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
         $payload = (object)[
-            'table'   => 'accountrole',
+            'table'   => 'account',
             'limit'   => 10,
             'offset'  => 0,
             'search'  => null,
@@ -277,152 +200,155 @@ class ListRecordsActionTest extends TestCase
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('resolveEntityClass')
-            ->with('accountrole')
-            ->willReturn(AccountRole::class);
+            ->with($payload->table)
+            ->willReturn(Account::class);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            "Table 'accountrole' does not have a column named 'not-a-column'.");
+            "Table '{$payload->table}' does not have a column named '{$payload->sortkey}'.");
         ah::CallMethod($sut, 'onExecute');
     }
 
     function testOnExecuteWithSortKey()
     {
-        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass',
+            'findEntities', 'countEntities');
         $payload = (object)[
-            'table'   => 'accountrole',
+            'table'   => 'account',
             'limit'   => 10,
             'offset'  => 0,
             'search'  => null,
-            'sortkey' => 'role',
+            'sortkey' => 'displayName',
             'sortdir' => null
         ];
-        $fakeDatabase = Database::Instance();
+        $expected = [
+            'data' => [new Account()],
+            'total' => 1
+        ];
 
         $sut->expects($this->once())
             ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('resolveEntityClass')
-            ->with('accountrole')
-            ->willReturn(AccountRole::class);
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` ORDER BY `role` LIMIT 10 OFFSET 0',
-            result: [
-                ['id' => 5, 'accountId' => 200, 'role' => 10]
-            ],
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `accountrole`',
-            result: [[1]],
-            times: 1
-        );
+            ->with($payload->table)
+            ->willReturn(Account::class);
+        $sut->expects($this->once())
+            ->method('findEntities')
+            ->with(
+                Account::class,
+                null,
+                null,
+                "`{$payload->sortkey}`",
+                $payload->limit,
+                $payload->offset
+            )
+            ->willReturn($expected['data']);
+        $sut->expects($this->once())
+            ->method('countEntities')
+            ->with(Account::class, null, null)
+            ->willReturn($expected['total']);
 
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertCount(1, $result['data']);
-        $this->assertInstanceOf(AccountRole::class, $result['data'][0]);
-          $this->assertSame(5, $result['data'][0]->id);
-          $this->assertSame(200, $result['data'][0]->accountId);
-          $this->assertSame(10, $result['data'][0]->role);
-        $this->assertSame(1, $result['total']);
-        $fakeDatabase->VerifyAllExpectationsMet();
+        $actual = ah::CallMethod($sut, 'onExecute');
+
+        $this->assertEquals($expected, $actual);
     }
 
     function testOnExecuteWithSortKeyAndSortDirection()
     {
-        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass',
+            'findEntities', 'countEntities');
         $payload = (object)[
-            'table'   => 'accountrole',
+            'table'   => 'account',
             'limit'   => 10,
             'offset'  => 0,
             'search'  => null,
-            'sortkey' => 'role',
-            'sortdir' => 'DESC'
+            'sortkey' => 'email',
+            'sortdir' => 'desc'
         ];
-        $fakeDatabase = Database::Instance();
+        $expected = [
+            'data' => [new Account()],
+            'total' => 1
+        ];
 
         $sut->expects($this->once())
             ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('resolveEntityClass')
-            ->with('accountrole')
-            ->willReturn(AccountRole::class);
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` ORDER BY `role` DESC LIMIT 10 OFFSET 0',
-            result: [
-                ['id' => 7, 'accountId' => 300, 'role' => 99]
-            ],
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `accountrole`',
-            result: [[1]],
-            times: 1
-        );
+            ->with($payload->table)
+            ->willReturn(Account::class);
+        $sut->expects($this->once())
+            ->method('findEntities')
+            ->with(
+                Account::class,
+                null,
+                null,
+                "`{$payload->sortkey}` " . \strtoupper($payload->sortdir),
+                $payload->limit,
+                $payload->offset
+            )
+            ->willReturn($expected['data']);
+        $sut->expects($this->once())
+            ->method('countEntities')
+            ->with(Account::class, null, null)
+            ->willReturn($expected['total']);
 
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertCount(1, $result['data']);
-        $this->assertInstanceOf(AccountRole::class, $result['data'][0]);
-          $this->assertSame(7, $result['data'][0]->id);
-          $this->assertSame(300, $result['data'][0]->accountId);
-          $this->assertSame(99, $result['data'][0]->role);
-        $this->assertSame(1, $result['total']);
-        $fakeDatabase->VerifyAllExpectationsMet();
+        $actual = ah::CallMethod($sut, 'onExecute');
+
+        $this->assertEquals($expected, $actual);
     }
 
-function testOnExecuteWithAllParameters()
+    function testOnExecuteWithAllParameters()
     {
-        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass');
+        $sut = $this->systemUnderTest('validatePayload', 'resolveEntityClass',
+            'findEntities', 'countEntities');
         $payload = (object)[
-            'table'   => 'accountrole',
+            'table'   => 'account',
             'limit'   => 3,
             'offset'  => 3,
-            'search'  => '20',
-            'sortkey' => 'role',
-            'sortdir' => 'ASC'
+            'search'  => 'Alice',
+            'sortkey' => 'id',
+            'sortdir' => 'asc'
         ];
-        $fakeDatabase = Database::Instance();
+        $condition = '`id` LIKE :search OR '
+                   . '`email` LIKE :search OR '
+                   . '`passwordHash` LIKE :search OR '
+                   . '`displayName` LIKE :search OR '
+                   . '`timeActivated` LIKE :search OR '
+                   . '`timeLastLogin` LIKE :search';
+        $bindings = ['search' => $this->escapeSearchTerm($payload->search)];
+        $expected = [
+            'data' => [new Account()],
+            'total' => 1
+        ];
 
         $sut->expects($this->once())
             ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
             ->method('resolveEntityClass')
-            ->with('accountrole')
-            ->willReturn(AccountRole::class);
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE '
-               . '`id` LIKE :search OR '
-               . '`accountId` LIKE :search OR '
-               . '`role` LIKE :search '
-               . 'ORDER BY `role` ASC '
-               . 'LIMIT 3 OFFSET 3',
-            bindings: ['search' => '%20%'],
-            result: [
-                ['id' => 10, 'accountId' => 9001, 'role' => 20]
-            ],
-            times: 1
-        );
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `accountrole` WHERE '
-               . '`id` LIKE :search OR '
-               . '`accountId` LIKE :search OR '
-               . '`role` LIKE :search',
-            bindings: ['search' => '%20%'],
-            result: [[1]],
-            times: 1
-        );
+            ->with($payload->table)
+            ->willReturn(Account::class);
+        $sut->expects($this->once())
+            ->method('findEntities')
+            ->with(
+                Account::class,
+                $condition,
+                $bindings,
+                "`{$payload->sortkey}` " . \strtoupper($payload->sortdir),
+                $payload->limit,
+                $payload->offset
+            )
+            ->willReturn($expected['data']);
+        $sut->expects($this->once())
+            ->method('countEntities')
+            ->with(Account::class, $condition, $bindings)
+            ->willReturn($expected['total']);
 
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertCount(1, $result['data']);
-        $this->assertInstanceOf(AccountRole::class, $result['data'][0]);
-          $this->assertSame(10, $result['data'][0]->id);
-          $this->assertSame(9001, $result['data'][0]->accountId);
-          $this->assertSame(20, $result['data'][0]->role);
-        $this->assertSame(1, $result['total']);
-        $fakeDatabase->VerifyAllExpectationsMet();
+        $actual = ah::CallMethod($sut, 'onExecute');
+
+        $this->assertEquals($expected, $actual);
     }
 
     #endregion onExecute
@@ -512,8 +438,145 @@ function testOnExecuteWithAllParameters()
 
     #endregion validatePayload
 
+    #region findEntities -------------------------------------------------------
+
+    function testFindEntitiesWithMinimalParameters()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = Database::Instance();
+
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM `account`',
+            result: [],
+            times: 1
+        );
+
+        $actual = ah::CallMethod($sut, 'findEntities', [
+            Account::class,
+            null,
+            null,
+            null,
+            null,
+            null
+        ]);
+
+        $this->assertSame([], $actual);
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testFindEntitiesWithAllParameters()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = Database::Instance();
+        $condition = '`displayName` LIKE :search';
+        $bindings = ['search' => $this->escapeSearchTerm('Alice')];
+        $orderBy = '`id` DESC';
+        $limit = 5;
+        $offset = 10;
+        $data = [[
+            'id' => 2,
+            'email' => 'alice.campbell@example.com',
+            'passwordHash' => 'abc123',
+            'displayName' => 'Alice',
+            'timeActivated' => '2023-01-01 00:00:00',
+            'timeLastLogin' => '2023-01-10 00:00:00'
+        ], [
+            'id' => 1,
+            'email' => 'alice.summers@example.com',
+            'passwordHash' => 'def456',
+            'displayName' => 'Alice',
+            'timeActivated' => '2023-02-01 00:00:00',
+            'timeLastLogin' => null
+        ]];
+        $expected = [
+            new Account($data[0]),
+            new Account($data[1])
+        ];
+
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM `account`'
+               . " WHERE $condition"
+               . " ORDER BY $orderBy"
+               . " LIMIT $limit"
+               . " OFFSET $offset",
+            bindings: $bindings,
+            result: $data,
+            times: 1
+        );
+
+        $actual = ah::CallMethod($sut, 'findEntities', [
+            Account::class,
+            $condition,
+            $bindings,
+            $orderBy,
+            $limit,
+            $offset
+        ]);
+
+        $this->assertEquals($expected, $actual);
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #endregion findEntities
+
+    #region countEntities ------------------------------------------------------
+
+    function testCountEntitiesWithMinimalParameters()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = Database::Instance();
+
+        $fakeDatabase->Expect(
+            sql: 'SELECT COUNT(*) FROM `account`',
+            result: [[0]],
+            times: 1
+        );
+
+        $actual = ah::CallMethod($sut, 'countEntities', [
+            Account::class,
+            null,
+            null
+        ]);
+
+        $this->assertSame(0, $actual);
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testCountEntitiesWithAllParameters()
+    {
+        $sut = $this->systemUnderTest();
+        $fakeDatabase = Database::Instance();
+        $condition = '`timeActivated` IS NOT NULL';
+        $bindings = [];
+
+        $fakeDatabase->Expect(
+            sql: 'SELECT COUNT(*) FROM `account`'
+               . " WHERE $condition",
+            bindings: $bindings,
+            result: [[7]],
+            times: 1
+        );
+
+        $actual = ah::CallMethod($sut, 'countEntities', [
+            Account::class,
+            $condition,
+            $bindings
+        ]);
+
+        $this->assertSame(7, $actual);
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    #endregion countEntities
+
     #region Data Providers -----------------------------------------------------
 
+    /**
+     * @return array<string, array{
+     *   payload: array<string, mixed>,
+     *   exceptionMessage: string
+     * }>
+     */
     static function invalidPayloadProvider()
     {
         return [

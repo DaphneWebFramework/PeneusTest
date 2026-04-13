@@ -9,8 +9,6 @@ use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\SecurityService;
-use \Harmonia\Systems\DatabaseSystem\Database;
-use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\AccountView;
 use \TestToolkit\AccessHelper as ah;
@@ -19,15 +17,12 @@ use \TestToolkit\AccessHelper as ah;
 class ChangePasswordActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
-    private ?Database $originalDatabase = null;
     private ?SecurityService $originalSecurityService = null;
 
     protected function setUp(): void
     {
         $this->originalRequest =
             Request::ReplaceInstance($this->createMock(Request::class));
-        $this->originalDatabase =
-            Database::ReplaceInstance(new FakeDatabase());
         $this->originalSecurityService =
             SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
     }
@@ -35,7 +30,6 @@ class ChangePasswordActionTest extends TestCase
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
-        Database::ReplaceInstance($this->originalDatabase);
         SecurityService::ReplaceInstance($this->originalSecurityService);
     }
 
@@ -271,61 +265,6 @@ class ChangePasswordActionTest extends TestCase
 
     #endregion ensureLocalAccount
 
-    #region findAccount --------------------------------------------------------
-
-    function testFindAccountThrowsIfRecordNotFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = Database::Instance();
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: null,
-            times: 1
-        );
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Account not found.");
-        $this->expectExceptionCode(StatusCode::NotFound->value);
-        ah::CallMethod($sut, 'findAccount', [42]);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testFindAccountReturnsEntityIfRecordFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = Database::Instance();
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: [[
-                'id' => 42,
-                'email' => 'john@example.com',
-                'passwordHash' => 'hash1234',
-                'displayName' => 'John',
-                'timeActivated' => '2024-01-01 00:00:00',
-                'timeLastLogin' => '2025-01-01 00:00:00'
-            ]],
-            times: 1
-        );
-
-        $account = ah::CallMethod($sut, 'findAccount', [42]);
-        $this->assertInstanceOf(Account::class, $account);
-        $this->assertSame(42, $account->id);
-        $this->assertSame('john@example.com', $account->email);
-        $this->assertSame('hash1234', $account->passwordHash);
-        $this->assertSame('John', $account->displayName);
-        $this->assertSame('2024-01-01 00:00:00',
-                          $account->timeActivated->format('Y-m-d H:i:s'));
-        $this->assertSame('2025-01-01 00:00:00',
-                          $account->timeLastLogin->format('Y-m-d H:i:s'));
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    #endregion findAccount
-
     #region validatePayload ----------------------------------------------------
 
     #[DataProvider('invalidPayloadProvider')]
@@ -448,6 +387,12 @@ class ChangePasswordActionTest extends TestCase
 
     #region Data Providers -----------------------------------------------------
 
+    /**
+     * @return array<string, array{
+     *   payload: array<string, mixed>,
+     *   exceptionMessage: string
+     * }>
+     */
     static function invalidPayloadProvider()
     {
         return [

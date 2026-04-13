@@ -14,7 +14,6 @@ use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
-use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Api\Hooks\ICaptchaHook;
 use \Peneus\Model\PendingAccount;
 use \Peneus\Resource;
@@ -158,7 +157,6 @@ class RegisterActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Account registration failed.");
-        $this->expectExceptionCode(StatusCode::InternalServerError->value);
         ah::CallMethod($sut, 'onExecute');
     }
 
@@ -280,90 +278,6 @@ class RegisterActionTest extends TestCase
     }
 
     #endregion validatePayload
-
-    #region ensureNotRegistered ------------------------------------------------
-
-    function testEnsureNotRegisteredThrowsIfCountIsNotZero()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `account` WHERE email = :email',
-            bindings: ['email' => 'john@example.com'],
-            result: [[1]],
-            times: 1
-        );
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("This account is already registered.");
-        $this->expectExceptionCode(StatusCode::Conflict->value);
-        ah::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testEnsureNotRegisteredSucceedsIfCountIsZero()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `account` WHERE email = :email',
-            bindings: ['email' => 'john@example.com'],
-            result: [[0]],
-            times: 1
-        );
-
-        ah::CallMethod($sut, 'ensureNotRegistered', ['john@example.com']);
-        $this->expectNotToPerformAssertions();
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    #endregion ensureNotRegistered
-
-    #region ensureNotPending ---------------------------------------------------
-
-    function testEnsureNotPendingThrowsIfCountIsNotZero()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `pendingaccount` WHERE email = :email',
-            bindings: ['email' => 'john@example.com'],
-            result: [[1]],
-            times: 1
-        );
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("This account is already awaiting activation.");
-        $this->expectExceptionCode(StatusCode::Conflict->value);
-        ah::CallMethod($sut, 'ensureNotPending', ['john@example.com']);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testEnsureNotPendingSucceedsIfCountIsZero()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT COUNT(*) FROM `pendingaccount` WHERE email = :email',
-            bindings: ['email' => 'john@example.com'],
-            result: [[0]],
-            times: 1
-        );
-
-        ah::CallMethod($sut, 'ensureNotPending', ['john@example.com']);
-        $this->expectNotToPerformAssertions();
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    #endregion ensureNotPending
 
     #region doRegister ---------------------------------------------------------
 
@@ -547,6 +461,12 @@ class RegisterActionTest extends TestCase
 
     #region Data Providers -----------------------------------------------------
 
+    /**
+     * @return array<string, array{
+     *   payload: array<string, mixed>,
+     *   exceptionMessage: string
+     * }>
+     */
     static function invalidPayloadProvider()
     {
         return [

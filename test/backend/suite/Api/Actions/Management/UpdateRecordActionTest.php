@@ -11,9 +11,7 @@ use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\SecurityService;
-use \Harmonia\Systems\DatabaseSystem\Database;
-use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
-use \Peneus\Model\AccountRole; // sample
+use \Peneus\Model\Entity;
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as ah;
 
@@ -21,20 +19,16 @@ use \TestToolkit\AccessHelper as ah;
 class UpdateRecordActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
-    private ?Database $originalDatabase = null;
 
     protected function setUp(): void
     {
         $this->originalRequest =
             Request::ReplaceInstance($this->createMock(Request::class));
-        $this->originalDatabase =
-            Database::ReplaceInstance(new FakeDatabase());
     }
 
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
-        Database::ReplaceInstance($this->originalDatabase);
     }
 
     private function systemUnderTest(string ...$mockedMethods): UpdateRecordAction
@@ -61,21 +55,17 @@ class UpdateRecordActionTest extends TestCase
 
     function testOnExecuteThrowsIfEntityNotFound()
     {
-        $sut = $this->systemUnderTest('validatePayload', 'findEntity');
+        $sut = $this->systemUnderTest('validatePayload', 'tryFindEntity');
         $payload = (object)[
-            'entityClass' => AccountRole::class,
-            'data' => [
-                'id' => 42,
-                'accountId' => 1,
-                'role' => 10
-            ]
+            'entityClass' => Entity::class,
+            'data' => ['id' => 42]
         ];
 
         $sut->expects($this->once())
             ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
-            ->method('findEntity')
+            ->method('tryFindEntity')
             ->with($payload->entityClass, 42)
             ->willReturn(null);
 
@@ -86,22 +76,22 @@ class UpdateRecordActionTest extends TestCase
 
     function testOnExecuteThrowsIfEntitySaveFails()
     {
-        $sut = $this->systemUnderTest('validatePayload', 'findEntity');
+        $sut = $this->systemUnderTest('validatePayload', 'tryFindEntity');
         $payload = (object)[
-            'entityClass' => AccountRole::class,
+            'entityClass' => Entity::class,
             'data' => [
                 'id' => 42,
                 'accountId' => 1,
                 'role' => 10
             ]
         ];
-        $entity = $this->createMock(AccountRole::class);
+        $entity = $this->createMock(Entity::class);
 
         $sut->expects($this->once())
             ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
-            ->method('findEntity')
+            ->method('tryFindEntity')
             ->with($payload->entityClass, $payload->data['id'])
             ->willReturn($entity);
         $entity->expects($this->once())
@@ -118,22 +108,22 @@ class UpdateRecordActionTest extends TestCase
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest('validatePayload', 'findEntity');
+        $sut = $this->systemUnderTest('validatePayload', 'tryFindEntity');
         $payload = (object)[
-            'entityClass' => AccountRole::class,
+            'entityClass' => Entity::class,
             'data' => [
                 'id' => 42,
                 'accountId' => 1,
                 'role' => 10
             ]
         ];
-        $entity = $this->createMock(AccountRole::class);
+        $entity = $this->createMock(Entity::class);
 
         $sut->expects($this->once())
             ->method('validatePayload')
             ->willReturn($payload);
         $sut->expects($this->once())
-            ->method('findEntity')
+            ->method('tryFindEntity')
             ->with($payload->entityClass, $payload->data['id'])
             ->willReturn($entity);
         $entity->expects($this->once())
@@ -202,17 +192,17 @@ class UpdateRecordActionTest extends TestCase
 
     function testValidatePayloadSucceeds()
     {
-        $sut = $this->systemUnderTest();
+        $sut = $this->systemUnderTest('resolveEntityClass', 'validationRulesForUpdate');
         $request = Request::Instance();
         $queryParams = $this->createMock(CArray::class);
-        $query = ['table' => 'accountrole'];
+        $query = ['table' => 'entity'];
         $body = [
             'id' => 42,
             'accountId' => 1,
             'role' => 10
         ];
         $expected = (object)[
-            'entityClass' => AccountRole::class,
+            'entityClass' => Entity::class,
             'data' => $body
         ];
 
@@ -222,6 +212,14 @@ class UpdateRecordActionTest extends TestCase
         $queryParams->expects($this->once())
             ->method('ToArray')
             ->willReturn($query);
+        $sut->expects($this->once())
+            ->method('resolveEntityClass')
+            ->with('entity')
+            ->willReturn(Entity::class);
+        $sut->expects($this->once())
+            ->method('validationRulesForUpdate')
+            ->with(Entity::class)
+            ->willReturn([]);
         $request->expects($this->once())
             ->method('JsonBody')
             ->willReturn($body);
@@ -232,53 +230,15 @@ class UpdateRecordActionTest extends TestCase
 
     #endregion validatePayload
 
-    #region findEntity ---------------------------------------------------------
-
-    function testFindEntityReturnsNullIfNotFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = Database::Instance();
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: null,
-            times: 1
-        );
-
-        $entity = ah::CallMethod($sut, 'findEntity', [AccountRole::class, 42]);
-        $this->assertNull($entity);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testFindEntityReturnsEntityIfFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = Database::Instance();
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `accountrole` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: [[
-                'id' => 42,
-                'accountId' => 99,
-                'role' => 10
-            ]],
-            times: 1
-        );
-
-        $entity = ah::CallMethod($sut, 'findEntity', [AccountRole::class, 42]);
-        $this->assertInstanceOf(AccountRole::class, $entity);
-        $this->assertSame(42, $entity->id);
-        $this->assertSame(99, $entity->accountId);
-        $this->assertSame(10, $entity->role);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    #endregion findEntity
-
     #region Data Providers -----------------------------------------------------
 
+    /**
+     * @return array<string, array{
+     *   query: array<string, mixed>,
+     *   body: array<string, mixed>,
+     *   exceptionMessage: string
+     * }>
+     */
     static function invalidPayloadProvider()
     {
         return [

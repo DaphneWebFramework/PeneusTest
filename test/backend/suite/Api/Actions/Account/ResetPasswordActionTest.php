@@ -12,7 +12,6 @@ use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
-use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Model\Account;
 use \Peneus\Model\PasswordReset;
 use \Peneus\Resource;
@@ -221,10 +220,10 @@ class ResetPasswordActionTest extends TestCase
 
     function testFindAccountAndPasswordResetThrowsIfPasswordResetNotFound()
     {
-        $sut = $this->systemUnderTest('findPasswordReset');
+        $sut = $this->systemUnderTest('tryFindPasswordResetByCode');
 
         $sut->expects($this->once())
-            ->method('findPasswordReset')
+            ->method('tryFindPasswordResetByCode')
             ->with('code1234')
             ->willReturn(null);
 
@@ -237,16 +236,17 @@ class ResetPasswordActionTest extends TestCase
 
     function testFindAccountAndPasswordResetThrowsIfAccountNotFound()
     {
-        $sut = $this->systemUnderTest('findPasswordReset', 'findAccount');
+        $sut = $this->systemUnderTest('tryFindPasswordResetByCode',
+            'tryFindAccountById');
         $pr = $this->createStub(PasswordReset::class);
         $pr->accountId = 42;
 
         $sut->expects($this->once())
-            ->method('findPasswordReset')
+            ->method('tryFindPasswordResetByCode')
             ->with('code1234')
             ->willReturn($pr);
         $sut->expects($this->once())
-            ->method('findAccount')
+            ->method('tryFindAccountById')
             ->with(42)
             ->willReturn(null);
 
@@ -259,17 +259,18 @@ class ResetPasswordActionTest extends TestCase
 
     function testFindAccountAndPasswordResetSucceeds()
     {
-        $sut = $this->systemUnderTest('findPasswordReset', 'findAccount');
+        $sut = $this->systemUnderTest('tryFindPasswordResetByCode',
+            'tryFindAccountById');
         $pr = $this->createStub(PasswordReset::class);
         $pr->accountId = 42;
         $account = $this->createStub(Account::class);
 
         $sut->expects($this->once())
-            ->method('findPasswordReset')
+            ->method('tryFindPasswordResetByCode')
             ->with('code1234')
             ->willReturn($pr);
         $sut->expects($this->once())
-            ->method('findAccount')
+            ->method('tryFindAccountById')
             ->with(42)
             ->willReturn($account);
 
@@ -280,113 +281,6 @@ class ResetPasswordActionTest extends TestCase
     }
 
     #endregion findAccountAndPasswordReset
-
-    #region findPasswordReset --------------------------------------------------
-
-    function testFindPasswordResetReturnsNullIfRecordNotFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `passwordreset`'
-               . ' WHERE resetCode = :resetCode LIMIT 1',
-            bindings: ['resetCode' => 'code1234'],
-            result: null,
-            times: 1
-        );
-
-        $pr = ah::CallMethod($sut, 'findPasswordReset', ['code1234']);
-        $this->assertNull($pr);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testFindPasswordResetReturnsEntityIfRecordFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `passwordreset`'
-               . ' WHERE resetCode = :resetCode LIMIT 1',
-            bindings: ['resetCode' => 'code1234'],
-            result: [[
-                'id' => 1,
-                'accountId' => 42,
-                'resetCode' => 'code1234',
-                'timeRequested' => '2024-12-31 00:00:00'
-            ]],
-            times: 1
-        );
-
-        $pr = ah::CallMethod($sut, 'findPasswordReset', ['code1234']);
-        $this->assertInstanceOf(PasswordReset::class, $pr);
-        $this->assertSame(1, $pr->id);
-        $this->assertSame(42, $pr->accountId);
-        $this->assertSame('code1234', $pr->resetCode);
-        $this->assertSame('2024-12-31 00:00:00',
-            $pr->timeRequested->format('Y-m-d H:i:s'));
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    #endregion findPasswordReset
-
-    #region findAccount --------------------------------------------------------
-
-    function testFindAccountReturnsNullIfRecordNotFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: null,
-            times: 1
-        );
-
-        $account = ah::CallMethod($sut, 'findAccount', [42]);
-        $this->assertNull($account);
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    function testFindAccountReturnsEntityIfRecordFound()
-    {
-        $sut = $this->systemUnderTest();
-        $fakeDatabase = new FakeDatabase();
-        Database::ReplaceInstance($fakeDatabase);
-
-        $fakeDatabase->Expect(
-            sql: 'SELECT * FROM `account` WHERE `id` = :id LIMIT 1',
-            bindings: ['id' => 42],
-            result: [[
-                'id' => 42,
-                'email' => 'john@example.com',
-                'passwordHash' => 'hash1234',
-                'displayName' => 'John',
-                'timeActivated' => '2024-01-01 00:00:00',
-                'timeLastLogin' => '2025-01-01 00:00:00'
-            ]],
-            times: 1
-        );
-
-        $account = ah::CallMethod($sut, 'findAccount', [42]);
-        $this->assertInstanceOf(Account::class, $account);
-        $this->assertSame(42, $account->id);
-        $this->assertSame('john@example.com', $account->email);
-        $this->assertSame('hash1234', $account->passwordHash);
-        $this->assertSame('John', $account->displayName);
-        $this->assertSame('2024-01-01 00:00:00',
-            $account->timeActivated->format('Y-m-d H:i:s'));
-        $this->assertSame('2025-01-01 00:00:00',
-            $account->timeLastLogin->format('Y-m-d H:i:s'));
-        $fakeDatabase->VerifyAllExpectationsMet();
-    }
-
-    #endregion findAccount
 
     #region doReset ------------------------------------------------------------
 
@@ -459,6 +353,12 @@ class ResetPasswordActionTest extends TestCase
 
     #region Data Providers -----------------------------------------------------
 
+    /**
+     * @return array<string, array{
+     *   payload: array<string, mixed>,
+     *   exceptionMessage: string
+     * }>
+     */
     static function invalidPayloadProvider()
     {
         return [
