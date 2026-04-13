@@ -17,6 +17,7 @@ use \Peneus\Api\Actions\Account\SignInWithGoogleAction;
 use \Peneus\Api\Guards\FormTokenGuard;
 use \Peneus\Api\Guards\HeaderTokenGuard;
 use \Peneus\Api\Guards\SessionGuard;
+use \Peneus\Api\Guards\TurnstileGuard;
 use \TestToolkit\AccessHelper;
 
 #[CoversClass(AccountHandler::class)]
@@ -40,8 +41,9 @@ class AccountHandlerTest extends TestCase
         $action = AccessHelper::CallMethod($handler, 'createAction', ['register']);
         $this->assertInstanceOf(RegisterAction::class, $action);
         $guards = AccessHelper::GetProperty($action, 'guards');
-        $this->assertCount(1, $guards);
+        $this->assertCount(2, $guards);
         $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);
+        $this->assertInstanceOf(TurnstileGuard::class, $guards[1]);
     }
 
     function testCreateActionWithActivate()
@@ -60,8 +62,9 @@ class AccountHandlerTest extends TestCase
         $action = AccessHelper::CallMethod($handler, 'createAction', ['log-in']);
         $this->assertInstanceOf(LogInAction::class, $action);
         $guards = AccessHelper::GetProperty($action, 'guards');
-        $this->assertCount(1, $guards);
+        $this->assertCount(2, $guards);
         $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);
+        $this->assertInstanceOf(TurnstileGuard::class, $guards[1]);
     }
 
     function testCreateActionWithLogOut()
@@ -80,8 +83,9 @@ class AccountHandlerTest extends TestCase
         $action = AccessHelper::CallMethod($handler, 'createAction', ['send-password-reset']);
         $this->assertInstanceOf(SendPasswordResetAction::class, $action);
         $guards = AccessHelper::GetProperty($action, 'guards');
-        $this->assertCount(1, $guards);
+        $this->assertCount(2, $guards);
         $this->assertInstanceOf(FormTokenGuard::class, $guards[0]);
+        $this->assertInstanceOf(TurnstileGuard::class, $guards[1]);
     }
 
     function testCreateActionWithResetPassword()
