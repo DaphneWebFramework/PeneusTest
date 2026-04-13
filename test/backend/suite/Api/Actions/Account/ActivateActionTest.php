@@ -11,9 +11,11 @@ use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Systems\DatabaseSystem\Database;
+use \Peneus\Api\Hooks\IAccountActivationHook;
 use \Peneus\Model\Account;
 use \Peneus\Model\PendingAccount;
 use \Peneus\Resource;
+use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as ah;
 
 #[CoversClass(ActivateAction::class)]
@@ -22,6 +24,7 @@ class ActivateActionTest extends TestCase
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
     private ?Resource $originalResource = null;
+    private ?AccountService $originalAccountService = null;
     private ?CookieService $originalCookieService = null;
 
     protected function setUp(): void
@@ -32,6 +35,8 @@ class ActivateActionTest extends TestCase
             Database::ReplaceInstance($this->createMock(Database::class));
         $this->originalResource =
             Resource::ReplaceInstance($this->createMock(Resource::class));
+        $this->originalAccountService =
+            AccountService::ReplaceInstance($this->createMock(AccountService::class));
         $this->originalCookieService =
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
     }
@@ -41,6 +46,7 @@ class ActivateActionTest extends TestCase
         Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
         Resource::ReplaceInstance($this->originalResource);
+        AccountService::ReplaceInstance($this->originalAccountService);
         CookieService::ReplaceInstance($this->originalCookieService);
     }
 
@@ -284,11 +290,43 @@ class ActivateActionTest extends TestCase
         ah::CallMethod($sut, 'doActivate', [$pa]);
     }
 
+    function testDoActivateThrowsIfHookFails()
+    {
+        $sut = $this->systemUnderTest('constructAccount');
+        $pa = $this->createMock(PendingAccount::class);
+        $account = $this->createMock(Account::class);
+        $accountService = AccountService::Instance();
+        $hook = $this->createMock(IAccountActivationHook::class);
+
+        $sut->expects($this->once())
+            ->method('constructAccount')
+            ->willReturn($account);
+        $account->expects($this->once())
+            ->method('Save')
+            ->willReturn(true);
+        $pa->expects($this->once())
+            ->method('Delete')
+            ->willReturn(true);
+        $accountService->expects($this->once())
+            ->method('ActivationHooks')
+            ->willReturn([$hook]);
+        $hook->expects($this->once())
+            ->method('OnActivateAccount')
+            ->with($account)
+            ->willThrowException(new \RuntimeException('Expected message.'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Expected message.');
+        ah::CallMethod($sut, 'doActivate', [$pa]);
+    }
+
     function testDoActivateSucceeds()
     {
         $sut = $this->systemUnderTest('constructAccount');
         $pa = $this->createMock(PendingAccount::class);
         $account = $this->createMock(Account::class);
+        $accountService = AccountService::Instance();
+        $hook = $this->createMock(IAccountActivationHook::class);
 
         $sut->expects($this->once())
             ->method('constructAccount')
@@ -300,6 +338,12 @@ class ActivateActionTest extends TestCase
         $pa->expects($this->once())
             ->method('Delete')
             ->willReturn(true);
+        $accountService->expects($this->once())
+            ->method('ActivationHooks')
+            ->willReturn([$hook]);
+        $hook->expects($this->once())
+            ->method('OnActivateAccount')
+            ->with($account);
 
         ah::CallMethod($sut, 'doActivate', [$pa]);
     }

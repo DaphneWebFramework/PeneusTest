@@ -137,7 +137,7 @@ class DeleteActionTest extends TestCase
 
     #region doDelete -----------------------------------------------------------
 
-    function testDoDeleteThrowsIfHookDeleteFails()
+    function testDoDeleteThrowsIfHookFails()
     {
         $sut = $this->systemUnderTest();
         $account = $this->createMock(Account::class);

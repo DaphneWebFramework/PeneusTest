@@ -12,6 +12,7 @@ use \Harmonia\Services\SecurityService;
 use \Harmonia\Session;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
+use \Peneus\Api\Hooks\IAccountActivationHook;
 use \Peneus\Api\Hooks\IAccountDeletionHook;
 use \Peneus\Model\AccountView;
 use \Peneus\Services\PersistentLoginManager;
@@ -235,6 +236,51 @@ class AccountServiceTest extends TestCase
     }
 
     #endregion SessionAccount
+
+    #region RegisterActivationHook ---------------------------------------------
+
+    function testRegisterActivationHook()
+    {
+        $sut = $this->systemUnderTest();
+        $hook = $this->createStub(IAccountActivationHook::class);
+
+        $sut->RegisterActivationHook($hook);
+
+        $hooks = ah::GetMockProperty(
+            AccountService::class,
+            $sut,
+            'activationHooks'
+        );
+
+        $this->assertCount(1, $hooks);
+        $this->assertSame($hook, $hooks[0]);
+    }
+
+    #endregion RegisterActivationHook
+
+    #region ActivationHooks ----------------------------------------------------
+
+    function testActivationHooks()
+    {
+        $sut = $this->systemUnderTest();
+        $hook1 = $this->createStub(IAccountActivationHook::class);
+        $hook2 = $this->createStub(IAccountActivationHook::class);
+
+        ah::SetMockProperty(
+            AccountService::class,
+            $sut,
+            'activationHooks',
+            [$hook1, $hook2]
+        );
+
+        $hooks = $sut->ActivationHooks();
+
+        $this->assertCount(2, $hooks);
+        $this->assertSame($hook1, $hooks[0]);
+        $this->assertSame($hook2, $hooks[1]);
+    }
+
+    #endregion ActivationHooks
 
     #region RegisterDeletionHook -----------------------------------------------
 
