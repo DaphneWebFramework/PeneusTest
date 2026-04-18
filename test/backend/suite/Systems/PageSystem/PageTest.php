@@ -697,7 +697,7 @@ class PageTest extends TestCase
 
     #[DataProvider('requireLoginRedirectsDataProvider')]
     function testRequireLoginRedirectsToErrorPageIfAccountRoleIsInsufficient(
-        ?int $accountRole,
+        Role $accountRole,
         Role $minimumRole
     ) {
         $sut = $this->systemUnderTest('redirect');
@@ -725,7 +725,7 @@ class PageTest extends TestCase
 
     #[DataProvider('requireLoginPassesDataProvider')]
     function testRequireLoginPassesIfUserIsLoggedInAndRoleIsSufficient(
-        ?int $accountRole,
+        Role $accountRole,
         Role $minimumRole
     ) {
         $sut = $this->systemUnderTest('redirect');
@@ -829,27 +829,21 @@ class PageTest extends TestCase
     static function requireLoginRedirectsDataProvider()
     {
         return [
-            'invalid vs Editor' => [99, Role::Editor],
-            'invalid vs Admin'  => [99, Role::Admin],
-            'null vs Editor'    => [null, Role::Editor],
-            'null vs Admin'     => [null, Role::Admin],
-            'None vs Editor'    => [0, Role::Editor],
-            'None vs Admin'     => [0, Role::Admin],
-            'Editor vs Admin'   => [10, Role::Admin],
+            'None vs Editor'  => [Role::None,   Role::Editor],
+            'None vs Admin'   => [Role::None,   Role::Admin],
+            'Editor vs Admin' => [Role::Editor, Role::Admin],
         ];
     }
 
     static function requireLoginPassesDataProvider()
     {
         return [
-            'invalid vs None'   => [99, Role::None],
-            'null vs None'      => [null, Role::None],
-            'None vs None'      => [0, Role::None],
-            'Editor vs None'    => [10, Role::None],
-            'Editor vs Editor'  => [10, Role::Editor],
-            'Admin vs None'     => [20, Role::None],
-            'Admin vs Editor'   => [20, Role::Editor],
-            'Admin vs Admin'    => [20, Role::Admin],
+            'None vs None'     => [Role::None,   Role::None],
+            'Editor vs None'   => [Role::Editor, Role::None],
+            'Editor vs Editor' => [Role::Editor, Role::Editor],
+            'Admin vs None'    => [Role::Admin,  Role::None],
+            'Admin vs Editor'  => [Role::Admin,  Role::Editor],
+            'Admin vs Admin'   => [Role::Admin,  Role::Admin],
         ];
     }
 

@@ -42,7 +42,7 @@ class SessionGuardTest extends TestCase
     #[DataProvider('verifyDataProvider')]
     public function testVerify(
         bool $expected,
-        ?int $accountRole,
+        Role $accountRole,
         Role $minimumRole
     ) {
         $sut = new SessionGuard($minimumRole);
@@ -64,25 +64,15 @@ class SessionGuardTest extends TestCase
     static function verifyDataProvider()
     {
         return [
-            'invalid vs None'   => [true,  99, Role::None],
-            'invalid vs Editor' => [false, 99, Role::Editor],
-            'invalid vs Admin'  => [false, 99, Role::Admin],
-
-            'null vs None'   => [true,  null, Role::None],
-            'null vs Editor' => [false, null, Role::Editor],
-            'null vs Admin'  => [false, null, Role::Admin],
-
-            'None vs None'   => [true,  0, Role::None],
-            'None vs Editor' => [false, 0, Role::Editor],
-            'None vs Admin'  => [false, 0, Role::Admin],
-
-            'Editor vs None'   => [true,  10, Role::None],
-            'Editor vs Editor' => [true,  10, Role::Editor],
-            'Editor vs Admin'  => [false, 10, Role::Admin],
-
-            'Admin vs None'   => [true,  20, Role::None],
-            'Admin vs Editor' => [true,  20, Role::Editor],
-            'Admin vs Admin'  => [true,  20, Role::Admin],
+            'None vs None'     => [true,  Role::None,   Role::None],
+            'None vs Editor'   => [false, Role::None,   Role::Editor],
+            'None vs Admin'    => [false, Role::None,   Role::Admin],
+            'Editor vs None'   => [true,  Role::Editor, Role::None],
+            'Editor vs Editor' => [true,  Role::Editor, Role::Editor],
+            'Editor vs Admin'  => [false, Role::Editor, Role::Admin],
+            'Admin vs None'    => [true,  Role::Admin,  Role::None],
+            'Admin vs Editor'  => [true,  Role::Admin,  Role::Editor],
+            'Admin vs Admin'   => [true,  Role::Admin,  Role::Admin],
         ];
     }
 

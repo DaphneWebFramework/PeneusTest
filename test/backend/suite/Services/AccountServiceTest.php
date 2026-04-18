@@ -15,6 +15,7 @@ use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
 use \Peneus\Api\Hooks\IAccountActivationHook;
 use \Peneus\Api\Hooks\IAccountDeletionHook;
 use \Peneus\Model\AccountView;
+use \Peneus\Model\Role;
 use \Peneus\Services\PersistentLoginManager;
 use \TestToolkit\AccessHelper as ah;
 
@@ -380,7 +381,7 @@ class AccountServiceTest extends TestCase
             'displayName'   => 'John',
             'timeActivated' => '2024-01-01 00:00:00',
             'timeLastLogin' => '2025-01-01 00:00:00',
-            'role'          => null
+            'role'          => Role::None->value
         ];
         $expected = new AccountView($data);
 
