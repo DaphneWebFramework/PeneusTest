@@ -74,11 +74,11 @@ class EntityPropertyInfoTest extends TestCase
 
     #region Type ---------------------------------------------------------------
 
-    #[TestWith([EntityPropertyType::Boolean   ])]
-    #[TestWith([EntityPropertyType::Integer   ])]
-    #[TestWith([EntityPropertyType::Float     ])]
-    #[TestWith([EntityPropertyType::String    ])]
-    #[TestWith([EntityPropertyType::DateTime  ])]
+    #[TestWith([EntityPropertyType::Boolean    ])]
+    #[TestWith([EntityPropertyType::Integer    ])]
+    #[TestWith([EntityPropertyType::Float      ])]
+    #[TestWith([EntityPropertyType::String     ])]
+    #[TestWith([EntityPropertyType::DateTime   ])]
     #[TestWith([EntityPropertyType::Enumeration])]
     function testType(EntityPropertyType $expected)
     {
