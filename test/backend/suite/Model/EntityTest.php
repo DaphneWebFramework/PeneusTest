@@ -9,30 +9,16 @@ use \Peneus\Model\Entity;
 
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Harmonia\Systems\DatabaseSystem\Fakes\FakeDatabase;
+use \Peneus\Model\Core\EntityPropertyInfo;
+use \Peneus\Model\Core\EntityPropertyType;
 use \Peneus\Model\ViewEntity;
 use \TestToolkit\AccessHelper as ah;
 
-enum TPureEnum {
-    case Zero;
-    case One;
-    case Two;
-}
-
-enum TEmptyIntegerEnum: int {}
-
-enum TEmptyStringEnum: string {}
-
-enum TIntegerEnum: int {
-    case Zero = 0;
-    case One = 1;
-    case Two = 2;
-}
-
-enum TStringEnum: string {
-    case Zero = 'zero';
-    case One = 'one';
-    case Two = 'two';
-}
+use \suite\Model\Core\TEmptyIntegerEnum;
+use \suite\Model\Core\TEmptyStringEnum;
+use \suite\Model\Core\TIntegerEnum;
+use \suite\Model\Core\TPureEnum;
+use \suite\Model\Core\TStringEnum;
 
 class TEmptyEntity extends Entity {}
 
@@ -83,45 +69,27 @@ class EntityTest extends TestCase
             ->getMock();
     }
 
-    private function assertProperties(Entity $sut, array $extras): void
-    {
-        $expected = [
-            ...$extras,
-            'id' => [
-                'type' => 'int',
-                'nullable' => false
-            ]
-        ];
-        $actual = \iterator_to_array(ah::CallMethod($sut, 'properties'));
-        $this->assertSame($expected, $actual);
-    }
-
     #region __construct --------------------------------------------------------
 
     function testBaseClassCannotBeInstantiated()
     {
         $this->expectException(\Error::class);
-
         new Entity();
     }
 
     function testConstructorDoesNotCallPopulateWhenDataIsOmitted()
     {
         $sut = $this->systemUnderTest('Populate');
-
         $sut->expects($this->never())
             ->method('Populate');
-
         $sut->__construct();
     }
 
     function testConstructorDoesNotCallPopulateWhenDataIsNull()
     {
         $sut = $this->systemUnderTest('Populate');
-
         $sut->expects($this->never())
             ->method('Populate');
-
         $sut->__construct(null);
     }
 
@@ -129,11 +97,9 @@ class EntityTest extends TestCase
     {
         $sut = $this->systemUnderTest('Populate');
         $data = [];
-
         $sut->expects($this->once())
             ->method('Populate')
             ->with($data);
-
         $sut->__construct($data);
     }
 
@@ -141,11 +107,9 @@ class EntityTest extends TestCase
     {
         $sut = $this->systemUnderTest('Populate');
         $data = new \stdClass();
-
         $sut->expects($this->once())
             ->method('Populate')
             ->with($data);
-
         $sut->__construct($data);
     }
 
@@ -156,9 +120,7 @@ class EntityTest extends TestCase
     function testPopulateWithEmptyData()
     {
         $sut = new TEntity();
-
         $sut->Populate([]);
-
         $this->assertSame(0, $sut->id);
         $this->assertSame(false, $sut->aBool);
         $this->assertNull($sut->aNullableBool);
@@ -188,9 +150,7 @@ class EntityTest extends TestCase
             'aString' => 'Hello, World!',
             'aDateTime' => '2025-07-22 14:35:00'
         ];
-
         $sut->Populate($data);
-
         $this->assertSame($data['id'], $sut->id);
         $this->assertSame($data['aBool'], $sut->aBool);
         $this->assertSame($data['anInt'], $sut->anInt);
@@ -210,9 +170,7 @@ class EntityTest extends TestCase
             'aString' => 'Hello, World!',
             'aDateTime' => '2025-07-22 14:35:00'
         ];
-
         $sut->Populate($data);
-
         $this->assertSame($data->id, $sut->id);
         $this->assertSame($data->aBool, $sut->aBool);
         $this->assertSame($data->anInt, $sut->anInt);
@@ -221,7 +179,7 @@ class EntityTest extends TestCase
         $this->assertSame($data->aDateTime, $sut->aDateTime->format('Y-m-d H:i:s'));
     }
 
-    function testPopulateWithClassInstanceData()
+    function testPopulateWithClassData()
     {
         $sut = new TEntity();
         $data = new class {
@@ -234,9 +192,7 @@ class EntityTest extends TestCase
             protected TIntegerEnum $anIntegerEnum = TIntegerEnum::One; // protected
             public TStringEnum $aStringEnum = TStringEnum::Two;
         };
-
         $sut->Populate($data);
-
         $this->assertSame($data->id, $sut->id);
         $this->assertSame($data->aBool, $sut->aBool);
         $this->assertSame(0, $sut->anInt); // should not be assigned
@@ -266,9 +222,7 @@ class EntityTest extends TestCase
             'aNullableIntegerEnum' => null,
             'aNullableStringEnum' => null
         ];
-
         $sut->Populate($data);
-
         $this->assertNull($sut->aNullableBool);
         $this->assertNull($sut->aNullableInt);
         $this->assertNull($sut->aNullableFloat);
@@ -285,57 +239,57 @@ class EntityTest extends TestCase
     #[TestWith(['aDateTime'])]
     #[TestWith(['anIntegerEnum'])]
     #[TestWith(['aStringEnum'])]
-    function testPopulateThrowsWhenAssigningNullToNonNullable(string $property)
+    function testPopulateThrowsWhenAssigningNullToNonNullable(string $propName)
     {
         $sut = new TEntity();
-
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            "Failed to assign value to property '$property'.");
-
-        $sut->Populate([$property => null]);
+        $this->expectExceptionMessage("Failed to set property '$propName':"
+            . " Cannot assign null to non-nullable property.");
+        $sut->Populate([$propName => null]);
     }
 
-    #[TestWith(['anInt', '123'])]
-    #[TestWith(['aFloat', '1.23'])]
-    #[TestWith(['aString', 123])]
+    #[TestWith([true,  'aBool',   123   ])]
+    #[TestWith([123,   'anInt',   '123' ])]
+    #[TestWith([1.23,  'aFloat',  '1.23'])]
+    #[TestWith(['123', 'aString', 123   ])]
+    function testPopulateCastsTypes(mixed $expected, string $propName, mixed $value)
+    {
+        $sut = new TEntity();
+        $sut->Populate([$propName => $value]);
+        $this->assertSame($expected, $sut->$propName);
+    }
+
     #[TestWith(['aDateTime', 123])]
     #[TestWith(['anIntegerEnum', '123'])]
     #[TestWith(['aStringEnum', 123])]
-    function testPopulateThrowsOnIncompatibleTypes(string $property, mixed $value)
+    function testPopulateThrowsOnIncompatibleTypes(string $propName, mixed $value)
     {
         $sut = new TEntity();
-
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            "Failed to assign value to property '{$property}'.");
-
-        $sut->Populate([$property => $value]);
+        $sut->Populate([$propName => $value]);
     }
 
-    #[TestWith([false, false])]
-    #[TestWith([true, true])]
-    #[TestWith([false, 0])]
-    #[TestWith([true, 1])]
-    #[TestWith([true, -1])]
-    #[TestWith([false, '0'])]
-    #[TestWith([true, '1'])]
-    #[TestWith([true, 'false'])]
-    #[TestWith([true, 'true'])]
-    #[TestWith([true, 'no'])]
-    #[TestWith([true, 'yes'])]
-    #[TestWith([false, ''])]
-    #[TestWith([true, ' '])]
-    #[TestWith([false, 0.0])]
-    #[TestWith([true, 0.1])]
-    #[TestWith([false, []])]
-    #[TestWith([true, [1]])]
+    #[TestWith([false, ''     ])]
+    #[TestWith([false, '0'    ])]
+    #[TestWith([false, []     ])]
+    #[TestWith([false, 0      ])]
+    #[TestWith([false, 0.0    ])]
+    #[TestWith([false, false  ])]
+    #[TestWith([true,  -1     ])]
+    #[TestWith([true,  ' '    ])]
+    #[TestWith([true,  '1'    ])]
+    #[TestWith([true,  'false'])]
+    #[TestWith([true,  'no'   ])]
+    #[TestWith([true,  'true' ])]
+    #[TestWith([true,  'yes'  ])]
+    #[TestWith([true,  [1]    ])]
+    #[TestWith([true,  0.1    ])]
+    #[TestWith([true,  1      ])]
+    #[TestWith([true,  true   ])]
     function testPopulateAssignsBoolean(bool $expected, mixed $value)
     {
         $sut = new TEntity();
-
         $sut->Populate(['aBool' => $value]);
-
         $this->assertSame($expected, $sut->aBool);
     }
 
@@ -346,9 +300,7 @@ class EntityTest extends TestCase
     function testPopulateAssignsDateTimeString(string $expected, string $value)
     {
         $sut = new TEntity();
-
         $sut->Populate(['aDateTime' => $value]);
-
         $this->assertSame($expected, $sut->aDateTime->format('Y-m-d H:i:s'));
     }
 
@@ -356,9 +308,7 @@ class EntityTest extends TestCase
     {
         $sut = new TEntity();
         $expected = new \DateTime('2026-04-16 10:00:00');
-
         $sut->Populate(['aDateTime' => $expected]);
-
         $this->assertSame($expected, $sut->aDateTime);
     }
 
@@ -368,11 +318,7 @@ class EntityTest extends TestCase
     function testPopulateThrowsWhenAssigningInvalidDateTime(string $value)
     {
         $sut = new TEntity();
-
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage(
-            "Failed to assign value to property 'aDateTime'.");
-
         $sut->Populate(['aDateTime' => $value]);
     }
 
@@ -385,9 +331,7 @@ class EntityTest extends TestCase
     function testPopulateAssignsIntegerEnum(mixed $expected, mixed $value)
     {
         $sut = new TEntity();
-
         $sut->Populate(['anIntegerEnum' => $value]);
-
         $this->assertSame($expected, $sut->anIntegerEnum);
     }
 
@@ -400,13 +344,11 @@ class EntityTest extends TestCase
     function testPopulateAssignsStringEnum(mixed $expected, mixed $value)
     {
         $sut = new TEntity();
-
         $sut->Populate(['aStringEnum' => $value]);
-
         $this->assertSame($expected, $sut->aStringEnum);
     }
 
-    function testPopulateSkipsNonEligibleProperties()
+    function testPopulateSkipsUnsupportedProperties()
     {
         $sut = new class extends Entity {
             protected int       $aProtected = 1;
@@ -416,12 +358,10 @@ class EntityTest extends TestCase
             public              $anUntyped = 5;
             public int|string   $aUnion = 6;
             public array        $anArray = [7];
-
             public function __construct() {
                 $this->aReadonly = 4;
             }
         };
-
         $sut->Populate([
             'aProtected' => 99,
             'aPrivate'   => 99,
@@ -431,7 +371,6 @@ class EntityTest extends TestCase
             'aUnion'     => 99,
             'anArray'    => [99]
         ]);
-
         $this->assertSame(0, $sut->id);
         $this->assertSame(1, ah::GetProperty($sut, 'aProtected'));
         $this->assertSame(2, ah::GetProperty($sut, 'aPrivate'));
@@ -451,13 +390,11 @@ class EntityTest extends TestCase
     function testSaveCallsInsertWhenIdIsZero(bool $returnValue)
     {
         $sut = $this->systemUnderTest('insert', 'update');
-
         $sut->expects($this->once())
             ->method('insert')
             ->willReturn($returnValue);
         $sut->expects($this->never())
             ->method('update');
-
         $this->assertSame($returnValue, $sut->Save());
     }
 
@@ -467,13 +404,11 @@ class EntityTest extends TestCase
     {
         $sut = $this->systemUnderTest('insert', 'update');
         $sut->id = 1;
-
         $sut->expects($this->never())
             ->method('insert');
         $sut->expects($this->once())
             ->method('update')
             ->willReturn($returnValue);
-
         $this->assertSame($returnValue, $sut->Save());
     }
 
@@ -484,7 +419,6 @@ class EntityTest extends TestCase
     function testDeleteFailsIfIdIsZero()
     {
         $sut = new TEntity();
-
         $this->assertFalse($sut->Delete());
     }
 
@@ -496,7 +430,6 @@ class EntityTest extends TestCase
     {
         $sut = new TEntity(['id' => 1]);
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'DELETE FROM `tentity`'
                . ' WHERE `id` = :id',
@@ -505,9 +438,7 @@ class EntityTest extends TestCase
             lastAffectedRowCount: $lastAffectedRowCount,
             times: 1
         );
-
         $actual = $sut->Delete();
-
         $this->assertSame($expected, $actual);
         $this->assertSame($finalId, $sut->id);
         $fakeDatabase->VerifyAllExpectationsMet();
@@ -546,9 +477,7 @@ class EntityTest extends TestCase
             'aStringEnum'          => TStringEnum::Two->value,
             'aNullableStringEnum'  => null
         ];
-
         $actual = $sut->jsonSerialize();
-
         $this->assertSame($expected, $actual);
     }
 
@@ -561,13 +490,10 @@ class EntityTest extends TestCase
         $sut = $this->systemUnderTest('jsonSerialize');
         $serialized = ['kept' => 0, 'excluded' => 0];
         $expected = ['kept' => 0];
-
         $sut->expects($this->once())
             ->method('jsonSerialize')
             ->willReturn($serialized);
-
         $actual = $sut->Without('excluded');
-
         $this->assertSame($expected, $actual);
     }
 
@@ -576,13 +502,11 @@ class EntityTest extends TestCase
         $sut = $this->systemUnderTest('jsonSerialize');
         $serialized = ['kept' => 0];
         $expected = $serialized;
-
         $sut->expects($this->once())
             ->method('jsonSerialize')
             ->willReturn($serialized);
 
         $actual = $sut->Without();
-
         $this->assertSame($expected, $actual);
     }
 
@@ -591,13 +515,11 @@ class EntityTest extends TestCase
         $sut = $this->systemUnderTest('jsonSerialize');
         $serialized = ['kept' => 0, 'excluded' => 0];
         $expected = ['kept' => 0];
-
         $sut->expects($this->once())
             ->method('jsonSerialize')
             ->willReturn($serialized);
 
         $actual = $sut->Without('non-existent', 'excluded');
-
         $this->assertSame($expected, $actual);
     }
 
@@ -631,7 +553,6 @@ class EntityTest extends TestCase
                 return 'custom_table_name';
             }
         };
-
         $this->assertSame('custom_table_name', $customEntity::TableName());
     }
 
@@ -658,9 +579,7 @@ class EntityTest extends TestCase
             ['name' => 'aStringEnum',          'type' => 'TEXT',     'nullable' => false],
             ['name' => 'aNullableStringEnum',  'type' => 'TEXT',     'nullable' => true],
         ];
-
         $actual = TEntity::Metadata();
-
         $this->assertSame($expected, $actual);
     }
 
@@ -674,13 +593,11 @@ class EntityTest extends TestCase
     function testTableExists(bool $expected, ?array $result)
     {
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: "SHOW TABLES LIKE 'tentity'",
             result: $result,
             times: 1
         );
-
         $this->assertSame($expected, TEntity::TableExists());
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -689,10 +606,9 @@ class EntityTest extends TestCase
 
     #region CreateTable --------------------------------------------------------
 
-    function testCreateTableFailsOnEmptyEntity()
+    function testCreateTableFailsForEmptyEntity()
     {
         $sut = new TEmptyEntity();
-
         $this->assertFalse($sut::CreateTable());
     }
 
@@ -701,15 +617,12 @@ class EntityTest extends TestCase
     function testCreateTableForViewEntity($expected, $result)
     {
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'CREATE OR REPLACE VIEW `tviewentity` AS SELECT 1',
             result: $result,
             times: 1
         );
-
         $actual = TViewEntity::CreateTable();
-
         $this->assertSame($expected, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -719,7 +632,6 @@ class EntityTest extends TestCase
     function testCreateTableForRegularEntity($expected, $result)
     {
         $fakeDatabase = Database::Instance();
-
         $sql = 'CREATE TABLE `tentity` ('
              . '`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY, '
              . '`aBool` BIT NOT NULL, '
@@ -737,15 +649,12 @@ class EntityTest extends TestCase
              . '`aStringEnum` TEXT NOT NULL, '
              . '`aNullableStringEnum` TEXT NULL'
              . ') ENGINE=InnoDB';
-
         $fakeDatabase->Expect(
             sql: $sql,
             result: $result,
             times: 1
         );
-
         $actual = TEntity::CreateTable();
-
         $this->assertSame($expected, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -759,15 +668,12 @@ class EntityTest extends TestCase
     function testDropTableForViewEntity($expected, $result)
     {
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'DROP VIEW `tviewentity`',
             result: $result,
             times: 1
         );
-
         $actual = TViewEntity::DropTable();
-
         $this->assertSame($expected, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -777,15 +683,12 @@ class EntityTest extends TestCase
     function testDropTableForRegularEntity($expected, $result)
     {
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'DROP TABLE `tentity`',
             result: $result,
             times: 1
         );
-
         $actual = TEntity::DropTable();
-
         $this->assertSame($expected, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -800,7 +703,6 @@ class EntityTest extends TestCase
     {
         $id = 17;
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `tentity`'
                . ' WHERE `id` = :id LIMIT 1',
@@ -808,9 +710,7 @@ class EntityTest extends TestCase
             result: $result,
             times: 1
         );
-
         $actual = TEntity::FindById($id);
-
         $this->assertNull($actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -837,7 +737,6 @@ class EntityTest extends TestCase
         ];
         $expected = new TEntity($data);
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `tentity`'
                . ' WHERE `id` = :id LIMIT 1',
@@ -845,9 +744,7 @@ class EntityTest extends TestCase
             result: [$data],
             times: 1
         );
-
         $actual = TEntity::FindById(1);
-
         $this->assertEquals($expected, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -861,16 +758,13 @@ class EntityTest extends TestCase
     function testFindFirstFails($result)
     {
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `tentity`'
                . ' LIMIT 1',
             result: $result,
             times: 1
         );
-
         $actual = TEntity::FindFirst();
-
         $this->assertNull($actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -896,7 +790,6 @@ class EntityTest extends TestCase
         ];
         $expected = new TEntity($data);
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `tentity`'
                . ' WHERE anInt > :anInt'
@@ -906,13 +799,11 @@ class EntityTest extends TestCase
             result: [$data],
             times: 1
         );
-
         $actual = TEntity::FindFirst(
             condition: 'anInt > :anInt',
             bindings: ['anInt' => 29],
             orderBy: 'aString DESC'
         );
-
         $this->assertEquals($expected, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -926,15 +817,12 @@ class EntityTest extends TestCase
     function testFindFails($result)
     {
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `tentity`',
             result: $result,
             times: 1
         );
-
         $actual = TEntity::Find();
-
         $this->assertSame([], $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -976,7 +864,6 @@ class EntityTest extends TestCase
         ]];
         $expected = [new TEntity($data[0]), new TEntity($data[1])];
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `tentity`'
                . ' WHERE aString LIKE :aString AND anInt >= :anInt'
@@ -986,7 +873,6 @@ class EntityTest extends TestCase
             result: $data,
             times: 1
         );
-
         $actual = TEntity::Find(
             condition: 'aString LIKE :aString AND anInt >= :anInt',
             bindings: ['aString' => 'A%', 'anInt' => 25],
@@ -994,7 +880,6 @@ class EntityTest extends TestCase
             limit: 10,
             offset: 5
         );
-
         $this->assertEquals($expected, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -1009,15 +894,12 @@ class EntityTest extends TestCase
     function testCountFails($result)
     {
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM `tentity`',
             result: $result,
             times: 1
         );
-
         $actual = TEntity::Count();
-
         $this->assertSame(0, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -1026,15 +908,12 @@ class EntityTest extends TestCase
     {
         $expected = 123;
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM `tentity`',
             result: [[$expected]],
             times: 1
         );
-
         $actual = TEntity::Count();
-
         $this->assertSame($expected, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -1043,7 +922,6 @@ class EntityTest extends TestCase
     {
         $expected = 7;
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'SELECT COUNT(*) FROM `tentity`'
                . ' WHERE anInt > :anInt',
@@ -1051,12 +929,10 @@ class EntityTest extends TestCase
             result: [[$expected]],
             times: 1
         );
-
         $actual = TEntity::Count(
             condition: 'anInt > :anInt',
             bindings: ['anInt' => 30]
         );
-
         $this->assertSame($expected, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -1065,10 +941,9 @@ class EntityTest extends TestCase
 
     #region insert -------------------------------------------------------------
 
-    function testInsertFailsOnEmptyEntity()
+    function testInsertFailsForEmptyEntity()
     {
         $sut = new TEmptyEntity();
-
         $this->assertFalse(ah::CallMethod($sut, 'insert'));
     }
 
@@ -1086,7 +961,6 @@ class EntityTest extends TestCase
             'aStringEnum'   => TStringEnum::Two
         ]);
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
             sql: 'INSERT INTO `tentity` ('
                . '`aBool`, `aNullableBool`, '
@@ -1125,9 +999,7 @@ class EntityTest extends TestCase
             lastInsertId: $lastInsertId,
             times: 1
         );
-
         $actual = ah::CallMethod($sut, 'insert');
-
         $this->assertSame($expected, $actual);
         $this->assertSame($lastInsertId, $sut->id);
         $fakeDatabase->VerifyAllExpectationsMet();
@@ -1137,10 +1009,9 @@ class EntityTest extends TestCase
 
     #region update -------------------------------------------------------------
 
-    function testUpdateFailsOnEmptyEntity()
+    function testUpdateFailsForEmptyEntity()
     {
         $sut = new TEmptyEntity();
-
         $this->assertFalse(ah::CallMethod($sut, 'update'));
     }
 
@@ -1161,17 +1032,16 @@ class EntityTest extends TestCase
             'aStringEnum'   => TStringEnum::Two
         ]);
         $fakeDatabase = Database::Instance();
-
         $fakeDatabase->Expect(
-            sql: 'UPDATE `tentity` SET '
-               . '`aBool` = :aBool, `aNullableBool` = :aNullableBool, '
-               . '`anInt` = :anInt, `aNullableInt` = :aNullableInt, '
-               . '`aFloat` = :aFloat, `aNullableFloat` = :aNullableFloat, '
-               . '`aString` = :aString, `aNullableString` = :aNullableString, '
-               . '`aDateTime` = :aDateTime, `aNullableDateTime` = :aNullableDateTime, '
-               . '`anIntegerEnum` = :anIntegerEnum, `aNullableIntegerEnum` = :aNullableIntegerEnum, '
-               . '`aStringEnum` = :aStringEnum, `aNullableStringEnum` = :aNullableStringEnum '
-               . 'WHERE `id` = :id',
+            sql: 'UPDATE `tentity` SET'
+               . ' `aBool` = :aBool, `aNullableBool` = :aNullableBool,'
+               . ' `anInt` = :anInt, `aNullableInt` = :aNullableInt,'
+               . ' `aFloat` = :aFloat, `aNullableFloat` = :aNullableFloat,'
+               . ' `aString` = :aString, `aNullableString` = :aNullableString,'
+               . ' `aDateTime` = :aDateTime, `aNullableDateTime` = :aNullableDateTime,'
+               . ' `anIntegerEnum` = :anIntegerEnum, `aNullableIntegerEnum` = :aNullableIntegerEnum,'
+               . ' `aStringEnum` = :aStringEnum, `aNullableStringEnum` = :aNullableStringEnum'
+               . ' WHERE `id` = :id',
             bindings: [
                 'id'                   => 23,
                 'aBool'                => true,
@@ -1193,9 +1063,7 @@ class EntityTest extends TestCase
             lastAffectedRowCount: $lastAffectedRowCount,
             times: 1
         );
-
         $actual = ah::CallMethod($sut, 'update');
-
         $this->assertSame($expected, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
@@ -1204,160 +1072,115 @@ class EntityTest extends TestCase
 
     #region properties ---------------------------------------------------------
 
-    function testPropertiesWithNoProperties()
+    /**
+     * @param array<string, array{
+     *   0: EntityPropertyType,
+     *   1: string,
+     *   2: bool
+     * }> $data
+     * @return array<string, EntityPropertyInfo>
+     */
+    private function expectedProperties(array $data): array
     {
-        $sut = new class extends Entity {
-            // No properties
-        };
-
-        $this->assertProperties($sut, []);
+        $expected = [];
+        $expected['id'] = ah::CallConstructor(EntityPropertyInfo::class, [
+            EntityPropertyType::Integer, 'int', false
+        ]);
+        foreach ($data as $key => $value) {
+            $expected[$key] = ah::CallConstructor(EntityPropertyInfo::class, [
+                $value[0], $value[1], $value[2]
+            ]);
+        }
+        return $expected;
     }
 
-    function testPropertiesSkipsNonPublicProperties()
+    /**
+     * @param Entity $sut
+     * @return array<string, EntityPropertyInfo>
+     */
+    private function actualProperties(Entity $sut): array
     {
-        $sut = new class extends Entity {
-            protected int $aProtected;
-            private int   $aPrivate;
-        };
-
-        $this->assertProperties($sut, []);
+        return \iterator_to_array(ah::CallMethod($sut, 'properties'));
     }
 
-    function testPropertiesSkipsStaticProperties()
+    function testPropertiesForEmptyEntity()
     {
-        $sut = new class extends Entity {
-            public static int $aStatic;
-        };
-
-        $this->assertProperties($sut, []);
+        $sut = new TEmptyEntity();
+        $expected = $this->expectedProperties([]);
+        $actual = $this->actualProperties($sut);
+        $this->assertEquals($expected, $actual);
+        $this->assertSame(0, $sut->id);
     }
 
-    function testPropertiesSkipsReadOnlyProperties()
+    function testPropertiesSkipsUnsupportedProperties()
     {
         $sut = new class extends Entity {
-            public readonly int $aReadOnly;
-        };
-
-        $this->assertProperties($sut, []);
-    }
-
-    function testPropertiesSkipsUntypedProperties()
-    {
-        $sut = new class extends Entity {
-            public $anUntyped;
-        };
-
-        $this->assertProperties($sut, []);
-    }
-
-    function testPropertiesSkipsUnionTypeProperties()
-    {
-        $sut = new class extends Entity {
-            public int|string $aUnion;
-        };
-
-        $this->assertProperties($sut, []);
-    }
-
-    function testPropertiesSkipsIntersectionTypeProperties()
-    {
-        $sut = new class extends Entity {
+        // Non-public
+            protected int               $aProtected;
+            private int                 $aPrivate;
+        // Static
+            public static int           $aStatic;
+        // Read-only
+            public readonly int         $aReadOnly;
+        // Untyped
+            public                      $anUntyped;
+        // Union
+            public int|string           $aUnion;
+        // Intersection
             public \Iterator&\Countable $anIntersection;
+        // Unsupported
+            public array                $anArray;
+            public \stdClass            $aStdClass;
+            public \Closure             $aClosure;
+            public iterable             $anIterable;
+            public \DateTimeImmutable   $aDateTimeImmutable;
+        // Pure enum
+            public TPureEnum            $aPureEnum;
+        // Empty backed enum
+            public TEmptyIntegerEnum    $anEmptyIntegerEnum;
+            public TEmptyStringEnum     $anEmptyStringEnum;
         };
-
-        $this->assertProperties($sut, []);
+        $expected = $this->expectedProperties([]);
+        $actual = $this->actualProperties($sut);
+        $this->assertEquals($expected, $actual);
     }
 
-    function testPropertiesSkipsUnsupportedTypes()
+    function testPropertiesInitializesProperties()
     {
-        $sut = new class extends Entity {
-            public array              $anArray;
-            public \stdClass          $anObject;
-            public iterable           $anIterable;
-            public \DateTimeImmutable $aDateTimeImmutable;
-        };
-
-        $this->assertProperties($sut, []);
-    }
-
-    function testPropertiesSkipsPureEnumProperties()
-    {
-        $sut = new class extends Entity {
-            public TPureEnum $aPureEnum;
-        };
-
-        $this->assertProperties($sut, []);
-    }
-
-    function testPropertiesSkipsEmptyBackedEnumProperties()
-    {
-        $sut = new class extends Entity {
-            public TEmptyIntegerEnum $anEmptyIntegerEnum;
-            public TEmptyStringEnum  $anEmptyStringEnum;
-        };
-
-        $this->assertProperties($sut, []);
-    }
-
-    function testPropertiesHandlesNullableSupportedProperties()
-    {
-        $sut = new class extends Entity {
-            public ?bool         $aNullableBool;
-            public ?int          $aNullableInt;
-            public ?float        $aNullableFloat;
-            public ?string       $aNullableString;
-            public ?\DateTime    $aNullableDateTime;
-            public ?TIntegerEnum $aNullableIntegerEnum;
-            public ?TStringEnum  $aNullableStringEnum;
-        };
-
-        $this->assertProperties($sut, [
-            'aNullableBool'        => ['type' => 'bool', 'nullable' => true],
-            'aNullableInt'         => ['type' => 'int', 'nullable' => true],
-            'aNullableFloat'       => ['type' => 'float', 'nullable' => true],
-            'aNullableString'      => ['type' => 'string', 'nullable' => true],
-            'aNullableDateTime'    => ['type' => 'DateTime', 'nullable' => true],
-            'aNullableIntegerEnum' => ['type' => TIntegerEnum::class, 'nullable' => true],
-            'aNullableStringEnum'  => ['type' => TStringEnum::class, 'nullable' => true],
+        $sut = new TEntity();
+        $expected = $this->expectedProperties([
+            'aBool' => [EntityPropertyType::Boolean, 'bool', false],
+            'aNullableBool' => [EntityPropertyType::Boolean, 'bool', true],
+            'anInt' => [EntityPropertyType::Integer, 'int', false],
+            'aNullableInt' => [EntityPropertyType::Integer, 'int', true],
+            'aFloat' => [EntityPropertyType::Float, 'float', false],
+            'aNullableFloat' => [EntityPropertyType::Float, 'float', true],
+            'aString' => [EntityPropertyType::String, 'string', false],
+            'aNullableString' => [EntityPropertyType::String, 'string', true],
+            'aDateTime' => [EntityPropertyType::DateTime, \DateTime::class, false],
+            'aNullableDateTime' => [EntityPropertyType::DateTime, \DateTime::class, true],
+            'anIntegerEnum' => [EntityPropertyType::Enumeration, TIntegerEnum::class, false],
+            'aNullableIntegerEnum' => [EntityPropertyType::Enumeration, TIntegerEnum::class, true],
+            'aStringEnum' => [EntityPropertyType::Enumeration, TStringEnum::class, false],
+            'aNullableStringEnum' => [EntityPropertyType::Enumeration, TStringEnum::class, true]
         ]);
-        $this->assertNull($sut->aNullableBool);
-        $this->assertNull($sut->aNullableInt);
-        $this->assertNull($sut->aNullableFloat);
-        $this->assertNull($sut->aNullableString);
-        $this->assertNull($sut->aNullableDateTime);
-        $this->assertNull($sut->aNullableIntegerEnum);
-        $this->assertNull($sut->aNullableStringEnum);
-    }
-
-    function testPropertiesHandlesSupportedProperties()
-    {
-        $sut = new class extends Entity {
-            public bool         $aBool;
-            public int          $anInt;
-            public float        $aFloat;
-            public string       $aString;
-            public \DateTime    $aDateTime;
-            public TIntegerEnum $anIntegerEnum;
-            public TStringEnum  $aStringEnum;
-        };
-
-        $this->assertProperties($sut, [
-            'aBool'         => ['type' => 'bool', 'nullable' => false],
-            'anInt'         => ['type' => 'int', 'nullable' => false],
-            'aFloat'        => ['type' => 'float', 'nullable' => false],
-            'aString'       => ['type' => 'string', 'nullable' => false],
-            'aDateTime'     => ['type' => 'DateTime', 'nullable' => false],
-            'anIntegerEnum' => ['type' => TIntegerEnum::class, 'nullable' => false],
-            'aStringEnum'   => ['type' => TStringEnum::class, 'nullable' => false],
-        ]);
+        $actual = $this->actualProperties($sut);
+        $this->assertEquals($expected, $actual);
         $this->assertFalse($sut->aBool);
+        $this->assertNull($sut->aNullableBool);
         $this->assertSame(0, $sut->anInt);
+        $this->assertNull($sut->aNullableInt);
         $this->assertSame(0.0, $sut->aFloat);
+        $this->assertNull($sut->aNullableFloat);
         $this->assertSame('', $sut->aString);
+        $this->assertNull($sut->aNullableString);
         $this->assertInstanceOf(\DateTime::class, $sut->aDateTime);
         $this->assertEqualsWithDelta(\time(), $sut->aDateTime->getTimestamp(), 1);
+        $this->assertNull($sut->aNullableDateTime);
         $this->assertSame(TIntegerEnum::Zero, $sut->anIntegerEnum);
+        $this->assertNull($sut->aNullableIntegerEnum);
         $this->assertSame(TStringEnum::Zero, $sut->aStringEnum);
+        $this->assertNull($sut->aNullableStringEnum);
     }
 
     function testPropertiesDoesNotOverwriteAlreadyInitializedProperties()
@@ -1370,21 +1193,21 @@ class EntityTest extends TestCase
             public \DateTime    $aDateTime;
             public TIntegerEnum $anIntegerEnum = TIntegerEnum::One;
             public TStringEnum  $aStringEnum = TStringEnum::Two;
-
             public function __construct() {
                 $this->aDateTime = new \DateTime('2020-01-01 10:00:00');
             }
         };
-
-        $this->assertProperties($sut, [
-            'aBool'         => ['type' => 'bool', 'nullable' => false],
-            'anInt'         => ['type' => 'int', 'nullable' => false],
-            'aFloat'        => ['type' => 'float', 'nullable' => false],
-            'aString'       => ['type' => 'string', 'nullable' => false],
-            'aDateTime'     => ['type' => 'DateTime', 'nullable' => false],
-            'anIntegerEnum' => ['type' => TIntegerEnum::class, 'nullable' => false],
-            'aStringEnum'   => ['type' => TStringEnum::class, 'nullable' => false],
+        $expected = $this->expectedProperties([
+            'aBool' => [EntityPropertyType::Boolean, 'bool', false],
+            'anInt' => [EntityPropertyType::Integer, 'int', false],
+            'aFloat' => [EntityPropertyType::Float, 'float', false],
+            'aString' => [EntityPropertyType::String, 'string', false],
+            'aDateTime' => [EntityPropertyType::DateTime, \DateTime::class, false],
+            'anIntegerEnum' => [EntityPropertyType::Enumeration, TIntegerEnum::class, false],
+            'aStringEnum' => [EntityPropertyType::Enumeration, TStringEnum::class, false]
         ]);
+        $actual = $this->actualProperties($sut);
+        $this->assertEquals($expected, $actual);
         $this->assertTrue($sut->aBool);
         $this->assertSame(1, $sut->anInt);
         $this->assertSame(1.1, $sut->aFloat);
@@ -1396,153 +1219,74 @@ class EntityTest extends TestCase
 
     #endregion properties
 
-    #region isSupportedPropertyType --------------------------------------------
-
-    #[TestWith(['bool'])]
-    #[TestWith(['int'])]
-    #[TestWith(['float'])]
-    #[TestWith(['string'])]
-    #[TestWith(['DateTime'])]
-    #[TestWith([TIntegerEnum::class])]
-    #[TestWith([TStringEnum::class])]
-    function testIsSupportedPropertyTypeReturnsTrue(string $type)
-    {
-        $actual = ah::CallStaticMethod(
-            Entity::class,
-            'isSupportedPropertyType',
-            [$type]
-        );
-
-        $this->assertTrue($actual);
-    }
-
-    #[TestWith(['array'])]
-    #[TestWith(['object'])]
-    #[TestWith(['iterable'])]
-    #[TestWith([\DateTimeImmutable::class])]
-    #[TestWith(['NonExistentClass'])]
-    #[TestWith([TPureEnum::class])]
-    #[TestWith([TEmptyIntegerEnum::class])]
-    #[TestWith([TEmptyStringEnum::class])]
-    function testIsSupportedPropertyTypeReturnsFalse(string $type)
-    {
-        $actual = ah::CallStaticMethod(
-            Entity::class,
-            'isSupportedPropertyType',
-            [$type]
-        );
-
-        $this->assertFalse($actual);
-    }
-
-    #endregion isSupportedPropertyType
-
-    #region defaultValueForSupportedPropertyType -------------------------------
-
-    #[TestWith([false, 'bool'])]
-    #[TestWith([0, 'int'])]
-    #[TestWith([0.0, 'float'])]
-    #[TestWith(['', 'string'])]
-    #[TestWith([null, 'DateTime'])] // null is a placeholder; verified specifically
-    #[TestWith([TIntegerEnum::Zero, TIntegerEnum::class])]
-    #[TestWith([TStringEnum::Zero, TStringEnum::class])]
-    function testDefaultValueForSupportedPropertyType(mixed $expected, string $type)
-    {
-        $actual = ah::CallStaticMethod(
-            Entity::class,
-            'defaultValueForSupportedPropertyType',
-            [$type]
-        );
-
-        if ($type === 'DateTime') {
-            $this->assertInstanceOf(\DateTime::class, $actual);
-            $this->assertEqualsWithDelta(\time(), $actual->getTimestamp(), 1);
-        } else {
-            $this->assertSame($expected, $actual);
-        }
-    }
-
-    #endregion defaultValueForSupportedPropertyType
-
     #region scalarize ----------------------------------------------------------
 
-    #[TestWith([true, true])]
-    #[TestWith([false, false])]
-    #[TestWith([12345, 12345])]
-    #[TestWith([123.45, 123.45])]
-    #[TestWith(['a-string', 'a-string'])]
-    function testScalarize(mixed $expected, mixed $value)
+    function testScalarizeReturnsNullIfValueIsNull()
     {
+        $propInfo = $this->createMock(EntityPropertyInfo::class);
+        $propInfo->expects($this->never())
+            ->method('Type');
         $actual = ah::CallStaticMethod(
             Entity::class,
             'scalarize',
-            [$value]
+            [null, $propInfo]
         );
-
-        $this->assertSame($expected, $actual);
+        $this->assertNull($actual);
     }
 
-    function testScalarizeWithDateTime()
+    #[TestWith([true,       EntityPropertyType::Boolean])]
+    #[TestWith([123,        EntityPropertyType::Integer])]
+    #[TestWith([123.45,     EntityPropertyType::Float  ])]
+    #[TestWith(['a-string', EntityPropertyType::String ])]
+    function testScalarizeForScalar(mixed $value, EntityPropertyType $type)
+    {
+        $propInfo = $this->createMock(EntityPropertyInfo::class);
+        $propInfo->expects($this->once())
+            ->method('Type')
+            ->willReturn($type);
+        $actual = ah::CallStaticMethod(
+            Entity::class,
+            'scalarize',
+            [$value, $propInfo]
+        );
+        $this->assertSame($value, $actual);
+    }
+
+    function testScalarizeForDateTime()
     {
         $value = new \DateTime();
+        $propInfo = $this->createMock(EntityPropertyInfo::class);
         $expected = $value->format('Y-m-d H:i:s');
-
+        $propInfo->expects($this->once())
+            ->method('Type')
+            ->willReturn(EntityPropertyType::DateTime);
         $actual = ah::CallStaticMethod(
             Entity::class,
             'scalarize',
-            [$value]
+            [$value, $propInfo]
         );
-
         $this->assertSame($expected, $actual);
     }
 
-    #[TestWith([0, TIntegerEnum::Zero])]
-    #[TestWith([1, TIntegerEnum::One])]
-    #[TestWith([2, TIntegerEnum::Two])]
+    #[TestWith([0,      TIntegerEnum::Zero])]
+    #[TestWith([1,      TIntegerEnum::One])]
+    #[TestWith([2,      TIntegerEnum::Two])]
     #[TestWith(['zero', TStringEnum::Zero])]
-    #[TestWith(['one', TStringEnum::One])]
-    #[TestWith(['two', TStringEnum::Two])]
-    function testScalarizeWithBackedEnum(mixed $expected, mixed $value)
+    #[TestWith(['one',  TStringEnum::One])]
+    #[TestWith(['two',  TStringEnum::Two])]
+    function testScalarizeForEnumeration(mixed $expected, mixed $value)
     {
+        $propInfo = $this->createMock(EntityPropertyInfo::class);
+        $propInfo->expects($this->once())
+            ->method('Type')
+            ->willReturn(EntityPropertyType::Enumeration);
         $actual = ah::CallStaticMethod(
             Entity::class,
             'scalarize',
-            [$value]
+            [$value, $propInfo]
         );
-
         $this->assertSame($expected, $actual);
     }
 
     #endregion scalarize
-
-    #region backingTypeForEnum -------------------------------------------------
-
-    #[TestWith(['NonExistentClass'])]
-    #[TestWith([\stdClass::class])]
-    #[TestWith([TPureEnum::class])]
-    function testBackingTypeForEnumFails(string $class)
-    {
-        $this->expectException(\ReflectionException::class);
-
-        ah::CallStaticMethod(
-            Entity::class,
-            'backingTypeForEnum',
-            [$class]
-        );
-    }
-
-    #[TestWith(['int', TIntegerEnum::class])]
-    #[TestWith(['string', TStringEnum::class])]
-    function testBackingTypeForEnumSucceeds(string $expected, string $class)
-    {
-        $actual = ah::CallStaticMethod(
-            Entity::class,
-            'backingTypeForEnum',
-            [$class]
-        );
-
-        $this->assertSame($expected, $actual);
-    }
-
-    #endregion backingTypeForEnum
 }
