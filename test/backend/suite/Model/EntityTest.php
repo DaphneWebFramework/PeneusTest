@@ -705,9 +705,31 @@ class EntityTest extends TestCase
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `tentity`'
-               . ' WHERE `id` = :id LIMIT 1',
+               . ' WHERE `id` = :id'
+               . ' LIMIT 1',
             bindings: ['id' => $id],
             result: $result,
+            times: 1
+        );
+        $actual = TEntity::FindById($id);
+        $this->assertNull($actual);
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testFindByIdFailsWithCorruptedRecord()
+    {
+        $id = 17;
+        $data = [
+            'id'            => $id,
+            'anIntegerEnum' => 9
+        ];
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM `tentity`'
+               . ' WHERE `id` = :id'
+               . ' LIMIT 1',
+            bindings: ['id' => $id],
+            result: [$data],
             times: 1
         );
         $actual = TEntity::FindById($id);
@@ -739,7 +761,8 @@ class EntityTest extends TestCase
         $fakeDatabase = Database::Instance();
         $fakeDatabase->Expect(
             sql: 'SELECT * FROM `tentity`'
-               . ' WHERE `id` = :id LIMIT 1',
+               . ' WHERE `id` = :id'
+               . ' LIMIT 1',
             bindings: ['id' => 1],
             result: [$data],
             times: 1
@@ -762,6 +785,24 @@ class EntityTest extends TestCase
             sql: 'SELECT * FROM `tentity`'
                . ' LIMIT 1',
             result: $result,
+            times: 1
+        );
+        $actual = TEntity::FindFirst();
+        $this->assertNull($actual);
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testFindFirstFailsWithCorruptedRecord()
+    {
+        $data = [
+            'id'          => 17,
+            'aStringEnum' => 'nine'
+        ];
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM `tentity`'
+               . ' LIMIT 1',
+            result: [$data],
             times: 1
         );
         $actual = TEntity::FindFirst();
@@ -824,6 +865,33 @@ class EntityTest extends TestCase
         );
         $actual = TEntity::Find();
         $this->assertSame([], $actual);
+        $fakeDatabase->VerifyAllExpectationsMet();
+    }
+
+    function testFindSkipsCorruptedRecords()
+    {
+        $data = [[
+            'id'        => 1,
+            'aDateTime' => '2026-04-18 12:00:00'
+        ], [
+            'id'        => 2,
+            'aDateTime' => null // cannot assign null to non-nullable property
+        ], [
+            'id'        => 3,
+            'aDateTime' => '2026-04-18 13:00:00'
+        ]];
+        $expected = [
+            new TEntity($data[0]),
+            new TEntity($data[2])
+        ];
+        $fakeDatabase = Database::Instance();
+        $fakeDatabase->Expect(
+            sql: 'SELECT * FROM `tentity`',
+            result: $data,
+            times: 1
+        );
+        $actual = TEntity::Find();
+        $this->assertEquals($expected, $actual);
         $fakeDatabase->VerifyAllExpectationsMet();
     }
 
