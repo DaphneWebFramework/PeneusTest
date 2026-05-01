@@ -1,8 +1,9 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Account;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
-use \PHPUnit\Framework\Attributes\TestWith;
 
 use \Peneus\Api\Actions\Account\SendPasswordResetAction;
 
@@ -10,7 +11,6 @@ use \Harmonia\Config;
 use \Harmonia\Core\CArray;
 use \Harmonia\Core\CUrl;
 use \Harmonia\Http\Request;
-use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Services\SecurityService;
 use \Harmonia\Systems\DatabaseSystem\Database;
@@ -18,6 +18,7 @@ use \Peneus\Model\Account;
 use \Peneus\Model\PasswordReset;
 use \Peneus\Resource;
 use \TestToolkit\AccessHelper as ah;
+use \TestToolkit\Context;
 
 #[CoversClass(SendPasswordResetAction::class)]
 class SendPasswordResetActionTest extends TestCase
@@ -64,396 +65,403 @@ class SendPasswordResetActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfPayloadValidationFails()
+    private function contextForOnExecute(
+        bool $validatePayloadSucceeds = true,
+        bool $doTransactionSucceeds = true,
+        bool $deleteCsrfCookieSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('validatePayload');
-
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteBypassesDatabaseTransactionIfAccountNotFound()
-    {
-        $sut = $this->systemUnderTest('validatePayload', 'tryFindAccountByEmail',
-            'doSend');
-        $payload = (object)[
-            'email' => 'john@example.com'
-        ];
-        $database = Database::Instance();
-        $cookieService = CookieService::Instance();
-
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('tryFindAccountByEmail')
-            ->with('john@example.com')
-            ->willReturn(null);
-        $database->expects($this->never())
-            ->method('WithTransaction');
-        $sut->expects($this->never())
-            ->method('doSend');
-        $cookieService->expects($this->once())
-            ->method('DeleteCsrfCookie');
-
-        $result = ah::CallMethod($sut, 'onExecute');
-
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey('message', $result);
-        $this->assertSame(
-            "A password reset link has been sent to your email address.",
-            $result['message']
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest(
+            'validatePayload',
+            'doTransaction',
+            'composeResult'
         );
+        $email = 'john@example.com';
+        $payload = new \stdClass();
+        $payload->email = $email;
+        $cookieService = CookieService::Instance();
+        $ctx->result = ['message' => 'SUCCESS_MESSAGE'];
+
+        $ctx->sut->expects($ctx->chain())
+            ->method('validatePayload')
+            ->willReturnCallback(fn() => $validatePayloadSucceeds
+                ? $payload
+                : throw new \RuntimeException('VALIDATE_PAYLOAD_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($validatePayloadSucceeds))
+            ->method('doTransaction')
+            ->with($payload)
+            ->willReturnCallback(fn() => $doTransactionSucceeds
+                ? null
+                : throw new \RuntimeException('DO_TRANSACTION_FAILED'));
+        $cookieService->expects($ctx->chainIf($doTransactionSucceeds))
+            ->method('DeleteCsrfCookie')
+            ->willReturnCallback(fn() => $deleteCsrfCookieSucceeds
+                ? null
+                : throw new \RuntimeException('DELETE_CSRF_COOKIE_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($deleteCsrfCookieSucceeds))
+            ->method('composeResult')
+            ->willReturn($ctx->result);
+
+        return $ctx;
     }
 
-    function testOnExecuteThrowsIfDoSendFails()
+    function testOnExecuteFailsIfValidatePayloadFails()
     {
-        $sut = $this->systemUnderTest('validatePayload', 'tryFindAccountByEmail',
-            'doSend');
-        $payload = (object)[
-            'email' => 'john@example.com'
-        ];
-        $account = $this->createStub(Account::class);
-        $database = Database::Instance();
-
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('tryFindAccountByEmail')
-            ->with('john@example.com')
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('doSend')
-            ->with($account)
-            ->willThrowException(new \RuntimeException());
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                $callback();
-            });
-
+        $ctx = $this->contextForOnExecute(validatePayloadSucceeds: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "We couldn't send the email. Please try again later.");
-        ah::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('VALIDATE_PAYLOAD_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfDoTransactionFails()
+    {
+        $ctx = $this->contextForOnExecute(doTransactionSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DO_TRANSACTION_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfDeleteCsrfCookieFails()
+    {
+        $ctx = $this->contextForOnExecute(deleteCsrfCookieSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DELETE_CSRF_COOKIE_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest('validatePayload', 'tryFindAccountByEmail',
-            'doSend');
-        $payload = (object)[
-            'email' => 'john@example.com'
-        ];
-        $account = $this->createStub(Account::class);
-        $database = Database::Instance();
-        $cookieService = CookieService::Instance();
-
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('tryFindAccountByEmail')
-            ->with('john@example.com')
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('doSend')
-            ->with($account);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                $callback();
-            });
-        $cookieService->expects($this->once())
-            ->method('DeleteCsrfCookie');
-
-        $result = ah::CallMethod($sut, 'onExecute');
-
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey('message', $result);
-        $this->assertSame(
-            "A password reset link has been sent to your email address.",
-            $result['message']
-        );
+        $ctx = $this->contextForOnExecute();
+        $actual = ah::CallMethod($ctx->sut, 'onExecute');
+        $this->assertSame($ctx->result, $actual);
     }
 
     #endregion onExecute
 
     #region validatePayload ----------------------------------------------------
 
-    #[DataProvider('invalidPayloadProvider')]
-    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
+    private function contextForValidatePayload(
+        array $payload
+    ): Context
     {
-        $sut = $this->systemUnderTest();
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
 
-        $request->expects($this->once())
+        $request->expects($ctx->chain())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->once())
+        $formParams->expects($ctx->chain())
             ->method('ToArray')
             ->willReturn($payload);
 
+        return $ctx;
+    }
+
+    #[DataProvider('invalidPayloadProvider')]
+    function testValidatePayloadFails(array $payload)
+    {
+        $ctx = $this->contextForValidatePayload($payload);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'validatePayload');
+        ah::CallMethod($ctx->sut, 'validatePayload');
     }
 
     function testValidatePayloadSucceeds()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
         $payload = [
             'email' => 'john@example.com'
         ];
+        $ctx = $this->contextForValidatePayload($payload);
         $expected = (object)$payload;
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($payload);
-
-        $this->assertEquals($expected, ah::CallMethod($sut, 'validatePayload'));
+        $actual = ah::CallMethod($ctx->sut, 'validatePayload');
+        $this->assertEquals($expected, $actual);
     }
 
     #endregion validatePayload
 
-    #region doSend -------------------------------------------------------------
+    #region doTransaction ------------------------------------------------------
 
-    function testDoSendThrowsIfPasswordResetSaveFails()
+    private function contextForDoTransaction(
+        bool $accountFound = true,
+        bool $accountIsThirdParty = false,
+        bool $passwordResetSaveSucceeds = true,
+        bool $sendEmailSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('findOrConstructPasswordReset', 'sendEmail');
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest(
+            'tryFindAccountByEmail',
+            'isThirdPartyAccount',
+            'findOrMakePasswordReset',
+            'sendEmail'
+        );
+        $email = 'john@example.com';
+        $ctx->payload = new \stdClass();
+        $ctx->payload->email = $email;
+        $accountId = 17;
+        $displayName = 'John';
         $account = $this->createStub(Account::class);
-        $account->id = 42;
+        $account->id = $accountId;
+        $account->email = $email;
+        $account->displayName = $displayName;
+        $database = Database::Instance();
         $securityService = SecurityService::Instance();
-        $pr = $this->createMock(PasswordReset::class);
+        $resetCode = 'code1234';
+        $passwordReset = $this->createMock(PasswordReset::class);
 
-        $securityService->expects($this->once())
+        $ctx->sut->expects($ctx->chain())
+            ->method('tryFindAccountByEmail')
+            ->with($email)
+            ->willReturn($accountFound ? $account : null);
+        $ctx->sut->expects($ctx->chainIf($accountFound))
+            ->method('isThirdPartyAccount')
+            ->with($account)
+            ->willReturn($accountIsThirdParty);
+        $database->expects($ctx->chainIf(!$accountIsThirdParty))
+            ->method('WithTransaction')
+            ->willReturnCallback(fn($callback) => $callback());
+        $securityService->expects($ctx->chain())
             ->method('GenerateToken')
-            ->willReturn('code1234');
-        $sut->expects($this->once())
-            ->method('findOrConstructPasswordReset')
-            ->with(42)
-            ->willReturn($pr);
-        $pr->expects($this->once())
+            ->willReturn($resetCode);
+        $ctx->sut->expects($ctx->chain())
+            ->method('findOrMakePasswordReset')
+            ->with($accountId)
+            ->willReturn($passwordReset);
+        $passwordReset->expects($ctx->chain())
             ->method('Save')
-            ->willReturn(false);
-        $sut->expects($this->never())
-            ->method('sendEmail');
+            ->willReturn($passwordResetSaveSucceeds);
+        $ctx->sut->expects($ctx->chainIf($passwordResetSaveSucceeds))
+            ->method('sendEmail')
+            ->with($email, $displayName, $resetCode)
+            ->willReturnCallback(fn() => $sendEmailSucceeds
+                ? null
+                : throw new \RuntimeException('SEND_EMAIL_FAILED'));
 
+        return $ctx;
+    }
+
+    function testDoTransactionSkipsIfAccountNotFound()
+    {
+        $ctx = $this->contextForDoTransaction(accountFound: false);
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->payload]);
+    }
+
+    function testDoTransactionSkipsIfAccountIsThirdParty()
+    {
+        $ctx = $this->contextForDoTransaction(accountIsThirdParty: true);
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->payload]);
+    }
+
+    function testDoTransactionFailsIfPasswordResetSaveFails()
+    {
+        $ctx = $this->contextForDoTransaction(passwordResetSaveSucceeds: false);
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save password reset.");
-        ah::CallMethod($sut, 'doSend', [$account]);
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->payload]);
     }
 
-    function testDoSendThrowsIfSendEmailFails()
+    function testDoTransactionFailsIfSendEmailFails()
     {
-        $sut = $this->systemUnderTest('findOrConstructPasswordReset', 'sendEmail');
-        $account = $this->createStub(Account::class);
-        $account->id = 42;
-        $account->email = 'john@example.com';
-        $account->displayName = 'John';
-        $securityService = SecurityService::Instance();
-        $pr = $this->createMock(PasswordReset::class);
-
-        $securityService->expects($this->once())
-            ->method('GenerateToken')
-            ->willReturn('code1234');
-        $sut->expects($this->once())
-            ->method('findOrConstructPasswordReset')
-            ->with(42)
-            ->willReturn($pr);
-        $pr->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('sendEmail')
-            ->with('john@example.com', 'John', 'code1234')
-            ->willReturn(false);
-
+        $ctx = $this->contextForDoTransaction(sendEmailSucceeds: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Failed to send email.");
-        ah::CallMethod($sut, 'doSend', [$account]);
+        $this->expectExceptionMessage('SEND_EMAIL_FAILED');
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->payload]);
     }
 
-    function testDoSendSucceeds()
+    function testDoTransactionSucceeds()
     {
-        $sut = $this->systemUnderTest('findOrConstructPasswordReset', 'sendEmail');
-        $account = $this->createStub(Account::class);
-        $account->id = 42;
-        $account->email = 'john@example.com';
-        $account->displayName = 'John';
-        $securityService = SecurityService::Instance();
-        $pr = $this->createMock(PasswordReset::class);
-
-        $securityService->expects($this->once())
-            ->method('GenerateToken')
-            ->willReturn('code1234');
-        $sut->expects($this->once())
-            ->method('findOrConstructPasswordReset')
-            ->with(42)
-            ->willReturn($pr);
-        $pr->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $sut->expects($this->once())
-            ->method('sendEmail')
-            ->with('john@example.com', 'John', 'code1234')
-            ->willReturn(true);
-
-        ah::CallMethod($sut, 'doSend', [$account]);
+        $ctx = $this->contextForDoTransaction();
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->payload]);
     }
 
-    #endregion doSend
+    #endregion doTransaction
 
-    #region findOrConstructPasswordReset ---------------------------------------
+    #region isThirdPartyAccount ------------------------------------------------
 
-    function testFindOrConstructPasswordResetWithExistingRecord()
-    {
-        $sut = $this->systemUnderTest('tryFindPasswordResetByAccountId',
-            'constructPasswordReset');
-        $pr = $this->createStub(PasswordReset::class);
-
-        $sut->expects($this->once())
-            ->method('tryFindPasswordResetByAccountId')
-            ->with(42)
-            ->willReturn($pr);
-        $sut->expects($this->never())
-            ->method('constructPasswordReset');
-
-        $this->assertSame($pr, ah::CallMethod(
-            $sut,
-            'findOrConstructPasswordReset',
-            [42]
-        ));
-    }
-
-    function testFindOrConstructPasswordResetWithNonExistingRecord()
-    {
-        $sut = $this->systemUnderTest('tryFindPasswordResetByAccountId',
-            'constructPasswordReset');
-        $pr = $this->createStub(PasswordReset::class);
-
-        $sut->expects($this->once())
-            ->method('tryFindPasswordResetByAccountId')
-            ->with(42)
-            ->willReturn(null);
-        $sut->expects($this->once())
-            ->method('constructPasswordReset')
-            ->with(42)
-            ->willReturn($pr);
-
-        $this->assertSame($pr, ah::CallMethod(
-            $sut,
-            'findOrConstructPasswordReset',
-            [42]
-        ));
-    }
-
-    #endregion findOrConstructPasswordReset
-
-    #region constructPasswordReset ---------------------------------------------
-
-    function testConstructPasswordReset()
+    function testIsThirdPartyAccountReturnsFalseIfAccountHasPasswordHash()
     {
         $sut = $this->systemUnderTest();
-
-        $pr = ah::CallMethod($sut, 'constructPasswordReset', [42]);
-        $this->assertInstanceOf(PasswordReset::class, $pr);
-        $this->assertSame(42, $pr->accountId);
+        $account = $this->createStub(Account::class);
+        $account->passwordHash = 'hash1234';
+        $this->assertFalse(ah::CallMethod($sut, 'isThirdPartyAccount', [$account]));
     }
 
-    #endregion constructPasswordReset
+    function testIsThirdPartyAccountReturnsTrueIfAccountHasNoPasswordHash()
+    {
+        $sut = $this->systemUnderTest();
+        $account = $this->createStub(Account::class);
+        $account->passwordHash = '';
+        $this->assertTrue(ah::CallMethod($sut, 'isThirdPartyAccount', [$account]));
+    }
+
+    #endregion isThirdPartyAccount
+
+    #region findOrMakePasswordReset --------------------------------------------
+
+    private function contextForFindOrMakePasswordReset(
+        bool $entityExists = true
+    ): Context
+    {
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest(
+            'tryFindPasswordResetByAccountId',
+            'makePasswordReset'
+        );
+        $ctx->accountId = 17;
+        $ctx->existingEntity = $this->createStub(PasswordReset::class);
+        $ctx->newEntity = $this->createStub(PasswordReset::class);
+
+        $ctx->sut->expects($ctx->chain())
+            ->method('tryFindPasswordResetByAccountId')
+            ->with($ctx->accountId)
+            ->willReturn($entityExists ? $ctx->existingEntity : null);
+        $ctx->sut->expects($ctx->chainIf(!$entityExists))
+            ->method('makePasswordReset')
+            ->with($ctx->accountId)
+            ->willReturn($ctx->newEntity);
+
+        return $ctx;
+    }
+
+    function testFindOrMakePasswordResetReturnsExistingIfFound()
+    {
+        $ctx = $this->contextForFindOrMakePasswordReset(entityExists: true);
+        $actual = ah::CallMethod($ctx->sut, 'findOrMakePasswordReset', [$ctx->accountId]);
+        $this->assertSame($ctx->existingEntity, $actual);
+    }
+
+    function testFindOrMakePasswordResetReturnsNewIfNotFound()
+    {
+        $ctx = $this->contextForFindOrMakePasswordReset(entityExists: false);
+        $actual = ah::CallMethod($ctx->sut, 'findOrMakePasswordReset', [$ctx->accountId]);
+        $this->assertSame($ctx->newEntity, $actual);
+    }
+
+    #endregion findOrMakePasswordReset
+
+    #region makePasswordReset --------------------------------------------------
+
+    function testMakePasswordReset()
+    {
+        $sut = $this->systemUnderTest();
+        $accountId = 17;
+
+        $passwordReset = ah::CallMethod($sut, 'makePasswordReset', [$accountId]);
+
+        $this->assertInstanceOf(PasswordReset::class, $passwordReset);
+        $this->assertSame(0,                  $passwordReset->id);
+        $this->assertSame($accountId,         $passwordReset->accountId);
+        $this->assertSame('',                 $passwordReset->resetCode);
+        $this->assertEqualsWithDelta(\time(), $passwordReset->timeRequested->getTimestamp(), 1);
+    }
+
+    #endregion makePasswordReset
 
     #region sendEmail ----------------------------------------------------------
 
-    #[TestWith([true])]
-    #[TestWith([false])]
-    function testSendEmail($returnValue)
+    private function contextForSendEmail(
+        bool $succeeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('sendTransactionalEmail');
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest('sendTransactionalEmail');
         $config = Config::Instance();
-        $actionUrl = $this->createMock(CUrl::class);
         $resource = Resource::Instance();
+        $ctx->email = 'john@example.com';
+        $ctx->displayName = 'John';
+        $ctx->resetCode = 'code1234';
+        $appName = 'Example';
+        $actionUrl = $this->createMock(CUrl::class);
+        $substitutions = [
+            'heroText' =>
+                "Reset your password",
+            'introText' =>
+                "Follow the link below to choose a new password.",
+            'buttonText' =>
+                "Reset My Password",
+            'disclaimerText' =>
+                "You received this email because a password reset was"
+              . " requested for your account on {$appName}. If you did"
+              . " not request this, you can safely ignore this email."
+        ];
 
-        $config->expects($this->once())
-            ->method('OptionOrDefault')
-            ->with('AppName', '')
-            ->willReturn('Example');
-        $resource->expects($this->once())
+        $config->expects($ctx->chain())
+            ->method('Option')
+            ->with('AppName')
+            ->willReturn($appName);
+        $resource->expects($ctx->chain())
             ->method('PageUrl')
             ->with('reset-password')
             ->willReturn($actionUrl);
-        $actionUrl->expects($this->once())
+        $actionUrl->expects($ctx->chain())
             ->method('Extend')
-            ->with('code1234')
+            ->with($ctx->resetCode)
             ->willReturnSelf();
-        $actionUrl->expects($this->once())
-            ->method('__toString')
-            ->willReturn('https://example.com/pages/reset-password/code1234');
-        $sut->expects($this->once())
+        $ctx->sut->expects($ctx->chain())
             ->method('sendTransactionalEmail')
             ->with(
-                'john@example.com',
-                'John',
-                'https://example.com/pages/reset-password/code1234',
-                [
-                    'heroText' =>
-                        "Reset your password",
-                    'introText' =>
-                        "Follow the link below to choose a new password.",
-                    'buttonText' =>
-                        "Reset My Password",
-                    'disclaimerText' =>
-                        "You received this email because a password reset was"
-                      . " requested for your account on Example. If you did"
-                      . " not request this, you can safely ignore this email."
-                ]
+                $ctx->email,
+                $ctx->displayName,
+                $actionUrl,
+                $substitutions
             )
-            ->willReturn($returnValue);
+            ->willReturn($succeeds);
 
-        $this->assertSame(
-            $returnValue,
-            ah::CallMethod($sut, 'sendEmail', [
-                'john@example.com',
-                'John',
-                'code1234'
-            ])
-        );
+        return $ctx;
+    }
+
+    function testSendEmailFails()
+    {
+        $ctx = $this->contextForSendEmail(succeeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Failed to send email.");
+        ah::CallMethod($ctx->sut, 'sendEmail', [
+            $ctx->email,
+            $ctx->displayName,
+            $ctx->resetCode
+        ]);
+    }
+
+    function testSendEmailSucceeds()
+    {
+        $ctx = $this->contextForSendEmail();
+        ah::CallMethod($ctx->sut, 'sendEmail', [
+            $ctx->email,
+            $ctx->displayName,
+            $ctx->resetCode
+        ]);
     }
 
     #endregion sendEmail
 
+    #region composeResult ------------------------------------------------------
+
+    function testComposeResult()
+    {
+        $sut = $this->systemUnderTest();
+        $expected = [
+            'message' =>
+                "A password reset link has been sent to your email address."
+        ];
+        $actual = ah::CallMethod($sut, 'composeResult');
+        $this->assertSame($expected, $actual);
+    }
+
+    #endregion composeResult
+
     #region Data Providers -----------------------------------------------------
 
-    /**
-     * @return array<string, array{
-     *   payload: array<string, mixed>,
-     *   exceptionMessage: string
-     * }>
-     */
     static function invalidPayloadProvider()
     {
         return [
-            'email missing' => [
-                'payload' => [],
-                'exceptionMessage' => "Required field 'email' is missing."
-            ],
-            'email invalid' => [
-                'payload' => ['email' => 'invalid-email'],
-                'exceptionMessage' => "Field 'email' must be a valid email address."
-            ]
+            'email.required' => [[
+                // empty
+            ]],
+            'email.email' => [[
+                'email' => 'invalid-email'
+            ]],
         ];
     }
 

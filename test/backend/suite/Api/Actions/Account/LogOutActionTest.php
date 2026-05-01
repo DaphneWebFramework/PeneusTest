@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Account;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 
@@ -6,6 +8,7 @@ use \Peneus\Api\Actions\Account\LogOutAction;
 
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as ah;
+use \TestToolkit\Context;
 
 #[CoversClass(LogOutAction::class)]
 class LogOutActionTest extends TestCase
@@ -32,15 +35,36 @@ class LogOutActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecute()
+    private function contextForOnExecute(
+        bool $sessionDeleteSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest();
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
         $accountService = AccountService::Instance();
 
-        $accountService->expects($this->once())
-            ->method('DeleteSession');
+        $accountService->expects($ctx->chain())
+            ->method('DeleteSession')
+            ->willReturnCallback(fn() => $sessionDeleteSucceeds
+                ? null
+                : throw new \RuntimeException('SESSION_DELETE_FAILED'));
 
-        $this->assertNull(ah::CallMethod($sut, 'onExecute'));
+        return $ctx;
+    }
+
+    function testOnExecuteFailsIfSessionDeleteFails()
+    {
+        $ctx = $this->contextForOnExecute(sessionDeleteSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('SESSION_DELETE_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteSucceeds()
+    {
+        $ctx = $this->contextForOnExecute();
+        $actual = ah::CallMethod($ctx->sut, 'onExecute');
+        $this->assertNull($actual);
     }
 
     #endregion onExecute

@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Account;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 
@@ -10,6 +12,7 @@ use \Peneus\Model\Account;
 use \Peneus\Model\AccountView;
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as ah;
+use \TestToolkit\Context;
 
 #[CoversClass(DeleteAction::class)]
 class DeleteActionTest extends TestCase
@@ -40,188 +43,199 @@ class DeleteActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfUserIsNotLoggedIn()
+    private function contextForOnExecute(
+        bool $ensureLoggedInSucceeds = true,
+        bool $findAccountSucceeds = true,
+        bool $doTransactionSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn');
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfAccountNotFound()
-    {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount');
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest(
+            'ensureLoggedIn',
+            'findAccount',
+            'doTransaction'
+        );
         $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with($accountView->id)
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfDoDeleteFails()
-    {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
-            'doDelete');
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
+        $accountView->id = 17;
         $account = $this->createStub(Account::class);
-        $database = Database::Instance();
 
-        $sut->expects($this->once())
+        $ctx->sut->expects($ctx->chain())
             ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
+            ->willReturnCallback(fn() => $ensureLoggedInSucceeds
+                ? $accountView
+                : throw new \RuntimeException('ENSURE_LOGGED_IN_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($ensureLoggedInSucceeds))
             ->method('findAccount')
             ->with($accountView->id)
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('doDelete')
+            ->willReturnCallback(fn() => $findAccountSucceeds
+                ? $account
+                : throw new \RuntimeException('FIND_ACCOUNT_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($findAccountSucceeds))
+            ->method('doTransaction')
             ->with($account)
-            ->willThrowException(new \RuntimeException());
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                $callback();
-            });
+            ->willReturnCallback(fn() => $doTransactionSucceeds
+                ? null
+                : throw new \RuntimeException('DO_TRANSACTION_FAILED'));
 
+        return $ctx;
+    }
+
+    function testOnExecuteFailsIfEnsureLoggedInFails()
+    {
+        $ctx = $this->contextForOnExecute(ensureLoggedInSucceeds: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Failed to delete account.");
-        ah::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('ENSURE_LOGGED_IN_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfFindAccountFails()
+    {
+        $ctx = $this->contextForOnExecute(findAccountSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('FIND_ACCOUNT_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfDoTransactionFails()
+    {
+        $ctx = $this->contextForOnExecute(doTransactionSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DO_TRANSACTION_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
-            'doDelete', 'logOut');
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
-        $account = $this->createStub(Account::class);
-        $database = Database::Instance();
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with($accountView->id)
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('doDelete')
-            ->with($account);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                $callback();
-            });
-        $sut->expects($this->once())
-            ->method('logOut');
-
-        $this->assertNull(ah::CallMethod($sut, 'onExecute'));
+        $ctx = $this->contextForOnExecute();
+        $actual = ah::CallMethod($ctx->sut, 'onExecute');
+        $this->assertNull($actual);
     }
 
     #endregion onExecute
 
-    #region doDelete -----------------------------------------------------------
+    #region doTransaction ------------------------------------------------------
 
-    function testDoDeleteThrowsIfHookFails()
+    private function contextForDoTransaction(
+        bool $triggerDeletionHooksSucceeds = true,
+        bool $accountDeleteSucceeds = true,
+        bool $sessionDeleteSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest('triggerDeletionHooks');
+        $ctx->account = $this->createMock(Account::class);
+        $database = Database::Instance();
         $accountService = AccountService::Instance();
-        $hook1 = $this->createMock(IAccountDeletionHook::class);
-        $hook2 = $this->createMock(IAccountDeletionHook::class);
-        $hook3 = $this->createMock(IAccountDeletionHook::class);
 
-        $accountService->expects($this->once())
-            ->method('DeletionHooks')
-            ->willReturn([$hook1, $hook2, $hook3]);
-        $hook1->expects($this->once())
-            ->method('OnDeleteAccount')
-            ->with($account);
-        $hook2->expects($this->once())
-            ->method('OnDeleteAccount')
-            ->with($account)
-            ->willThrowException(new \RuntimeException('Expected message.'));
-        $hook3->expects($this->never())
-            ->method('OnDeleteAccount');
-        $account->expects($this->never())
-            ->method('Delete');
+        $database->expects($ctx->chain())
+             ->method('WithTransaction')
+             ->willReturnCallback(fn($callback) => $callback());
+        $ctx->sut->expects($ctx->chain())
+            ->method('triggerDeletionHooks')
+            ->with($ctx->account)
+            ->willReturnCallback(fn() => $triggerDeletionHooksSucceeds
+                ? null
+                : throw new \RuntimeException('TRIGGER_DELETION_HOOKS_FAILED'));
+        $ctx->account->expects($ctx->chainIf($triggerDeletionHooksSucceeds))
+            ->method('Delete')
+            ->willReturn($accountDeleteSucceeds);
+        $accountService->expects($ctx->chainIf($accountDeleteSucceeds))
+            ->method('DeleteSession')
+            ->willReturnCallback(fn() => $sessionDeleteSucceeds
+                ? null
+                : throw new \RuntimeException('SESSION_DELETE_FAILED'));
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'doDelete', [$account]);
+        return $ctx;
     }
 
-    function testDoDeleteThrowsIfAccountDeleteFails()
+    function testDoTransactionFailsIfTriggerDeletionHooksFails()
     {
-        $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
-        $accountService = AccountService::Instance();
-        $hook = $this->createMock(IAccountDeletionHook::class);
+        $ctx = $this->contextForDoTransaction(triggerDeletionHooksSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('TRIGGER_DELETION_HOOKS_FAILED');
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->account]);
+    }
 
-        $accountService->expects($this->once())
-            ->method('DeletionHooks')
-            ->willReturn([$hook]);
-        $hook->expects($this->once())
-            ->method('OnDeleteAccount')
-            ->with($account);
-        $account->expects($this->once())
-            ->method('Delete')
-            ->willReturn(false);
-
+    function testDoTransactionFailsIfAccountDeleteFails()
+    {
+        $ctx = $this->contextForDoTransaction(accountDeleteSucceeds: false);
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to delete account.");
-        ah::CallMethod($sut, 'doDelete', [$account]);
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->account]);
     }
 
-    function testDoDeleteSucceeds()
+    function testDoTransactionFailsIfSessionDeleteFails()
     {
-        $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
-        $accountService = AccountService::Instance();
-        $hook = $this->createMock(IAccountDeletionHook::class);
+        $ctx = $this->contextForDoTransaction(sessionDeleteSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('SESSION_DELETE_FAILED');
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->account]);
+    }
 
-        $accountService->expects($this->once())
+    function testDoTransactionSucceeds()
+    {
+        $ctx = $this->contextForDoTransaction();
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->account]);
+    }
+
+    #endregion doTransaction
+
+    #region triggerDeletionHooks -----------------------------------------------
+
+    private function contextForTriggerDeletionHooks(
+        bool $firstHookSucceeds = true,
+        bool $secondHookSucceeds = true
+    ): Context
+    {
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
+        $ctx->account = $this->createStub(Account::class);
+        $accountService = AccountService::Instance();
+        $hooks = [
+            $this->createMock(IAccountDeletionHook::class),
+            $this->createMock(IAccountDeletionHook::class)
+        ];
+
+        $accountService->expects($ctx->chain())
             ->method('DeletionHooks')
-            ->willReturn([$hook]);
-        $hook->expects($this->once())
+            ->willReturn($hooks);
+        $hooks[0]->expects($ctx->chain())
             ->method('OnDeleteAccount')
-            ->with($account);
-        $account->expects($this->once())
-            ->method('Delete')
-            ->willReturn(true);
+            ->with($ctx->account)
+            ->willReturnCallback(fn() => $firstHookSucceeds
+                ? null
+                : throw new \RuntimeException('FIRST_HOOK_FAILED'));
+        $hooks[1]->expects($ctx->chainIf($firstHookSucceeds))
+            ->method('OnDeleteAccount')
+            ->with($ctx->account)
+            ->willReturnCallback(fn() => $secondHookSucceeds
+                ? null
+                : throw new \RuntimeException('SECOND_HOOK_FAILED'));
 
-        ah::CallMethod($sut, 'doDelete', [$account]);
+        return $ctx;
     }
 
-    #endregion doDelete
-
-    #region logOut -------------------------------------------------------------
-
-    function testLogOut()
+    function testTriggerDeletionHooksFailsIfFirstHookFails()
     {
-        $sut = $this->systemUnderTest();
-        $accountService = AccountService::Instance();
-
-        $accountService->expects($this->once())
-            ->method('DeleteSession');
-
-        ah::CallMethod($sut, 'logOut');
+        $ctx = $this->contextForTriggerDeletionHooks(firstHookSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('FIRST_HOOK_FAILED');
+        ah::CallMethod($ctx->sut, 'triggerDeletionHooks', [$ctx->account]);
     }
 
-    #endregion logOut
+    function testTriggerDeletionHooksFailsIfSecondHookFails()
+    {
+        $ctx = $this->contextForTriggerDeletionHooks(secondHookSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('SECOND_HOOK_FAILED');
+        ah::CallMethod($ctx->sut, 'triggerDeletionHooks', [$ctx->account]);
+    }
+
+    function testTriggerDeletionHooksSucceeds()
+    {
+        $ctx = $this->contextForTriggerDeletionHooks();
+        ah::CallMethod($ctx->sut, 'triggerDeletionHooks', [$ctx->account]);
+    }
+
+    #endregion triggerDeletionHooks
 }

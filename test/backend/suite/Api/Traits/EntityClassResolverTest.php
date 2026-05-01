@@ -18,7 +18,9 @@ use \Peneus\Api\DashboardRegistry;
 use \Peneus\Model\Entity;
 use \TestToolkit\AccessHelper as ah;
 
-class _EntityClassResolver { use EntityClassResolver; }
+class _EntityClassResolver {
+    use EntityClassResolver;
+}
 
 #[CoversClass(_EntityClassResolver::class)]
 class EntityClassResolverTest extends TestCase

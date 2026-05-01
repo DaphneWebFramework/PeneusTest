@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Account;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
@@ -8,15 +10,13 @@ use \Peneus\Api\Actions\Account\ActivateAction;
 use \Harmonia\Core\CArray;
 use \Harmonia\Core\CUrl;
 use \Harmonia\Http\Request;
-use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Systems\DatabaseSystem\Database;
-use \Peneus\Api\Hooks\IAccountActivationHook;
 use \Peneus\Model\Account;
 use \Peneus\Model\PendingAccount;
 use \Peneus\Resource;
-use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as ah;
+use \TestToolkit\Context;
 
 #[CoversClass(ActivateAction::class)]
 class ActivateActionTest extends TestCase
@@ -24,7 +24,6 @@ class ActivateActionTest extends TestCase
     private ?Request $originalRequest = null;
     private ?Database $originalDatabase = null;
     private ?Resource $originalResource = null;
-    private ?AccountService $originalAccountService = null;
     private ?CookieService $originalCookieService = null;
 
     protected function setUp(): void
@@ -35,8 +34,6 @@ class ActivateActionTest extends TestCase
             Database::ReplaceInstance($this->createMock(Database::class));
         $this->originalResource =
             Resource::ReplaceInstance($this->createMock(Resource::class));
-        $this->originalAccountService =
-            AccountService::ReplaceInstance($this->createMock(AccountService::class));
         $this->originalCookieService =
             CookieService::ReplaceInstance($this->createMock(CookieService::class));
     }
@@ -46,7 +43,6 @@ class ActivateActionTest extends TestCase
         Request::ReplaceInstance($this->originalRequest);
         Database::ReplaceInstance($this->originalDatabase);
         Resource::ReplaceInstance($this->originalResource);
-        AccountService::ReplaceInstance($this->originalAccountService);
         CookieService::ReplaceInstance($this->originalCookieService);
     }
 
@@ -59,343 +55,282 @@ class ActivateActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfPayloadValidationFails()
+    private function contextForOnExecute(
+        bool $validatePayloadSucceeds = true,
+        bool $findPendingAccountSucceeds = true,
+        bool $ensureNotRegisteredSucceeds = true,
+        bool $doTransactionSucceeds = true,
+        bool $deleteCsrfCookieSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('validatePayload');
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest(
+            'validatePayload',
+            'findPendingAccount',
+            'ensureNotRegistered',
+            'doTransaction',
+            'composeResult'
+        );
+        $payload = new \stdClass();
+        $payload->activationCode = 'code1234';
+        $pendingAccount = $this->createStub(PendingAccount::class);
+        $pendingAccount->email = 'john@example.com';
+        $cookieService = CookieService::Instance();
+        $ctx->result = ['redirectUrl' => new CUrl('https://example.com/login')];
 
-        $sut->expects($this->once())
+        $ctx->sut->expects($ctx->chain())
             ->method('validatePayload')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPendingAccountNotFound()
-    {
-        $sut = $this->systemUnderTest('validatePayload', 'findPendingAccount');
-        $payload = (object)[
-            'activationCode' => 'code1234'
-        ];
-
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
+            ->willReturnCallback(fn() => $validatePayloadSucceeds
+                ? $payload
+                : throw new \RuntimeException('VALIDATE_PAYLOAD_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($validatePayloadSucceeds))
             ->method('findPendingAccount')
-            ->with('code1234')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfEmailAlreadyRegistered()
-    {
-        $sut = $this->systemUnderTest('validatePayload', 'findPendingAccount',
-            'ensureNotRegistered');
-        $payload = (object)[
-            'activationCode' => 'code1234'
-        ];
-        $pa = $this->createStub(PendingAccount::class);
-        $pa->email = 'john@example.com';
-
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('findPendingAccount')
-            ->with('code1234')
-            ->willReturn($pa);
-        $sut->expects($this->once())
+            ->with($payload->activationCode)
+            ->willReturnCallback(fn() => $findPendingAccountSucceeds
+                ? $pendingAccount
+                : throw new \RuntimeException('FIND_PENDING_ACCOUNT_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($findPendingAccountSucceeds))
             ->method('ensureNotRegistered')
-            ->with('john@example.com')
-            ->willThrowException(new \RuntimeException('Expected message.'));
+            ->with($pendingAccount->email)
+            ->willReturnCallback(fn() => $ensureNotRegisteredSucceeds
+                ? null
+                : throw new \RuntimeException('ENSURE_NOT_REGISTERED_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($ensureNotRegisteredSucceeds))
+            ->method('doTransaction')
+            ->with($pendingAccount)
+            ->willReturnCallback(fn() => $doTransactionSucceeds
+                ? null
+                : throw new \RuntimeException('DO_TRANSACTION_FAILED'));
+        $cookieService->expects($ctx->chainIf($doTransactionSucceeds))
+            ->method('DeleteCsrfCookie')
+            ->willReturnCallback(fn() => $deleteCsrfCookieSucceeds
+                ? null
+                : throw new \RuntimeException('DELETE_CSRF_COOKIE_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($deleteCsrfCookieSucceeds))
+            ->method('composeResult')
+            ->willReturn($ctx->result);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
+        return $ctx;
     }
 
-    function testOnExecuteThrowsIfDoActivateFails()
+    function testOnExecuteFailsIfPayloadInvalid()
     {
-        $sut = $this->systemUnderTest('validatePayload', 'findPendingAccount',
-            'ensureNotRegistered', 'doActivate');
-        $payload = (object)[
-            'activationCode' => 'code1234'
-        ];
-        $pa = $this->createStub(PendingAccount::class);
-        $pa->email = 'john@example.com';
-        $database = Database::Instance();
-
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('findPendingAccount')
-            ->with('code1234')
-            ->willReturn($pa);
-        $sut->expects($this->once())
-            ->method('ensureNotRegistered')
-            ->with('john@example.com');
-        $sut->expects($this->once())
-            ->method('doActivate')
-            ->with($pa)
-            ->willThrowException(new \RuntimeException());
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                $callback();
-            });
-
+        $ctx = $this->contextForOnExecute(validatePayloadSucceeds: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Account activation failed.");
-        ah::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('VALIDATE_PAYLOAD_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfPendingAccountNotFound()
+    {
+        $ctx = $this->contextForOnExecute(findPendingAccountSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('FIND_PENDING_ACCOUNT_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfEmailAlreadyRegistered()
+    {
+        $ctx = $this->contextForOnExecute(ensureNotRegisteredSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('ENSURE_NOT_REGISTERED_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfTransactionFails()
+    {
+        $ctx = $this->contextForOnExecute(doTransactionSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DO_TRANSACTION_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfCsrfCookieDeleteFails()
+    {
+        $ctx = $this->contextForOnExecute(deleteCsrfCookieSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DELETE_CSRF_COOKIE_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest('validatePayload', 'findPendingAccount',
-            'ensureNotRegistered', 'doActivate');
-        $payload = (object)[
-            'activationCode' => 'code1234'
-        ];
-        $pa = $this->createStub(PendingAccount::class);
-        $pa->email = 'john@example.com';
-        $database = Database::Instance();
-        $cookieService = CookieService::Instance();
-        $redirectUrl = new CUrl('/url/to/login');
-        $resource = Resource::Instance();
-
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('findPendingAccount')
-            ->with('code1234')
-            ->willReturn($pa);
-        $sut->expects($this->once())
-            ->method('ensureNotRegistered')
-            ->with('john@example.com');
-        $sut->expects($this->once())
-            ->method('doActivate')
-            ->with($pa);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                $callback();
-            });
-        $cookieService->expects($this->once())
-            ->method('DeleteCsrfCookie');
-        $resource->expects($this->once())
-            ->method('LoginPageUrl')
-            ->with('home')
-            ->willReturn($redirectUrl);
-
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey('redirectUrl', $result);
-        $this->assertEquals($redirectUrl, $result['redirectUrl']);
+        $ctx = $this->contextForOnExecute();
+        $actual = ah::CallMethod($ctx->sut, 'onExecute');
+        $this->assertSame($ctx->result, $actual);
     }
 
     #endregion onExecute
 
     #region validatePayload ----------------------------------------------------
 
-    #[DataProvider('invalidPayloadProvider')]
-    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
+    private function contextForValidatePayload(
+        array $payload
+    ): Context
     {
-        $sut = $this->systemUnderTest();
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
 
-        $request->expects($this->once())
+        $request->expects($ctx->chain())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->once())
+        $formParams->expects($ctx->chain())
             ->method('ToArray')
             ->willReturn($payload);
 
+        return $ctx;
+    }
+
+    #[DataProvider('invalidPayloadProvider')]
+    function testValidatePayloadFails(array $payload)
+    {
+        $ctx = $this->contextForValidatePayload($payload);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'validatePayload');
+        ah::CallMethod($ctx->sut, 'validatePayload');
     }
 
     function testValidatePayloadSucceeds()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-        $payload = [
-            'activationCode' => \str_repeat('0123456789AbCdEf', 4)
-        ];
+        $payload = ['activationCode' => \str_repeat('a', 64)];
+        $ctx = $this->contextForValidatePayload($payload);
         $expected = (object)$payload;
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($payload);
-
-        $actual = ah::CallMethod($sut, 'validatePayload');
+        $actual = ah::CallMethod($ctx->sut, 'validatePayload');
         $this->assertEquals($expected, $actual);
     }
 
     #endregion validatePayload
 
-    #region doActivate ---------------------------------------------------------
+    #region doTransaction ------------------------------------------------------
 
-    function testDoActivateThrowsIfAccountSaveFails()
+    private function contextForDoTransaction(
+        bool $accountSaveSucceeds = true,
+        bool $pendingAccountDeleteSucceeds = true,
+        bool $triggerActivationHooksSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('constructAccount');
-        $pa = $this->createStub(PendingAccount::class);
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest('makeAccount', 'triggerActivationHooks');
+        $ctx->pendingAccount = $this->createMock(PendingAccount::class);
+        $database = Database::Instance();
         $account = $this->createMock(Account::class);
 
-        $sut->expects($this->once())
-            ->method('constructAccount')
-            ->with($pa)
+        $database->expects($ctx->chain())
+            ->method('WithTransaction')
+            ->willReturnCallback(fn($callback) => $callback());
+        $ctx->sut->expects($ctx->chain())
+            ->method('makeAccount')
+            ->with($ctx->pendingAccount)
             ->willReturn($account);
-        $account->expects($this->once())
+        $account->expects($ctx->chain())
             ->method('Save')
-            ->willReturn(false);
+            ->willReturn($accountSaveSucceeds);
+        $ctx->pendingAccount->expects($ctx->chainIf($accountSaveSucceeds))
+            ->method('Delete')
+            ->willReturn($pendingAccountDeleteSucceeds);
+        $ctx->sut->expects($ctx->chainIf($pendingAccountDeleteSucceeds))
+            ->method('triggerActivationHooks')
+            ->with($account)
+            ->willReturnCallback(fn() => $triggerActivationHooksSucceeds
+                ? null
+                : throw new \RuntimeException('TRIGGER_ACTIVATION_HOOKS_FAILED'));
 
+        return $ctx;
+    }
+
+    function testDoTransactionFailsIfAccountSaveFails()
+    {
+        $ctx = $this->contextForDoTransaction(accountSaveSucceeds: false);
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save account.");
-        ah::CallMethod($sut, 'doActivate', [$pa]);
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->pendingAccount]);
     }
 
-    function testDoActivateThrowsIfPendingAccountDeleteFails()
+    function testDoTransactionFailsIfPendingAccountDeleteFails()
     {
-        $sut = $this->systemUnderTest('constructAccount');
-        $pa = $this->createMock(PendingAccount::class);
-        $account = $this->createMock(Account::class);
-
-        $sut->expects($this->once())
-            ->method('constructAccount')
-            ->with($pa)
-            ->willReturn($account);
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $pa->expects($this->once())
-            ->method('Delete')
-            ->willReturn(false);
-
+        $ctx = $this->contextForDoTransaction(pendingAccountDeleteSucceeds: false);
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to delete pending account.");
-        ah::CallMethod($sut, 'doActivate', [$pa]);
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->pendingAccount]);
     }
 
-    function testDoActivateThrowsIfHookFails()
+    function testDoTransactionFailsIfTriggerActivationHooksFails()
     {
-        $sut = $this->systemUnderTest('constructAccount');
-        $pa = $this->createMock(PendingAccount::class);
-        $account = $this->createMock(Account::class);
-        $accountService = AccountService::Instance();
-        $hook = $this->createMock(IAccountActivationHook::class);
-
-        $sut->expects($this->once())
-            ->method('constructAccount')
-            ->willReturn($account);
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $pa->expects($this->once())
-            ->method('Delete')
-            ->willReturn(true);
-        $accountService->expects($this->once())
-            ->method('ActivationHooks')
-            ->willReturn([$hook]);
-        $hook->expects($this->once())
-            ->method('OnActivateAccount')
-            ->with($account)
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
+        $ctx = $this->contextForDoTransaction(triggerActivationHooksSucceeds: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'doActivate', [$pa]);
+        $this->expectExceptionMessage('TRIGGER_ACTIVATION_HOOKS_FAILED');
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->pendingAccount]);
     }
 
-    function testDoActivateSucceeds()
+    function testDoTransactionSucceeds()
     {
-        $sut = $this->systemUnderTest('constructAccount');
-        $pa = $this->createMock(PendingAccount::class);
-        $account = $this->createMock(Account::class);
-        $accountService = AccountService::Instance();
-        $hook = $this->createMock(IAccountActivationHook::class);
-
-        $sut->expects($this->once())
-            ->method('constructAccount')
-            ->with($pa)
-            ->willReturn($account);
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $pa->expects($this->once())
-            ->method('Delete')
-            ->willReturn(true);
-        $accountService->expects($this->once())
-            ->method('ActivationHooks')
-            ->willReturn([$hook]);
-        $hook->expects($this->once())
-            ->method('OnActivateAccount')
-            ->with($account);
-
-        ah::CallMethod($sut, 'doActivate', [$pa]);
+        $ctx = $this->contextForDoTransaction();
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->pendingAccount]);
     }
 
-    #endregion doActivate
+    #endregion doTransaction
 
-    #region constructAccount ---------------------------------------------------
+    #region makeAccount --------------------------------------------------------
 
-    function testConstructAccount()
+    function testMakeAccount()
     {
         $sut = $this->systemUnderTest();
-        $pa = $this->createStub(PendingAccount::class);
-        $pa->id = 1;
-        $pa->email = 'john@example.com';
-        $pa->passwordHash = 'hash1234';
-        $pa->displayName = 'John';
-        $pa->activationCode = 'code1234';
-        $pa->timeRegistered = new \DateTime();
+        $email = 'john@example.com';
+        $passwordHash = 'hash1234';
+        $displayName = 'John';
+        $pendingAccount = $this->createStub(PendingAccount::class);
+        $pendingAccount->email = $email;
+        $pendingAccount->passwordHash = $passwordHash;
+        $pendingAccount->displayName = $displayName;
 
-        $account = ah::CallMethod($sut, 'constructAccount', [$pa]);
+        $account = ah::CallMethod($sut, 'makeAccount', [
+            $pendingAccount
+        ]);
+
         $this->assertInstanceOf(Account::class, $account);
-        $this->assertSame(0, $account->id);
-        $this->assertSame($pa->email, $account->email);
-        $this->assertSame($pa->passwordHash, $account->passwordHash);
-        $this->assertSame($pa->displayName, $account->displayName);
+        $this->assertSame(0,                  $account->id);
+        $this->assertSame($email,             $account->email);
+        $this->assertSame($passwordHash,      $account->passwordHash);
+        $this->assertSame($displayName,       $account->displayName);
         $this->assertEqualsWithDelta(\time(), $account->timeActivated->getTimestamp(), 1);
-        $this->assertNull($account->timeLastLogin);
+        $this->assertNull(                    $account->timeLastLogin);
     }
 
-    #endregion constructAccount
+    #endregion makeAccount
+
+    #region composeResult ------------------------------------------------------
+
+    function testComposeResult()
+    {
+        $sut = $this->systemUnderTest();
+        $resource = Resource::Instance();
+        $redirectUrl = new CUrl('https://example.com/login/');
+        $expected = ['redirectUrl' => $redirectUrl];
+
+        $resource->expects($this->once())
+            ->method('LoginPageUrl')
+            ->with('home')
+            ->willReturn($redirectUrl);
+
+        $actual = ah::CallMethod($sut, 'composeResult');
+
+        $this->assertSame($expected, $actual);
+    }
+
+    #endregion composeResult
 
     #region Data Providers -----------------------------------------------------
 
-    /**
-     * @return array<string, array{
-     *   payload: array<string, mixed>,
-     *   exceptionMessage: string
-     * }>
-     */
     static function invalidPayloadProvider()
     {
         return [
-            'activationCode missing' => [
-                'payload' => [],
-                'exceptionMessage' => "Activation code is required."
-            ],
-            'activationCode invalid' => [
-                'payload' => [
-                    'activationCode' => 'invalid-code'
-                ],
-                'exceptionMessage' => "Activation code format is invalid."
-            ],
+            'activationCode.required' => [[
+                // empty
+            ]],
+            'activationCode.regex' => [[
+                'activationCode' => 'invalid-code'
+            ]],
         ];
     }
 

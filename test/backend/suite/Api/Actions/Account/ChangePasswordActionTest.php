@@ -1,7 +1,10 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Account;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
+use \PHPUnit\Framework\Attributes\TestWith;
 
 use \Peneus\Api\Actions\Account\ChangePasswordAction;
 
@@ -9,20 +12,25 @@ use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
 use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\SecurityService;
+use \Harmonia\Systems\DatabaseSystem\Database;
 use \Peneus\Model\Account;
 use \Peneus\Model\AccountView;
 use \TestToolkit\AccessHelper as ah;
+use \TestToolkit\Context;
 
 #[CoversClass(ChangePasswordAction::class)]
 class ChangePasswordActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
+    private ?Database $originalDatabase = null;
     private ?SecurityService $originalSecurityService = null;
 
     protected function setUp(): void
     {
         $this->originalRequest =
             Request::ReplaceInstance($this->createMock(Request::class));
+        $this->originalDatabase =
+            Database::ReplaceInstance($this->createMock(Database::class));
         $this->originalSecurityService =
             SecurityService::ReplaceInstance($this->createMock(SecurityService::class));
     }
@@ -30,6 +38,7 @@ class ChangePasswordActionTest extends TestCase
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
+        Database::ReplaceInstance($this->originalDatabase);
         SecurityService::ReplaceInstance($this->originalSecurityService);
     }
 
@@ -42,224 +51,145 @@ class ChangePasswordActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfUserNotLoggedIn()
+    private function contextForOnExecute(
+        bool $ensureLoggedInSucceeds = true,
+        bool $ensureLocalAccountSucceeds = true,
+        bool $findAccountSucceeds = true,
+        bool $validatePayloadSucceeds = true,
+        bool $verifyCurrentPasswordSucceeds = true,
+        bool $doTransactionSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn');
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfAccountIsNotLocal()
-    {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount');
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest(
+            'ensureLoggedIn',
+            'ensureLocalAccount',
+            'findAccount',
+            'validatePayload',
+            'verifyCurrentPassword',
+            'doTransaction'
+        );
         $accountView = $this->createStub(AccountView::class);
+        $accountView->id = 17;
+        $account = $this->createStub(Account::class);
+        $account->passwordHash = 'hash1234';
+        $payload = new \stdClass();
+        $payload->currentPassword = 'pass1234';
+        $payload->newPassword = 'pass5678';
 
-        $sut->expects($this->once())
+        $ctx->sut->expects($ctx->chain())
             ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
+            ->willReturnCallback(fn() => $ensureLoggedInSucceeds
+                ? $accountView
+                : throw new \RuntimeException('ENSURE_LOGGED_IN_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($ensureLoggedInSucceeds))
             ->method('ensureLocalAccount')
             ->with($accountView)
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfAccountNotFound()
-    {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
-            'findAccount');
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('ensureLocalAccount')
-            ->with($accountView);
-        $sut->expects($this->once())
+            ->willReturnCallback(fn() => $ensureLocalAccountSucceeds
+                ? null
+                : throw new \RuntimeException('ENSURE_LOCAL_ACCOUNT_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($ensureLocalAccountSucceeds))
             ->method('findAccount')
             ->with($accountView->id)
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPayloadValidationFails()
-    {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
-            'findAccount', 'validatePayload');
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
-        $account = $this->createStub(Account::class);
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('ensureLocalAccount')
-            ->with($accountView);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with($accountView->id)
-            ->willReturn($account);
-        $sut->expects($this->once())
+            ->willReturnCallback(fn() => $findAccountSucceeds
+                ? $account
+                : throw new \RuntimeException('FIND_ACCOUNT_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($findAccountSucceeds))
             ->method('validatePayload')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfCurrentPasswordVerificationFails()
-    {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
-            'findAccount', 'validatePayload', 'verifyCurrentPassword');
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
-        $account = $this->createStub(Account::class);
-        $account->passwordHash = 'hash1234';
-        $payload = (object)[
-            'currentPassword' => 'pass1234',
-            'newPassword' => 'pass5678'
-        ];
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('ensureLocalAccount')
-            ->with($accountView);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with($accountView->id)
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
+            ->willReturnCallback(fn() => $validatePayloadSucceeds
+                ? $payload
+                : throw new \RuntimeException('VALIDATE_PAYLOAD_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($validatePayloadSucceeds))
             ->method('verifyCurrentPassword')
             ->with($payload->currentPassword, $account->passwordHash)
-            ->willThrowException(new \RuntimeException('Expected message.'));
+            ->willReturnCallback(fn() => $verifyCurrentPasswordSucceeds
+                ? null
+                : throw new \RuntimeException('VERIFY_CURRENT_PASSWORD_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($verifyCurrentPasswordSucceeds))
+            ->method('doTransaction')
+            ->with($account, $payload->newPassword)
+            ->willReturnCallback(fn() => $doTransactionSucceeds
+                ? null
+                : throw new \RuntimeException('DO_TRANSACTION_FAILED'));
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
+        return $ctx;
     }
 
-    function testOnExecuteThrowsIfDoChangeFails()
+    function testOnExecuteFailsIfEnsureLoggedInFails()
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
-            'findAccount', 'validatePayload', 'verifyCurrentPassword',
-            'doChange');
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
-        $account = $this->createStub(Account::class);
-        $account->passwordHash = 'hash1234';
-        $payload = (object)[
-            'currentPassword' => 'pass1234',
-            'newPassword' => 'pass5678'
-        ];
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('ensureLocalAccount')
-            ->with($accountView);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with($accountView->id)
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('verifyCurrentPassword')
-            ->with($payload->currentPassword, $account->passwordHash);
-        $sut->expects($this->once())
-            ->method('doChange')
-            ->with($account, $payload->newPassword)
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
+        $ctx = $this->contextForOnExecute(ensureLoggedInSucceeds: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('ENSURE_LOGGED_IN_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfEnsureLocalAccountFails()
+    {
+        $ctx = $this->contextForOnExecute(ensureLocalAccountSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('ENSURE_LOCAL_ACCOUNT_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfFindAccountFails()
+    {
+        $ctx = $this->contextForOnExecute(findAccountSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('FIND_ACCOUNT_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfValidatePayloadFails()
+    {
+        $ctx = $this->contextForOnExecute(validatePayloadSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('VALIDATE_PAYLOAD_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfVerifyCurrentPasswordFails()
+    {
+        $ctx = $this->contextForOnExecute(verifyCurrentPasswordSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('VERIFY_CURRENT_PASSWORD_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfDoTransactionFails()
+    {
+        $ctx = $this->contextForOnExecute(doTransactionSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DO_TRANSACTION_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'ensureLocalAccount',
-            'findAccount', 'validatePayload', 'verifyCurrentPassword',
-            'doChange');
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
-        $account = $this->createStub(Account::class);
-        $account->passwordHash = 'hash1234';
-        $payload = (object)[
-            'currentPassword' => 'pass1234',
-            'newPassword' => 'pass5678'
-        ];
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('ensureLocalAccount')
-            ->with($accountView);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with($accountView->id)
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('verifyCurrentPassword')
-            ->with($payload->currentPassword, $account->passwordHash);
-        $sut->expects($this->once())
-            ->method('doChange')
-            ->with($account, $payload->newPassword);
-
-        ah::CallMethod($sut, 'onExecute');
+        $ctx = $this->contextForOnExecute();
+        $actual = ah::CallMethod($ctx->sut, 'onExecute');
+        $this->assertNull($actual);
     }
 
     #endregion onExecute
 
     #region ensureLocalAccount -------------------------------------------------
 
-    function testEnsureLocalAccountThrowsIfAccountIsNotLocal()
+    #[TestWith([true ])]
+    #[TestWith([false])]
+    function testEnsureLocalAccount(bool $isLocal)
     {
         $sut = $this->systemUnderTest();
         $accountView = $this->createStub(AccountView::class);
-        $accountView->isLocal = false;
+        $accountView->isLocal = $isLocal;
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "This account does not have a local password.");
-        $this->expectExceptionCode(StatusCode::Forbidden->value);
-        ah::CallMethod($sut, 'ensureLocalAccount', [$accountView]);
-    }
+        if ($isLocal) {
+            $this->expectNotToPerformAssertions();
+        } else {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage("This account does not have a local password.");
+            $this->expectExceptionCode(StatusCode::Forbidden->value);
+        }
 
-    function testEnsureLocalAccountSucceedsIfAccountIsLocal()
-    {
-        $sut = $this->systemUnderTest();
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->isLocal = true;
-
-        $this->expectNotToPerformAssertions();
         ah::CallMethod($sut, 'ensureLocalAccount', [$accountView]);
     }
 
@@ -267,45 +197,42 @@ class ChangePasswordActionTest extends TestCase
 
     #region validatePayload ----------------------------------------------------
 
-    #[DataProvider('invalidPayloadProvider')]
-    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
+    private function contextForValidatePayload(
+        array $payload
+    ): Context
     {
-        $sut = $this->systemUnderTest();
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
 
-        $request->expects($this->once())
+        $request->expects($ctx->chain())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->once())
+        $formParams->expects($ctx->chain())
             ->method('ToArray')
             ->willReturn($payload);
 
+        return $ctx;
+    }
+
+    #[DataProvider('invalidPayloadProvider')]
+    function testValidatePayloadFails(array $payload)
+    {
+        $ctx = $this->contextForValidatePayload($payload);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'validatePayload');
+        ah::CallMethod($ctx->sut, 'validatePayload');
     }
 
     function testValidatePayloadSucceeds()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
         $payload = [
             'currentPassword' => 'pass1234',
             'newPassword' => 'pass5678'
         ];
+        $ctx = $this->contextForValidatePayload($payload);
         $expected = (object)$payload;
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($payload);
-
-        $actual = ah::CallMethod($sut, 'validatePayload');
+        $actual = ah::CallMethod($ctx->sut, 'validatePayload');
         $this->assertEquals($expected, $actual);
     }
 
@@ -313,125 +240,122 @@ class ChangePasswordActionTest extends TestCase
 
     #region verifyCurrentPassword ----------------------------------------------
 
-    function testVerifyCurrentPasswordThrowsIfPasswordIsIncorrect()
+    #[TestWith([true ])]
+    #[TestWith([false])]
+    function testVerifyCurrentPassword(bool $isVerified)
     {
         $sut = $this->systemUnderTest();
+        $currentPassword = 'pass1234';
+        $passwordHash = 'hash1234';
         $securityService = SecurityService::Instance();
 
         $securityService->expects($this->once())
             ->method('VerifyPassword')
-            ->with('pass1234', 'hash1234')
-            ->willReturn(false);
+            ->with($currentPassword, $passwordHash)
+            ->willReturn($isVerified);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Current password is incorrect.");
-        ah::CallMethod($sut, 'verifyCurrentPassword', ['pass1234', 'hash1234']);
-    }
+        if ($isVerified) {
+            ;
+        } else {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage("Current password is incorrect.");
+            $this->expectExceptionCode(StatusCode::Unauthorized->value);
+        }
 
-    function testVerifyCurrentPasswordSucceedsIfPasswordIsCorrect()
-    {
-        $sut = $this->systemUnderTest();
-        $securityService = SecurityService::Instance();
-
-        $securityService->expects($this->once())
-            ->method('VerifyPassword')
-            ->with('pass1234', 'hash1234')
-            ->willReturn(true);
-
-        ah::CallMethod($sut, 'verifyCurrentPassword', ['pass1234', 'hash1234']);
+        ah::CallMethod($sut, 'verifyCurrentPassword', [
+            $currentPassword,
+            $passwordHash
+        ]);
     }
 
     #endregion verifyCurrentPassword
 
-    #region doChange -----------------------------------------------------------
+    #region doTransaction ------------------------------------------------------
 
-    function testDoChangeThrowsIfAccountSaveFails()
+    private function contextForDoTransaction(
+        bool $accountSaveSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
+        $database = Database::Instance();
+        $ctx->account = $this->createMock(Account::class);
+        $ctx->newPassword = 'pass5678';
+        $ctx->newHash = 'hash5678';
         $securityService = SecurityService::Instance();
 
-        $securityService->expects($this->once())
+        $database->expects($ctx->chain())
+             ->method('WithTransaction')
+             ->willReturnCallback(fn($callback) => $callback());
+        $securityService->expects($ctx->chain())
             ->method('HashPassword')
-            ->with('pass5678')
-            ->willReturn('hash5678');
-        $account->expects($this->once())
+            ->with($ctx->newPassword)
+            ->willReturn($ctx->newHash);
+        $ctx->account->expects($ctx->chain())
             ->method('Save')
-            ->willReturn(false);
+            ->willReturn($accountSaveSucceeds);
 
+        return $ctx;
+    }
+
+    function testDoTransactionFailsIfAccountSaveFails()
+    {
+        $ctx = $this->contextForDoTransaction(accountSaveSucceeds: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Failed to change password.");
-        ah::CallMethod($sut, 'doChange', [$account, 'pass5678']);
-        $this->assertSame('hash5678', $account->passwordHash);
+        $this->expectExceptionMessage("Failed to save account.");
+        ah::CallMethod($ctx->sut, 'doTransaction', [
+            $ctx->account,
+            $ctx->newPassword
+        ]);
     }
 
-    function testDoChangeSucceeds()
+    function testDoTransactionSucceeds()
     {
-        $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
-        $securityService = SecurityService::Instance();
-
-        $securityService->expects($this->once())
-            ->method('HashPassword')
-            ->with('pass5678')
-            ->willReturn('hash5678');
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-
-        ah::CallMethod($sut, 'doChange', [$account, 'pass5678']);
-        $this->assertSame('hash5678', $account->passwordHash);
+        $ctx = $this->contextForDoTransaction();
+        ah::CallMethod($ctx->sut, 'doTransaction', [
+            $ctx->account,
+            $ctx->newPassword
+        ]);
+        $this->assertSame($ctx->newHash, $ctx->account->passwordHash);
     }
 
-    #endregion doChange
+    #endregion doTransaction
 
     #region Data Providers -----------------------------------------------------
 
-    /**
-     * @return array<string, array{
-     *   payload: array<string, mixed>,
-     *   exceptionMessage: string
-     * }>
-     */
     static function invalidPayloadProvider()
     {
         return [
-            'currentPassword missing' => [
-                'payload' => [],
-                'exceptionMessage' => "Required field 'currentPassword' is missing."
-            ],
-            'currentPassword too short' => [
-                'payload' => [
-                    'currentPassword' => '1234567'
-                ],
-                'exceptionMessage' => "Field 'currentPassword' must have a minimum length of 8 characters."
-            ],
-            'currentPassword too long' => [
-                'payload' => [
-                    'currentPassword' => str_repeat('a', 73)
-                ],
-                'exceptionMessage' => "Field 'currentPassword' must have a maximum length of 72 characters."
-            ],
-            'newPassword missing' => [
-                'payload' => [
-                    'currentPassword' => 'pass1234'
-                ],
-                'exceptionMessage' => "Required field 'newPassword' is missing."
-            ],
-            'newPassword too short' => [
-                'payload' => [
-                    'currentPassword' => 'pass1234',
-                    'newPassword' => '1234567'
-                ],
-                'exceptionMessage' => "Field 'newPassword' must have a minimum length of 8 characters."
-            ],
-            'newPassword too long' => [
-                'payload' => [
-                    'currentPassword' => 'pass1234',
-                    'newPassword' => str_repeat('a', 73)
-                ],
-                'exceptionMessage' => "Field 'newPassword' must have a maximum length of 72 characters."
-            ],
+            'currentPassword.required' => [[
+                'newPassword' => 'pass5678'
+            ]],
+            'currentPassword.string' => [[
+                'currentPassword' => ['not', 'a', 'string'],
+                'newPassword' => 'pass5678'
+            ]],
+            'currentPassword.minLength' => [[
+                'currentPassword' => \str_repeat('a', SecurityService::PASSWORD_MIN_LENGTH - 1),
+                'newPassword' => 'pass5678'
+            ]],
+            'currentPassword.maxLength' => [[
+                'currentPassword' => \str_repeat('a', SecurityService::PASSWORD_MAX_LENGTH + 1),
+                'newPassword' => 'pass5678'
+            ]],
+            'newPassword.required' => [[
+                'currentPassword' => 'pass1234'
+            ]],
+            'newPassword.string' => [[
+                'currentPassword' => 'pass1234',
+                'newPassword' => ['not', 'a', 'string']
+            ]],
+            'newPassword.minLength' => [[
+                'currentPassword' => 'pass1234',
+                'newPassword' => \str_repeat('a', SecurityService::PASSWORD_MIN_LENGTH - 1)
+            ]],
+            'newPassword.maxLength' => [[
+                'currentPassword' => 'pass1234',
+                'newPassword' => \str_repeat('a', SecurityService::PASSWORD_MAX_LENGTH + 1)
+            ]],
         ];
     }
 

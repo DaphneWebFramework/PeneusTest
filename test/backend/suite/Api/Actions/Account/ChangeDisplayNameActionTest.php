@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Account;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
@@ -7,25 +9,30 @@ use \Peneus\Api\Actions\Account\ChangeDisplayNameAction;
 
 use \Harmonia\Core\CArray;
 use \Harmonia\Http\Request;
-use \Harmonia\Http\StatusCode;
+use \Harmonia\Systems\DatabaseSystem\Database;
 use \Peneus\Model\Account;
 use \Peneus\Model\AccountView;
 use \TestToolkit\AccessHelper as ah;
+use \TestToolkit\Context;
 
 #[CoversClass(ChangeDisplayNameAction::class)]
 class ChangeDisplayNameActionTest extends TestCase
 {
     private ?Request $originalRequest = null;
+    private ?Database $originalDatabase = null;
 
     protected function setUp(): void
     {
         $this->originalRequest =
             Request::ReplaceInstance($this->createMock(Request::class));
+        $this->originalDatabase =
+            Database::ReplaceInstance($this->createMock(Database::class));
     }
 
     protected function tearDown(): void
     {
         Request::ReplaceInstance($this->originalRequest);
+        Database::ReplaceInstance($this->originalDatabase);
     }
 
     private function systemUnderTest(string ...$mockedMethods): ChangeDisplayNameAction
@@ -37,221 +44,189 @@ class ChangeDisplayNameActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfUserNotLoggedIn()
+    private function contextForOnExecute(
+        bool $ensureLoggedInSucceeds = true,
+        bool $findAccountSucceeds = true,
+        bool $validatePayloadSucceeds = true,
+        bool $doTransactionSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn');
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfAccountNotFound()
-    {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount');
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest(
+            'ensureLoggedIn',
+            'findAccount',
+            'validatePayload',
+            'doTransaction'
+        );
         $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with($accountView->id)
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPayloadValidationFails()
-    {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
-            'validatePayload');
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
+        $accountView->id = 17;
         $account = $this->createStub(Account::class);
+        $payload = new \stdClass();
+        $payload->displayName = 'Display Name';
 
-        $sut->expects($this->once())
+        $ctx->sut->expects($ctx->chain())
             ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
+            ->willReturnCallback(fn() => $ensureLoggedInSucceeds
+                ? $accountView
+                : throw new \RuntimeException('ENSURE_LOGGED_IN_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($ensureLoggedInSucceeds))
             ->method('findAccount')
             ->with($accountView->id)
-            ->willReturn($account);
-        $sut->expects($this->once())
+            ->willReturnCallback(fn() => $findAccountSucceeds
+                ? $account
+                : throw new \RuntimeException('FIND_ACCOUNT_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($findAccountSucceeds))
             ->method('validatePayload')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfDoChangeFails()
-    {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
-            'validatePayload', 'doChange');
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
-        $account = $this->createStub(Account::class);
-        $payload = (object)[
-            'displayName' => 'Alice'
-        ];
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with($accountView->id)
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('doChange')
+            ->willReturnCallback(fn() => $validatePayloadSucceeds
+                ? $payload
+                : throw new \RuntimeException('VALIDATE_PAYLOAD_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($validatePayloadSucceeds))
+            ->method('doTransaction')
             ->with($account, $payload->displayName)
-            ->willThrowException(new \RuntimeException('Expected message.'));
+            ->willReturnCallback(fn() => $doTransactionSucceeds
+                ? null
+                : throw new \RuntimeException('DO_TRANSACTION_FAILED'));
 
+        return $ctx;
+    }
+
+    function testOnExecuteFailsIfEnsureLoggedInFails()
+    {
+        $ctx = $this->contextForOnExecute(ensureLoggedInSucceeds: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('ENSURE_LOGGED_IN_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfFindAccountFails()
+    {
+        $ctx = $this->contextForOnExecute(findAccountSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('FIND_ACCOUNT_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfValidatePayloadFails()
+    {
+        $ctx = $this->contextForOnExecute(validatePayloadSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('VALIDATE_PAYLOAD_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfDoTransactionFails()
+    {
+        $ctx = $this->contextForOnExecute(doTransactionSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DO_TRANSACTION_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest('ensureLoggedIn', 'findAccount',
-            'validatePayload', 'doChange');
-        $accountView = $this->createStub(AccountView::class);
-        $accountView->id = 42;
-        $account = $this->createStub(Account::class);
-        $payload = (object)[
-            'displayName' => 'Alice'
-        ];
-
-        $sut->expects($this->once())
-            ->method('ensureLoggedIn')
-            ->willReturn($accountView);
-        $sut->expects($this->once())
-            ->method('findAccount')
-            ->with($accountView->id)
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('doChange')
-            ->with($account, $payload->displayName);
-
-        ah::CallMethod($sut, 'onExecute');
+        $ctx = $this->contextForOnExecute();
+        $actual = ah::CallMethod($ctx->sut, 'onExecute');
+        $this->assertNull($actual);
     }
 
     #endregion onExecute
 
     #region validatePayload ----------------------------------------------------
 
-    #[DataProvider('invalidPayloadProvider')]
-    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
+    private function contextForValidatePayload(
+        array $payload
+    ): Context
     {
-        $sut = $this->systemUnderTest();
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
 
-        $request->expects($this->once())
+        $request->expects($ctx->chain())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->once())
+        $formParams->expects($ctx->chain())
             ->method('ToArray')
             ->willReturn($payload);
 
+        return $ctx;
+    }
+
+    #[DataProvider('invalidPayloadProvider')]
+    function testValidatePayloadFails(array $payload)
+    {
+        $ctx = $this->contextForValidatePayload($payload);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'validatePayload');
+        ah::CallMethod($ctx->sut, 'validatePayload');
     }
 
     function testValidatePayloadSucceeds()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-        $payload = [
-            'displayName' => 'Alice'
-        ];
+        $payload = ['displayName' => 'Display Name'];
+        $ctx = $this->contextForValidatePayload($payload);
         $expected = (object)$payload;
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($payload);
-
-        $actual = ah::CallMethod($sut, 'validatePayload');
+        $actual = ah::CallMethod($ctx->sut, 'validatePayload');
         $this->assertEquals($expected, $actual);
     }
 
     #endregion validatePayload
 
-    #region doChange -----------------------------------------------------------
+    #region doTransaction ------------------------------------------------------
 
-    function testDoChangeThrowsIfAccountSaveFails()
+    private function contextForDoTransaction(
+        bool $accountSaveSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
+        $database = Database::Instance();
+        $ctx->account = $this->createMock(Account::class);
+        $ctx->displayName = 'Display Name';
 
-        $account->expects($this->once())
+        $database->expects($ctx->chain())
+            ->method('WithTransaction')
+            ->willReturnCallback(fn($callback) => $callback());
+        $ctx->account->expects($ctx->chain())
             ->method('Save')
-            ->willReturn(false);
+            ->willReturn($accountSaveSucceeds);
 
+        return $ctx;
+    }
+
+    function testDoTransactionFailsIfAccountSaveFails()
+    {
+        $ctx = $this->contextForDoTransaction(accountSaveSucceeds: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Failed to change display name.");
-        ah::CallMethod($sut, 'doChange', [$account, 'Alice']);
-        $this->assertSame('Alice', $account->displayName);
+        $this->expectExceptionMessage("Failed to save account.");
+        ah::CallMethod($ctx->sut, 'doTransaction', [
+            $ctx->account,
+            $ctx->displayName
+        ]);
     }
 
-    function testDoChangeSucceeds()
+    function testDoTransactionSucceeds()
     {
-        $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
-
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-
-        ah::CallMethod($sut, 'doChange', [$account, 'Alice']);
-        $this->assertSame('Alice', $account->displayName);
+        $ctx = $this->contextForDoTransaction();
+        ah::CallMethod($ctx->sut, 'doTransaction', [
+            $ctx->account,
+            $ctx->displayName
+        ]);
+        $this->assertSame($ctx->displayName, $ctx->account->displayName);
     }
 
-    #endregion doChange
+    #endregion doTransaction
 
     #region Data Providers -----------------------------------------------------
 
-    /**
-     * @return array<string, array{
-     *   payload: array<string, mixed>,
-     *   exceptionMessage: string
-     * }>
-     */
     static function invalidPayloadProvider()
     {
         return [
-            'displayName missing' => [
-                'payload' => [],
-                'exceptionMessage' => "Required field 'displayName' is missing."
-            ],
-            'displayName invalid' => [
-                'payload' => [ 'displayName' => '<invalid-display-name>' ],
-                'exceptionMessage' => 'Display name is invalid. It must start'
-                    . ' with a letter or number and may only contain letters,'
-                    . ' numbers, spaces, dots, hyphens, and apostrophes.'
-            ],
+            'displayName.required' => [[
+                // empty
+            ]],
+            'displayName.regex' => [[
+                'displayName' => '<invalid-display-name>'
+            ]],
         ];
     }
 

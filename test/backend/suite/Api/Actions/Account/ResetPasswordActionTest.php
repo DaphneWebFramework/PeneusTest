@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Account;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
@@ -16,6 +18,7 @@ use \Peneus\Model\Account;
 use \Peneus\Model\PasswordReset;
 use \Peneus\Resource;
 use \TestToolkit\AccessHelper as ah;
+use \TestToolkit\Context;
 
 #[CoversClass(ResetPasswordAction::class)]
 class ResetPasswordActionTest extends TestCase
@@ -58,340 +61,315 @@ class ResetPasswordActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfPayloadValidationFails()
+    private function contextForOnExecute(
+        bool $validatePayloadSucceeds = true,
+        bool $findAccountAndPasswordResetSucceeds = true,
+        bool $doTransactionSucceeds = true,
+        bool $deleteCsrfCookieSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('validatePayload');
-
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfAccountAndPasswordResetNotFound()
-    {
-        $sut = $this->systemUnderTest('validatePayload',
-            'findAccountAndPasswordReset');
-        $payload = (object)[
-            'resetCode' => 'code1234'
-        ];
-
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('findAccountAndPasswordReset')
-            ->with('code1234')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfDoResetFails()
-    {
-        $sut = $this->systemUnderTest('validatePayload',
-            'findAccountAndPasswordReset', 'doReset');
-        $payload = (object)[
-            'resetCode' => 'code1234',
-            'newPassword' => 'pass1234'
-        ];
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest(
+            'validatePayload',
+            'findAccountAndPasswordReset',
+            'doTransaction',
+            'composeResult'
+        );
+        $payload = new \stdClass();
+        $payload->resetCode = 'code1234';
+        $payload->newPassword = 'pass5678';
         $account = $this->createStub(Account::class);
-        $pr = $this->createStub(PasswordReset::class);
-        $database = Database::Instance();
+        $passwordReset = $this->createStub(PasswordReset::class);
+        $cookieService = CookieService::Instance();
+        $ctx->result = ['redirectUrl' => new CUrl('https://example.com/login')];
 
-        $sut->expects($this->once())
+        $ctx->sut->expects($ctx->chain())
             ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
+            ->willReturnCallback(fn() => $validatePayloadSucceeds
+                ? $payload
+                : throw new \RuntimeException('VALIDATE_PAYLOAD_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($validatePayloadSucceeds))
             ->method('findAccountAndPasswordReset')
-            ->with('code1234')
-            ->willReturn([$account, $pr]);
-        $sut->expects($this->once())
-            ->method('doReset')
-            ->with($account, 'pass1234', $pr)
-            ->willThrowException(new \RuntimeException());
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                $callback();
-            });
+            ->with($payload->resetCode)
+            ->willReturnCallback(fn() => $findAccountAndPasswordResetSucceeds
+                ? [$account, $passwordReset]
+                : throw new \RuntimeException('FIND_ACCOUNT_AND_PASSWORD_RESET_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($findAccountAndPasswordResetSucceeds))
+            ->method('doTransaction')
+            ->with($payload->newPassword, $account, $passwordReset)
+            ->willReturnCallback(fn() => $doTransactionSucceeds
+                ? null
+                : throw new \RuntimeException('DO_TRANSACTION_FAILED'));
+        $cookieService->expects($ctx->chainIf($doTransactionSucceeds))
+            ->method('DeleteCsrfCookie')
+            ->willReturnCallback(fn() => $deleteCsrfCookieSucceeds
+                ? null
+                : throw new \RuntimeException('DELETE_CSRF_COOKIE_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($deleteCsrfCookieSucceeds))
+            ->method('composeResult')
+            ->willReturn($ctx->result);
 
+        return $ctx;
+    }
+
+    function testOnExecuteFailsIfValidatePayloadFails()
+    {
+        $ctx = $this->contextForOnExecute(validatePayloadSucceeds: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Password reset failed.");
-        ah::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('VALIDATE_PAYLOAD_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfFindAccountAndPasswordResetFails()
+    {
+        $ctx = $this->contextForOnExecute(findAccountAndPasswordResetSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('FIND_ACCOUNT_AND_PASSWORD_RESET_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfDoTransactionFails()
+    {
+        $ctx = $this->contextForOnExecute(doTransactionSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DO_TRANSACTION_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfDeleteCsrfCookieFails()
+    {
+        $ctx = $this->contextForOnExecute(deleteCsrfCookieSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DELETE_CSRF_COOKIE_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest('validatePayload',
-            'findAccountAndPasswordReset', 'doReset');
-        $payload = (object)[
-            'resetCode' => 'code1234',
-            'newPassword' => 'pass1234'
-        ];
-        $account = $this->createStub(Account::class);
-        $pr = $this->createStub(PasswordReset::class);
-        $database = Database::Instance();
-        $cookieService = CookieService::Instance();
-        $redirectUrl = new CUrl('/url/to/login');
-        $resource = Resource::Instance();
-
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('findAccountAndPasswordReset')
-            ->with('code1234')
-            ->willReturn([$account, $pr]);
-        $sut->expects($this->once())
-            ->method('doReset')
-            ->with($account, 'pass1234', $pr);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                $callback();
-            });
-        $cookieService->expects($this->once())
-            ->method('DeleteCsrfCookie');
-        $resource->expects($this->once())
-            ->method('LoginPageUrl')
-            ->with('home')
-            ->willReturn($redirectUrl);
-
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey('redirectUrl', $result);
-        $this->assertEquals($redirectUrl, $result['redirectUrl']);
+        $ctx = $this->contextForOnExecute();
+        $actual = ah::CallMethod($ctx->sut, 'onExecute');
+        $this->assertSame($ctx->result, $actual);
     }
 
     #endregion onExecute
 
     #region validatePayload ----------------------------------------------------
 
-    #[DataProvider('invalidPayloadProvider')]
-    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
+    private function contextForValidatePayload(
+        array $payload
+    ): Context
     {
-        $sut = $this->systemUnderTest();
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
 
-        $request->expects($this->once())
+        $request->expects($ctx->chain())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->once())
+        $formParams->expects($ctx->chain())
             ->method('ToArray')
             ->willReturn($payload);
 
+        return $ctx;
+    }
+
+    #[DataProvider('invalidPayloadProvider')]
+    function testValidatePayloadFails(array $payload)
+    {
+        $ctx = $this->contextForValidatePayload($payload);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'validatePayload');
+        ah::CallMethod($ctx->sut, 'validatePayload');
     }
 
     function testValidatePayloadSucceeds()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
         $payload = [
-            'resetCode' => \str_repeat('0123456789AbCdEf', 4),
-            'newPassword' => 'pass1234'
+            'resetCode'   => \str_repeat('0123456789AbCdEf', 4),
+            'newPassword' => 'pass5678'
         ];
+        $ctx = $this->contextForValidatePayload($payload);
         $expected = (object)$payload;
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($payload);
-
-        $this->assertEquals($expected, ah::CallMethod($sut, 'validatePayload'));
+        $actual = ah::CallMethod($ctx->sut, 'validatePayload');
+        $this->assertEquals($expected, $actual);
     }
 
     #endregion validatePayload
 
     #region findAccountAndPasswordReset ----------------------------------------
 
-    function testFindAccountAndPasswordResetThrowsIfPasswordResetNotFound()
+    private function contextForFindAccountAndPasswordReset(
+        bool $passwordResetFound = true,
+        bool $accountFound = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('tryFindPasswordResetByCode');
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest(
+            'tryFindPasswordResetByCode',
+            'tryFindAccountById'
+        );
+        $ctx->resetCode = 'code1234';
+        $ctx->passwordReset = $this->createStub(PasswordReset::class);
+        $ctx->passwordReset->accountId = 17;
+        $ctx->account = $this->createStub(Account::class);
 
-        $sut->expects($this->once())
+        $ctx->sut->expects($ctx->chain())
             ->method('tryFindPasswordResetByCode')
-            ->with('code1234')
-            ->willReturn(null);
+            ->with($ctx->resetCode)
+            ->willReturn($passwordResetFound ? $ctx->passwordReset : null);
+        $ctx->sut->expects($ctx->chainIf($passwordResetFound))
+            ->method('tryFindAccountById')
+            ->with($ctx->passwordReset->accountId)
+            ->willReturn($accountFound ? $ctx->account : null);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "This password reset request is no longer valid.");
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'findAccountAndPasswordReset', ['code1234']);
+        return $ctx;
     }
 
-    function testFindAccountAndPasswordResetThrowsIfAccountNotFound()
+    function testFindAccountAndPasswordResetFailsIfPasswordResetNotFound()
     {
-        $sut = $this->systemUnderTest('tryFindPasswordResetByCode',
-            'tryFindAccountById');
-        $pr = $this->createStub(PasswordReset::class);
-        $pr->accountId = 42;
-
-        $sut->expects($this->once())
-            ->method('tryFindPasswordResetByCode')
-            ->with('code1234')
-            ->willReturn($pr);
-        $sut->expects($this->once())
-            ->method('tryFindAccountById')
-            ->with(42)
-            ->willReturn(null);
-
+        $ctx = $this->contextForFindAccountAndPasswordReset(passwordResetFound: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(
-            "This password reset request is no longer valid.");
+        $this->expectExceptionMessage("This password reset request is no longer valid.");
         $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'findAccountAndPasswordReset', ['code1234']);
+        ah::CallMethod($ctx->sut, 'findAccountAndPasswordReset', [$ctx->resetCode]);
+    }
+
+    function testFindAccountAndPasswordResetFailsIfAccountNotFound()
+    {
+        $ctx = $this->contextForFindAccountAndPasswordReset(accountFound: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("This password reset request is no longer valid.");
+        $this->expectExceptionCode(StatusCode::BadRequest->value);
+        ah::CallMethod($ctx->sut, 'findAccountAndPasswordReset', [$ctx->resetCode]);
     }
 
     function testFindAccountAndPasswordResetSucceeds()
     {
-        $sut = $this->systemUnderTest('tryFindPasswordResetByCode',
-            'tryFindAccountById');
-        $pr = $this->createStub(PasswordReset::class);
-        $pr->accountId = 42;
-        $account = $this->createStub(Account::class);
-
-        $sut->expects($this->once())
-            ->method('tryFindPasswordResetByCode')
-            ->with('code1234')
-            ->willReturn($pr);
-        $sut->expects($this->once())
-            ->method('tryFindAccountById')
-            ->with(42)
-            ->willReturn($account);
-
-        $this->assertSame(
-            [$account, $pr],
-            ah::CallMethod($sut, 'findAccountAndPasswordReset', ['code1234'])
-        );
+        $ctx = $this->contextForFindAccountAndPasswordReset();
+        $actual = ah::CallMethod($ctx->sut, 'findAccountAndPasswordReset', [$ctx->resetCode]);
+        $this->assertSame([$ctx->account, $ctx->passwordReset], $actual);
     }
 
     #endregion findAccountAndPasswordReset
 
-    #region doReset ------------------------------------------------------------
+    #region doTransaction ------------------------------------------------------
 
-    function testDoResetThrowsIfAccountSaveFails()
+    private function contextForDoTransaction(
+        bool $accountSaveSucceeds = true,
+        bool $passwordResetDeleteSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
-        $pr = $this->createStub(PasswordReset::class);
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
+        $ctx->newPassword = 'pass5678';
+        $ctx->newPasswordHash = 'hash5678';
+        $ctx->account = $this->createMock(Account::class);
+        $ctx->passwordReset = $this->createMock(PasswordReset::class);
+        $database = Database::Instance();
         $securityService = SecurityService::Instance();
 
-        $securityService->expects($this->once())
+        $database->expects($ctx->chain())
+            ->method('WithTransaction')
+            ->willReturnCallback(fn($callback) => $callback());
+        $securityService->expects($ctx->chain())
             ->method('HashPassword')
-            ->with('pass1234')
-            ->willReturn('hash1234');
-        $account->expects($this->once())
+            ->with($ctx->newPassword)
+            ->willReturn($ctx->newPasswordHash);
+        $ctx->account->expects($ctx->chain())
             ->method('Save')
-            ->willReturn(false);
+            ->willReturn($accountSaveSucceeds);
+        $ctx->passwordReset->expects($ctx->chainIf($accountSaveSucceeds))
+            ->method('Delete')
+            ->willReturn($passwordResetDeleteSucceeds);
 
+        return $ctx;
+    }
+
+    function testDoTransactionFailsIfAccountSaveFails()
+    {
+        $ctx = $this->contextForDoTransaction(accountSaveSucceeds: false);
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save account.");
-        ah::CallMethod($sut, 'doReset', [$account, 'pass1234', $pr]);
+        ah::CallMethod($ctx->sut, 'doTransaction', [
+            $ctx->newPassword,
+            $ctx->account,
+            $ctx->passwordReset
+        ]);
     }
 
-    function testDoResetThrowsIfPasswordResetDeleteFails()
+    function testDoTransactionFailsIfPasswordResetDeleteFails()
     {
-        $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
-        $pr = $this->createMock(PasswordReset::class);
-        $securityService = SecurityService::Instance();
-
-        $securityService->expects($this->once())
-            ->method('HashPassword')
-            ->with('pass1234')
-            ->willReturn('hash1234');
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $pr->expects($this->once())
-            ->method('Delete')
-            ->willReturn(false);
-
+        $ctx = $this->contextForDoTransaction(passwordResetDeleteSucceeds: false);
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to delete password reset.");
-        ah::CallMethod($sut, 'doReset', [$account, 'pass1234', $pr]);
+        ah::CallMethod($ctx->sut, 'doTransaction', [
+            $ctx->newPassword,
+            $ctx->account,
+            $ctx->passwordReset
+        ]);
     }
 
-    function testDoResetSucceeds()
+    function testDoTransactionSucceeds()
+    {
+        $ctx = $this->contextForDoTransaction();
+        ah::CallMethod($ctx->sut, 'doTransaction', [
+            $ctx->newPassword,
+            $ctx->account,
+            $ctx->passwordReset
+        ]);
+        $this->assertSame($ctx->newPasswordHash, $ctx->account->passwordHash);
+    }
+
+    #endregion doTransaction
+
+    #region composeResult ------------------------------------------------------
+
+    function testComposeResult()
     {
         $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
-        $pr = $this->createMock(PasswordReset::class);
-        $securityService = SecurityService::Instance();
+        $resource = Resource::Instance();
+        $redirectUrl = new CUrl('https://example.com/login/');
+        $expected = ['redirectUrl' => $redirectUrl];
 
-        $securityService->expects($this->once())
-            ->method('HashPassword')
-            ->with('pass1234')
-            ->willReturn('hash1234');
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
-        $pr->expects($this->once())
-            ->method('Delete')
-            ->willReturn(true);
+        $resource->expects($this->once())
+            ->method('LoginPageUrl')
+            ->with('home')
+            ->willReturn($redirectUrl);
 
-        ah::CallMethod($sut, 'doReset', [$account, 'pass1234', $pr]);
-        $this->assertSame('hash1234', $account->passwordHash);
+        $actual = ah::CallMethod($sut, 'composeResult');
+
+        $this->assertSame($expected, $actual);
     }
 
-    #endregion doReset
+    #endregion composeResult
 
     #region Data Providers -----------------------------------------------------
 
-    /**
-     * @return array<string, array{
-     *   payload: array<string, mixed>,
-     *   exceptionMessage: string
-     * }>
-     */
     static function invalidPayloadProvider()
     {
         return [
-            'resetCode missing' => [
-                'payload' => [],
-                'exceptionMessage' => 'Reset code is required.'
-            ],
-            'resetCode invalid' => [
-                'payload' => [
-                    'resetCode' => 'invalid-code'
-                ],
-                'exceptionMessage' => 'Reset code format is invalid.'
-            ],
-            'newPassword missing' => [
-                'payload' => [
-                    'resetCode' => str_repeat('a', 64)
-                ],
-                'exceptionMessage' => "Required field 'newPassword' is missing."
-            ],
-            'newPassword too short' => [
-                'payload' => [
-                    'resetCode' => str_repeat('a', 64),
-                    'newPassword' => '1234567'
-                ],
-                'exceptionMessage' => "Field 'newPassword' must have a minimum length of 8 characters."
-            ],
-            'newPassword too long' => [
-                'payload' => [
-                    'resetCode' => str_repeat('a', 64),
-                    'newPassword' => str_repeat('a', 73)
-                ],
-                'exceptionMessage' => "Field 'newPassword' must have a maximum length of 72 characters."
-            ],
+            'resetCode.required' => [[
+                'newPassword' => 'pass5678'
+            ]],
+            'resetCode.regex' => [[
+                'resetCode'   => 'invalid-code',
+                'newPassword' => 'pass5678'
+            ]],
+            'newPassword.required' => [[
+                'resetCode'   => \str_repeat('a', 64)
+            ]],
+            'newPassword.string' => [[
+                'resetCode'   => \str_repeat('a', 64),
+                'newPassword' => ['not', 'a', 'string']
+            ]],
+            'newPassword.minLength' => [[
+                'resetCode'   => \str_repeat('a', 64),
+                'newPassword' => \str_repeat('a', SecurityService::PASSWORD_MIN_LENGTH - 1)
+            ]],
+            'newPassword.maxLength' => [[
+                'resetCode'   => \str_repeat('a', 64),
+                'newPassword' => \str_repeat('a', SecurityService::PASSWORD_MAX_LENGTH + 1)
+            ]],
         ];
     }
 

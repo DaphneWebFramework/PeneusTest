@@ -17,7 +17,9 @@ use \Peneus\Api\DashboardRegistry;
 use \Peneus\Model\Entity;
 use \TestToolkit\AccessHelper as ah;
 
-class _EntityValidationRulesProvider { use EntityValidationRulesProvider; }
+class _EntityValidationRulesProvider {
+    use EntityValidationRulesProvider;
+}
 
 #[CoversClass(_EntityValidationRulesProvider::class)]
 class EntityValidationRulesProviderTest extends TestCase

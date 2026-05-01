@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+namespace suite\Api\Actions\Account;
+
 use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\DataProvider;
@@ -15,10 +17,10 @@ use \Harmonia\Http\StatusCode;
 use \Harmonia\Services\CookieService;
 use \Harmonia\Systems\DatabaseSystem\Database;
 use \Peneus\Model\Account;
-use \Peneus\Model\AccountView;
 use \Peneus\Resource;
 use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as ah;
+use \TestToolkit\Context;
 
 #[CoversClass(SignInWithGoogleAction::class)]
 class SignInWithGoogleActionTest extends TestCase
@@ -69,442 +71,384 @@ class SignInWithGoogleActionTest extends TestCase
 
     #region onExecute ----------------------------------------------------------
 
-    function testOnExecuteThrowsIfUserIsLoggedIn()
+    private function contextForOnExecute(
+        bool $ensureNotLoggedInSucceeds = true,
+        bool $validatePayloadSucceeds = true,
+        bool $decodeProfileSucceeds = true,
+        bool $doTransactionSucceeds = true,
+        bool $deleteCsrfCookieSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('ensureNotLoggedIn');
-
-        $sut->expects($this->once())
-            ->method('ensureNotLoggedIn')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfPayloadValidationFails()
-    {
-        $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload');
-
-        $sut->expects($this->once())
-            ->method('ensureNotLoggedIn');
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfCredentialDecodeAndValidationFails()
-    {
-        $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload',
-            'decodeProfile');
-        $payload = (object)[
-            'credential' => 'cred1234'
-        ];
-
-        $sut->expects($this->once())
-            ->method('ensureNotLoggedIn');
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('decodeProfile')
-            ->with('cred1234')
-            ->willThrowException(new \RuntimeException('Expected message.'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Expected message.');
-        ah::CallMethod($sut, 'onExecute');
-    }
-
-    function testOnExecuteThrowsIfDoLogInFails()
-    {
-        $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload',
-            'decodeProfile', 'findOrConstructAccount', 'doLogIn', 'logOut');
-        $payload = (object)[
-            'credential' => 'cred1234'
-        ];
-        $profile = (object)[
-            'email' => 'john@example.com',
-            'displayName' => 'John'
-        ];
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest(
+            'ensureNotLoggedIn',
+            'validatePayload',
+            'decodeProfile',
+            'findOrMakeAccount',
+            'doTransaction',
+            'composeResult'
+        );
+        $payload = new \stdClass();
+        $payload->credential = 'cred1234';
+        $profile = new \stdClass();
         $account = $this->createStub(Account::class);
-        $database = Database::Instance();
+        $cookieService = CookieService::Instance();
+        $ctx->result = ['redirectUrl' => new CUrl('https://example.com/home/')];
 
-        $sut->expects($this->once())
-            ->method('ensureNotLoggedIn');
-        $sut->expects($this->once())
+        $ctx->sut->expects($ctx->chain())
+            ->method('ensureNotLoggedIn')
+            ->willReturnCallback(fn() => $ensureNotLoggedInSucceeds
+                ? null
+                : throw new \RuntimeException('ENSURE_NOT_LOGGED_IN_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($ensureNotLoggedInSucceeds))
             ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
+            ->willReturnCallback(fn() => $validatePayloadSucceeds
+                ? $payload
+                : throw new \RuntimeException('VALIDATE_PAYLOAD_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($validatePayloadSucceeds))
             ->method('decodeProfile')
-            ->with('cred1234')
-            ->willReturn($profile);
-        $sut->expects($this->once())
-            ->method('findOrConstructAccount')
+            ->with($payload->credential)
+            ->willReturnCallback(fn() => $decodeProfileSucceeds
+                ? $profile
+                : throw new \RuntimeException('DECODE_PROFILE_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($decodeProfileSucceeds))
+            ->method('findOrMakeAccount')
             ->with($profile)
             ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('doLogIn')
+        $ctx->sut->expects($ctx->chain())
+            ->method('doTransaction')
             ->with($account)
-            ->willThrowException(new \RuntimeException());
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                $callback();
-            });
-        $sut->expects($this->once())
-            ->method('logOut');
+            ->willReturnCallback(fn() => $doTransactionSucceeds
+                ? null
+                : throw new \RuntimeException('DO_TRANSACTION_FAILED'));
+        $cookieService->expects($ctx->chainIf($doTransactionSucceeds))
+            ->method('DeleteCsrfCookie')
+            ->willReturnCallback(fn() => $deleteCsrfCookieSucceeds
+                ? null
+                : throw new \RuntimeException('DELETE_CSRF_COOKIE_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($deleteCsrfCookieSucceeds))
+            ->method('composeResult')
+            ->willReturn($ctx->result);
 
+        return $ctx;
+    }
+
+    function testOnExecuteFailsIfEnsureNotLoggedInFails()
+    {
+        $ctx = $this->contextForOnExecute(ensureNotLoggedInSucceeds: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Login failed.");
-        ah::CallMethod($sut, 'onExecute');
+        $this->expectExceptionMessage('ENSURE_NOT_LOGGED_IN_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfValidatePayloadFails()
+    {
+        $ctx = $this->contextForOnExecute(validatePayloadSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('VALIDATE_PAYLOAD_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfDecodeProfileFails()
+    {
+        $ctx = $this->contextForOnExecute(decodeProfileSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DECODE_PROFILE_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfDoTransactionFails()
+    {
+        $ctx = $this->contextForOnExecute(doTransactionSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DO_TRANSACTION_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
+    }
+
+    function testOnExecuteFailsIfDeleteCsrfCookieFails()
+    {
+        $ctx = $this->contextForOnExecute(deleteCsrfCookieSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DELETE_CSRF_COOKIE_FAILED');
+        ah::CallMethod($ctx->sut, 'onExecute');
     }
 
     function testOnExecuteSucceeds()
     {
-        $sut = $this->systemUnderTest('ensureNotLoggedIn', 'validatePayload',
-            'decodeProfile', 'findOrConstructAccount', 'doLogIn', 'logOut');
-        $payload = (object)[
-            'credential' => 'cred1234'
-        ];
-        $profile = (object)[
-            'email' => 'john@example.com',
-            'displayName' => 'John'
-        ];
-        $account = $this->createStub(Account::class);
-        $database = Database::Instance();
-        $cookieService = CookieService::Instance();
-        $redirectUrl = new CUrl('/url/to/home');
-        $resource = Resource::Instance();
-
-        $sut->expects($this->once())
-            ->method('ensureNotLoggedIn');
-        $sut->expects($this->once())
-            ->method('validatePayload')
-            ->willReturn($payload);
-        $sut->expects($this->once())
-            ->method('decodeProfile')
-            ->with('cred1234')
-            ->willReturn($profile);
-        $sut->expects($this->once())
-            ->method('findOrConstructAccount')
-            ->with($profile)
-            ->willReturn($account);
-        $sut->expects($this->once())
-            ->method('doLogIn')
-            ->with($account);
-        $database->expects($this->once())
-            ->method('WithTransaction')
-            ->willReturnCallback(function($callback) {
-                $callback();
-            });
-        $sut->expects($this->never())
-            ->method('logOut');
-        $cookieService->expects($this->once())
-            ->method('DeleteCsrfCookie');
-        $resource->expects($this->once())
-            ->method('PageUrl')
-            ->with('home')
-            ->willReturn($redirectUrl);
-
-        $result = ah::CallMethod($sut, 'onExecute');
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey('redirectUrl', $result);
-        $this->assertEquals($redirectUrl, $result['redirectUrl']);
+        $ctx = $this->contextForOnExecute();
+        $actual = ah::CallMethod($ctx->sut, 'onExecute');
+        $this->assertSame($ctx->result, $actual);
     }
 
     #endregion onExecute
 
-    #region ensureNotLoggedIn --------------------------------------------------
-
-    function testEnsureNotLoggedInThrowsIfUserIsLoggedIn()
-    {
-        $sut = $this->systemUnderTest();
-        $accountView = $this->createStub(AccountView::class);
-        $accountService = AccountService::Instance();
-
-        $accountService->expects($this->once())
-            ->method('SessionAccount')
-            ->willReturn($accountView);
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("You are already logged in.");
-        $this->expectExceptionCode(StatusCode::Conflict->value);
-        ah::CallMethod($sut, 'ensureNotLoggedIn');
-    }
-
-    function testEnsureNotLoggedInSucceedsIfUserIsNotLoggedIn()
-    {
-        $sut = $this->systemUnderTest();
-        $accountService = AccountService::Instance();
-
-        $accountService->expects($this->once())
-            ->method('SessionAccount')
-            ->willReturn(null);
-
-        ah::CallMethod($sut, 'ensureNotLoggedIn');
-    }
-
-    #endregion ensureNotLoggedIn
-
     #region validatePayload ----------------------------------------------------
 
-    #[DataProvider('invalidPayloadProvider')]
-    function testValidatePayloadThrows(array $payload, string $exceptionMessage)
+    private function contextForValidatePayload(
+        array $payload
+    ): Context
     {
-        $sut = $this->systemUnderTest();
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
         $request = Request::Instance();
         $formParams = $this->createMock(CArray::class);
 
-        $request->expects($this->once())
+        $request->expects($ctx->chain())
             ->method('FormParams')
             ->willReturn($formParams);
-        $formParams->expects($this->once())
+        $formParams->expects($ctx->chain())
             ->method('ToArray')
             ->willReturn($payload);
 
+        return $ctx;
+    }
+
+    #[DataProvider('invalidPayloadProvider')]
+    function testValidatePayloadFails(array $payload)
+    {
+        $ctx = $this->contextForValidatePayload($payload);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        $this->expectExceptionCode(StatusCode::BadRequest->value);
-        ah::CallMethod($sut, 'validatePayload');
+        ah::CallMethod($ctx->sut, 'validatePayload');
     }
 
     function testValidatePayloadSucceeds()
     {
-        $sut = $this->systemUnderTest();
-        $request = Request::Instance();
-        $formParams = $this->createMock(CArray::class);
-        $payload = [
-            'credential' => 'cred1234'
-        ];
-
-        $request->expects($this->once())
-            ->method('FormParams')
-            ->willReturn($formParams);
-        $formParams->expects($this->once())
-            ->method('ToArray')
-            ->willReturn($payload);
-
-        $this->assertEquals((object)$payload, ah::CallMethod($sut, 'validatePayload'));
+        $payload = ['credential' => 'cred1234'];
+        $ctx = $this->contextForValidatePayload($payload);
+        $expected = (object)$payload;
+        $actual = ah::CallMethod($ctx->sut, 'validatePayload');
+        $this->assertEquals($expected, $actual);
     }
 
     #endregion validatePayload
 
     #region decodeProfile ------------------------------------------------------
 
-    function testDecodeProfileThrowsIfCredentialDecodeFails()
+    private function contextForDecodeProfile(
+        bool $decodeCredentialSucceeds = true,
+        bool $validateClientIdSucceeds = true,
+        bool $validateClaimsSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('decodeCredential');
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest(
+            'decodeCredential',
+            'validateClientId',
+            'validateClaims'
+        );
+        $ctx->credential = 'cred1234';
+        $claims = ['foo' => 'bar'];
+        $clientId = '1234567890.apps.googleusercontent.com';
+        $ctx->profile = new \stdClass();
+        $ctx->profile->email = 'john@example.com';
+        $ctx->profile->displayName = 'John';
 
-        $sut->expects($this->once())
+        $ctx->sut->expects($ctx->chain())
             ->method('decodeCredential')
-            ->with('credential')
-            ->willReturn(null);
+            ->with($ctx->credential)
+            ->willReturn($decodeCredentialSucceeds ? $claims : null);
+        $ctx->sut->expects($ctx->chainIf($decodeCredentialSucceeds))
+            ->method('validateClientId')
+            ->willReturnCallback(fn() => $validateClientIdSucceeds
+                ? $clientId
+                : throw new \RuntimeException('VALIDATE_CLIENT_ID_FAILED'));
+        $ctx->sut->expects($ctx->chainIf($validateClientIdSucceeds))
+            ->method('validateClaims')
+            ->with($claims, $clientId)
+            ->willReturnCallback(fn() => $validateClaimsSucceeds
+                ? $ctx->profile
+                : throw new \RuntimeException('VALIDATE_CLAIMS_FAILED'));
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Invalid credential.");
-        ah::CallMethod($sut, 'decodeProfile', ['credential']);
+        return $ctx;
     }
 
-    function testDecodeProfileThrowsIfClaimsValidationFails()
+    function testDecodeProfileFailsIfDecodeCredentialFails()
     {
-        $sut = $this->systemUnderTest('decodeCredential', 'validateClaims');
-        $claims = ['key' => 'value'];
-
-        $sut->expects($this->once())
-            ->method('decodeCredential')
-            ->with('credential')
-            ->willReturn($claims);
-        $sut->expects($this->once())
-            ->method('validateClaims')
-            ->with($claims)
-            ->willThrowException(new \RuntimeException());
-
+        $ctx = $this->contextForDecodeProfile(decodeCredentialSucceeds: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("Invalid claims.");
-        ah::CallMethod($sut, 'decodeProfile', ['credential']);
+        $this->expectExceptionMessage("Invalid credential.");
+        ah::CallMethod($ctx->sut, 'decodeProfile', [$ctx->credential]);
+    }
+
+    function testDecodeProfileFailsIfValidateClientIdFails()
+    {
+        $ctx = $this->contextForDecodeProfile(validateClientIdSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('VALIDATE_CLIENT_ID_FAILED');
+        ah::CallMethod($ctx->sut, 'decodeProfile', [$ctx->credential]);
+    }
+
+    function testDecodeProfileFailsIfValidateClaimsFails()
+    {
+        $ctx = $this->contextForDecodeProfile(validateClaimsSucceeds: false);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('VALIDATE_CLAIMS_FAILED');
+        ah::CallMethod($ctx->sut, 'decodeProfile', [$ctx->credential]);
     }
 
     function testDecodeProfileSucceeds()
     {
-        $sut = $this->systemUnderTest('decodeCredential', 'validateClaims');
-        $claims = ['foo' => 'bar'];
-        $profile = (object)['baz' => 'qux'];
-
-        $sut->expects($this->once())
-            ->method('decodeCredential')
-            ->with('credential')
-            ->willReturn($claims);
-        $sut->expects($this->once())
-            ->method('validateClaims')
-            ->with($claims)
-            ->willReturn($profile);
-
-        $this->assertSame(
-            $profile,
-            ah::CallMethod($sut, 'decodeProfile', ['credential'])
-        );
+        $ctx = $this->contextForDecodeProfile();
+        $actual = ah::CallMethod($ctx->sut, 'decodeProfile', [$ctx->credential]);
+        $this->assertSame($ctx->profile, $actual);
     }
 
     #endregion decodeProfile
 
     #region decodeCredential ---------------------------------------------------
 
-    function testDecodeCredentialReturnsNullIfClientSendFails()
+    private function contextForDecodeCredential(
+        bool $sendSucceeds = true,
+        int $statusCode = 200,
+        string $body = '{"foo":"bar"}'
+    ): Context
     {
-        $sut = $this->systemUnderTest();
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
+        $ctx->credential = 'cred1234';
+        $url = "https://oauth2.googleapis.com/tokeninfo?id_token={$ctx->credential}";
 
-        $this->client->expects($this->once())
+        $this->client->expects($ctx->chain())
             ->method('Url')
-            ->with('https://oauth2.googleapis.com/tokeninfo?id_token=cred1234')
+            ->with($url)
             ->willReturnSelf();
-        $this->client->expects($this->once())
+        $this->client->expects($ctx->chain())
             ->method('Send')
-            ->willReturn(false);
-
-        $claims = ah::CallMethod($sut, 'decodeCredential', ['cred1234']);
-        $this->assertNull($claims);
-    }
-
-    function testDecodeCredentialReturnsNullIfClientStatusCodeIsNot200()
-    {
-        $sut = $this->systemUnderTest();
-
-        $this->client->expects($this->once())
-            ->method('Url')
-            ->with('https://oauth2.googleapis.com/tokeninfo?id_token=cred1234')
-            ->willReturnSelf();
-        $this->client->expects($this->once())
-            ->method('Send')
-            ->willReturn(true);
-        $this->client->expects($this->once())
+            ->willReturn($sendSucceeds);
+        $this->client->expects($ctx->chainIf($sendSucceeds))
             ->method('StatusCode')
-            ->willReturn(400);
-
-        $claims = ah::CallMethod($sut, 'decodeCredential', ['cred1234']);
-        $this->assertNull($claims);
-    }
-
-    function testDecodeCredentialReturnsNullIfClientBodyCannotBeDecoded()
-    {
-        $sut = $this->systemUnderTest();
-
-        $this->client->expects($this->once())
-            ->method('Url')
-            ->with('https://oauth2.googleapis.com/tokeninfo?id_token=cred1234')
-            ->willReturnSelf();
-        $this->client->expects($this->once())
-            ->method('Send')
-            ->willReturn(true);
-        $this->client->expects($this->once())
-            ->method('StatusCode')
-            ->willReturn(200);
-        $this->client->expects($this->once())
+            ->willReturn($statusCode);
+        $this->client->expects($ctx->chainIf($statusCode === 200))
             ->method('Body')
-            ->willReturn('{invalid');
+            ->willReturn($body);
 
-        $claims = ah::CallMethod($sut, 'decodeCredential', ['cred1234']);
-        $this->assertNull($claims);
+        return $ctx;
+    }
+
+    function testDecodeCredentialFailsIfClientSendFails()
+    {
+        $ctx = $this->contextForDecodeCredential(sendSucceeds: false);
+        $actual = ah::CallMethod($ctx->sut, 'decodeCredential', [$ctx->credential]);
+        $this->assertNull($actual);
+    }
+
+    function testDecodeCredentialFailsIfClientStatusCodeIsNot200()
+    {
+        $ctx = $this->contextForDecodeCredential(statusCode: 400);
+        $actual = ah::CallMethod($ctx->sut, 'decodeCredential', [$ctx->credential]);
+        $this->assertNull($actual);
+    }
+
+    function testDecodeCredentialFailsIfClientBodyCannotBeDecoded()
+    {
+        $ctx = $this->contextForDecodeCredential(body: '{invalid');
+        $actual = ah::CallMethod($ctx->sut, 'decodeCredential', [$ctx->credential]);
+        $this->assertNull($actual);
     }
 
     function testDecodeCredentialSucceeds()
     {
-        $sut = $this->systemUnderTest();
-
-        $this->client->expects($this->once())
-            ->method('Url')
-            ->with('https://oauth2.googleapis.com/tokeninfo?id_token=cred1234')
-            ->willReturnSelf();
-        $this->client->expects($this->once())
-            ->method('Send')
-            ->willReturn(true);
-        $this->client->expects($this->once())
-            ->method('StatusCode')
-            ->willReturn(200);
-        $this->client->expects($this->once())
-            ->method('Body')
-            ->willReturn('{"foo":"bar"}');
-
-        $claims = ah::CallMethod($sut, 'decodeCredential', ['cred1234']);
-        $this->assertSame(['foo' => 'bar'], $claims);
+        $ctx = $this->contextForDecodeCredential();
+        $expected = ['foo' => 'bar'];
+        $actual = ah::CallMethod($ctx->sut, 'decodeCredential', [$ctx->credential]);
+        $this->assertSame($expected, $actual);
     }
 
     #endregion decodeCredential
 
-    #region validateClaims -----------------------------------------------------
+    #region validateClientId ---------------------------------------------------
 
-    #[TestWith([null])]
-    #[TestWith([''])]
-    #[TestWith(['.apps.googleusercontent.com'])]
-    #[TestWith(['"!^+%.apps.googleusercontent.com'])]
-    function testValidateClaimsThrowsIfConfigClientIdIsMissingOrInvalid(
+    private function contextForValidateClientId(
         ?string $clientId
-    ) {
-        $sut = $this->systemUnderTest();
+    ): Context
+    {
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest();
         $config = Config::Instance();
-        $claims = [];
 
-        $config->expects($this->once())
+        $config->expects($ctx->chain())
             ->method('Option')
             ->with('Google.OAuth2.ClientID')
             ->willReturn($clientId);
 
+        return $ctx;
+    }
+
+    #[DataProvider('invalidClientIdProvider')]
+    function testValidateClientIdFails(?string $clientId)
+    {
+        $ctx = $this->contextForValidateClientId($clientId);
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Missing or invalid Google OAuth 2.0 client ID.");
-        ah::CallMethod($sut, 'validateClaims', [$claims]);
+        ah::CallMethod($ctx->sut, 'validateClientId');
+    }
+
+    function testValidateClientIdSucceeds()
+    {
+        $clientId = '1234567890.apps.googleusercontent.com';
+        $ctx = $this->contextForValidateClientId($clientId);
+        $actual = ah::CallMethod($ctx->sut, 'validateClientId');
+        $this->assertEquals($clientId, $actual);
+    }
+
+    #endregion validateClientId
+
+    #region validateClaims -----------------------------------------------------
+
+    private function contextForValidateClaims(
+        array $claims,
+        bool $isValid = true
+    ): Context
+    {
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest('normalizeDisplayName');
+        $ctx->clientId = '1234567890.apps.googleusercontent.com';
+        $ctx->displayName = 'Display Name';
+
+        $ctx->sut->expects($ctx->chainIf($isValid))
+            ->method('normalizeDisplayName')
+            ->with(
+                $isValid ? $claims['name'] : '',
+                $isValid ? $claims['email'] : '',
+                $isValid ? $claims['sub'] : ''
+            )
+            ->willReturn($ctx->displayName);
+
+        return $ctx;
     }
 
     #[DataProvider('invalidClaimsProvider')]
-    function testValidateClaimsThrows(array $claims, string $exceptionMessage)
+    function testValidateClaimsFails(array $claims)
     {
-        $sut = $this->systemUnderTest();
-        $config = Config::Instance();
-
-        $config->expects($this->once())
-            ->method('Option')
-            ->with('Google.OAuth2.ClientID')
-            ->willReturn('1234567890.apps.googleusercontent.com');
-
+        $ctx = $this->contextForValidateClaims($claims, isValid: false);
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage($exceptionMessage);
-        ah::CallMethod($sut, 'validateClaims', [$claims]);
+        ah::CallMethod($ctx->sut, 'validateClaims', [
+            $claims,
+            $ctx->clientId
+        ]);
     }
 
     function testValidateClaimsSucceeds()
     {
-        $sut = $this->systemUnderTest('normalizeDisplayName');
-        $config = Config::Instance();
         $claims = [
-            'iss' => 'https://accounts.google.com',
-            'aud' => '1234567890.apps.googleusercontent.com',
-            'sub' => '1234567890',
-            'exp' => '253402300799',
+            'iss'   => 'https://accounts.google.com',
+            'aud'   => '1234567890.apps.googleusercontent.com',
+            'sub'   => '1234567890',
+            'exp'   => '253402300799',
             'email_verified' => 'true',
             'email' => 'john@example.com',
-            'name' => 'John'
+            'name'  => 'John'
         ];
-        $profile = (object)[
-            'email' => 'john@example.com',
-            'displayName' => 'John'
+        $ctx = $this->contextForValidateClaims($claims);
+        $expected = (object)[
+            'email'       => $claims['email'],
+            'displayName' => $ctx->displayName
         ];
-
-        $config->expects($this->once())
-            ->method('Option')
-            ->with('Google.OAuth2.ClientID')
-            ->willReturn('1234567890.apps.googleusercontent.com');
-        $sut->expects($this->once())
-            ->method('normalizeDisplayName')
-            ->with('John', 'john@example.com', '1234567890')
-            ->willReturn('John');
-
-        $this->assertEquals(
-            $profile,
-            ah::CallMethod($sut, 'validateClaims', [$claims])
-        );
+        $actual = ah::CallMethod($ctx->sut, 'validateClaims', [
+            $claims,
+            $ctx->clientId
+        ]);
+        $this->assertEquals($expected, $actual);
     }
 
     #endregion validateClaims
@@ -519,7 +463,6 @@ class SignInWithGoogleActionTest extends TestCase
         string $sub
     ) {
         $sut = $this->systemUnderTest();
-
         $actual = ah::CallMethod($sut, 'normalizeDisplayName', [
             $name,
             $email,
@@ -530,399 +473,408 @@ class SignInWithGoogleActionTest extends TestCase
 
     #endregion normalizeDisplayName
 
-    #region findOrConstructAccount ---------------------------------------------
+    #region findOrMakeAccount --------------------------------------------------
 
-    function testFindOrConstructAccountWithExistingRecord()
+    private function contextForFindOrMakeAccount(
+        bool $entityExists = true
+    ): Context
     {
-        $sut = $this->systemUnderTest('tryFindAccountByEmail', 'constructAccount');
-        $profile = (object)[
-            'email' => 'john@example.com',
-            'displayName' => 'John'
-        ];
-        $account = $this->createStub(Account::class);
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest('tryFindAccountByEmail', 'makeAccount');
+        $ctx->profile = new \stdClass();
+        $ctx->profile->email = 'john@example.com';
+        $ctx->existingEntity = $this->createStub(Account::class);
+        $ctx->newEntity = $this->createStub(Account::class);
 
-        $sut->expects($this->once())
+        $ctx->sut->expects($ctx->chain())
             ->method('tryFindAccountByEmail')
-            ->with('john@example.com')
-            ->willReturn($account);
-        $sut->expects($this->never())
-            ->method('constructAccount');
+            ->with($ctx->profile->email)
+            ->willReturn($entityExists ? $ctx->existingEntity : null);
+        $ctx->sut->expects($ctx->chainIf(!$entityExists))
+            ->method('makeAccount')
+            ->with($ctx->profile)
+            ->willReturn($ctx->newEntity);
 
-        $this->assertSame(
-            $account,
-            ah::CallMethod($sut, 'findOrConstructAccount', [$profile])
-        );
+        return $ctx;
     }
 
-    function testFindOrConstructAccountWithNonExistingRecord()
+    function testFindOrMakeAccountReturnsExistingIfFound()
     {
-        $sut = $this->systemUnderTest('tryFindAccountByEmail', 'constructAccount');
-        $profile = (object)[
-            'email' => 'john@example.com',
-            'displayName' => 'John'
-        ];
-        $account = $this->createStub(Account::class);
-
-        $sut->expects($this->once())
-            ->method('tryFindAccountByEmail')
-            ->with('john@example.com')
-            ->willReturn(null);
-        $sut->expects($this->once())
-            ->method('constructAccount')
-            ->with($profile)
-            ->willReturn($account);
-
-        $this->assertSame(
-            $account,
-            ah::CallMethod($sut, 'findOrConstructAccount', [$profile])
-        );
+        $ctx = $this->contextForFindOrMakeAccount(entityExists: true);
+        $actual = ah::CallMethod($ctx->sut, 'findOrMakeAccount', [$ctx->profile]);
+        $this->assertSame($ctx->existingEntity, $actual);
     }
 
-    #endregion findOrConstructAccount
+    function testFindOrMakeAccountReturnsNewIfNotFound()
+    {
+        $ctx = $this->contextForFindOrMakeAccount(entityExists: false);
+        $actual = ah::CallMethod($ctx->sut, 'findOrMakeAccount', [$ctx->profile]);
+        $this->assertSame($ctx->newEntity, $actual);
+    }
 
-    #region constructAccount ---------------------------------------------------
+    #endregion findOrMakeAccount
 
-    function testConstructAccount()
+    #region makeAccount --------------------------------------------------------
+
+    function testMakeAccount()
     {
         $sut = $this->systemUnderTest();
-        $profile = (object)[
-            'email' => 'john@example.com',
-            'displayName' => 'John'
-        ];
+        $email = 'john@example.com';
+        $displayName = 'John';
+        $profile = new \stdClass();
+        $profile->email = $email;
+        $profile->displayName = $displayName;
 
-        $account = ah::CallMethod($sut, 'constructAccount', [$profile]);
+        $account = ah::CallMethod($sut, 'makeAccount', [$profile]);
+
         $this->assertInstanceOf(Account::class, $account);
-        $this->assertSame(0, $account->id);
-        $this->assertSame($profile->email, $account->email);
-        $this->assertSame('', $account->passwordHash);
-        $this->assertSame($profile->displayName, $account->displayName);
+        $this->assertSame(0,                  $account->id);
+        $this->assertSame($email,             $account->email);
+        $this->assertSame('',                 $account->passwordHash);
+        $this->assertSame($displayName,       $account->displayName);
         $this->assertEqualsWithDelta(\time(), $account->timeActivated->getTimestamp(), 1);
-        $this->assertNull($account->timeLastLogin);
+        $this->assertNull(                    $account->timeLastLogin);
     }
 
-    #endregion constructAccount
+    #endregion makeAccount
 
-    #region doLogIn ------------------------------------------------------------
+    #region doTransaction ------------------------------------------------------
 
-    function testDoLogInThrowsIfAccountSaveFails()
+    private function contextForDoTransaction(
+        bool $isRegistering,
+        bool $accountSaveSucceeds = true,
+        bool $triggerActivationHooksSucceeds = true,
+        bool $sessionCreateSucceeds = true
+    ): Context
     {
-        $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
-        $account->id = 42;
+        $ctx = new Context($this);
+        $ctx->sut = $this->systemUnderTest('triggerActivationHooks', 'tryLogOut');
+        $ctx->account = $this->createMock(Account::class);
+        $ctx->account->id = $isRegistering ? 0 : 17;
+        $database = Database::Instance();
         $accountService = AccountService::Instance();
 
-        $account->expects($this->once())
+        $database->expects($ctx->chain())
+            ->method('WithTransaction')
+            ->willReturnCallback(fn($callback) => $callback());
+        $ctx->account->expects($ctx->chain())
             ->method('Save')
-            ->willReturn(false);
-        $accountService->expects($this->never())
-            ->method('CreateSession');
+            ->willReturn($accountSaveSucceeds);
+        $ctx->sut->expects($isRegistering
+                ? $ctx->chainIf($accountSaveSucceeds)
+                : $this->never())
+            ->method('triggerActivationHooks')
+            ->with($ctx->account)
+            ->willReturnCallback(fn() => $triggerActivationHooksSucceeds
+                ? null
+                : throw new \RuntimeException('TRIGGER_ACTIVATION_HOOKS_FAILED'));
+        $accountService->expects($ctx->chainIf($isRegistering
+                ? $triggerActivationHooksSucceeds
+                : $accountSaveSucceeds))
+            ->method('CreateSession')
+            ->with($ctx->account->id, true)
+            ->willReturnCallback(fn() => $sessionCreateSucceeds
+                ? null
+                : throw new \RuntimeException('SESSION_CREATE_FAILED'));
+        $ctx->update($sessionCreateSucceeds);
+        $ctx->sut->expects($ctx->isFailed()
+                ? $this->once()
+                : $this->never())
+            ->method('tryLogOut');
 
+        return $ctx;
+    }
+
+    function testDoTransactionFailsIfAccountSaveFails()
+    {
+        $ctx = $this->contextForDoTransaction(
+            isRegistering: false,
+            accountSaveSucceeds: false
+        );
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Failed to save account.");
-        ah::CallMethod($sut, 'doLogIn', [$account]);
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->account]);
     }
 
-    function testDoLogInSucceeds()
+    function testDoTransactionFailsIfTriggerActivationHooksFails()
+    {
+        $ctx = $this->contextForDoTransaction(
+            isRegistering: true,
+            triggerActivationHooksSucceeds: false
+        );
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('TRIGGER_ACTIVATION_HOOKS_FAILED');
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->account]);
+    }
+
+    #[TestWith([false])]
+    #[TestWith([true ])]
+    function testDoTransactionFailsIfSessionCreateFails(bool $isRegistering)
+    {
+        $ctx = $this->contextForDoTransaction(
+            isRegistering: $isRegistering,
+            sessionCreateSucceeds: false
+        );
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('SESSION_CREATE_FAILED');
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->account]);
+    }
+
+    #[TestWith([false])]
+    #[TestWith([true ])]
+    function testDoTransactionSucceeds(bool $isRegistering)
+    {
+        $ctx = $this->contextForDoTransaction(isRegistering: $isRegistering);
+        ah::CallMethod($ctx->sut, 'doTransaction', [$ctx->account]);
+        $this->assertEqualsWithDelta(\time(), $ctx->account->timeLastLogin->getTimestamp(), 1);
+    }
+
+    #endregion doTransaction
+
+    #region tryLogOut ----------------------------------------------------------
+
+    #[TestWith([true ])]
+    #[TestWith([false])]
+    function testTryLogOut(bool $sessionDeleteSucceeds)
     {
         $sut = $this->systemUnderTest();
-        $account = $this->createMock(Account::class);
-        $account->id = 42;
         $accountService = AccountService::Instance();
 
-        $account->expects($this->once())
-            ->method('Save')
-            ->willReturn(true);
         $accountService->expects($this->once())
-            ->method('CreateSession')
-            ->with($account->id, true);
+            ->method('DeleteSession')
+            ->willReturnCallback(fn() => $sessionDeleteSucceeds
+                ? null
+                : throw new \RuntimeException());
 
-        ah::CallMethod($sut, 'doLogIn', [$account]);
-        $this->assertEqualsWithDelta(\time(), $account->timeLastLogin->getTimestamp(), 1);
+        ah::CallMethod($sut, 'tryLogOut');
     }
 
-    #endregion doLogIn
+    #endregion tryLogOut
 
-    #region logOut -------------------------------------------------------------
+    #region composeResult ------------------------------------------------------
 
-    function testLogOut()
+    function testComposeResult()
     {
         $sut = $this->systemUnderTest();
-        $accountService = AccountService::Instance();
+        $resource = Resource::Instance();
+        $redirectUrl = new CUrl('https://example.com/home/');
+        $expected = ['redirectUrl' => $redirectUrl];
 
-        $accountService->expects($this->once())
-            ->method('DeleteSession');
+        $resource->expects($this->once())
+            ->method('PageUrl')
+            ->with('home')
+            ->willReturn($redirectUrl);
 
-        ah::CallMethod($sut, 'logOut');
+        $actual = ah::CallMethod($sut, 'composeResult');
+
+        $this->assertSame($expected, $actual);
     }
 
-    #endregion logOut
+    #endregion composeResult
 
     #region Data Providers -----------------------------------------------------
 
-    /**
-     * @return array<string, array{
-     *   payload: array<string, mixed>,
-     *   exceptionMessage: string
-     * }>
-     */
     static function invalidPayloadProvider()
     {
         return [
-            'credential missing' => [
-                'payload' => [],
-                'exceptionMessage' => "Required field 'credential' is missing."
-            ],
-            'credential not a string' => [
-                'payload' => [
-                    'credential' => 42
-                ],
-                'exceptionMessage' => "Field 'credential' must be a string."
-            ],
-            'credential empty' => [
-                'payload' => [
-                    'credential' => ''
-                ],
-                'exceptionMessage' => "Field 'credential' must have a minimum length of 1 characters."
-            ],
+            'credential.required' => [[
+                // empty
+            ]],
+            'credential.string' => [[
+                'credential' => ['not', 'a', 'string']
+            ]],
+            'credential.minLength' => [[
+                'credential' => ''
+            ]],
+        ];
+    }
+
+    static function invalidClientIdProvider()
+    {
+        return [
+            [null],
+            [''],
+            ['.apps.googleusercontent.com'],
+            ['"!^+%.apps.googleusercontent.com']
         ];
     }
 
     static function invalidClaimsProvider()
     {
         return [
-            'iss missing' => [
-                'claims' => [
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Required field 'iss' is missing."
-            ],
-            'iss not a string' => [
-                'claims' => [
-                    'iss' => 42,
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Field 'iss' must be a string."
-            ],
-            'iss not one of the expected values' => [
-                'claims' => [
-                    'iss' => 'https://example.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Field 'iss' failed custom validation."
-            ],
-            'aud missing' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Required field 'aud' is missing."
-            ],
-            'aud not a string' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => 42,
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Field 'aud' must be a string."
-            ],
-            'aud does not match expected value' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '0987654321.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Field 'aud' failed custom validation."
-            ],
-            'sub missing' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Required field 'sub' is missing."
-            ],
-            'sub not a string' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => 42,
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Field 'sub' must be a string."
-            ],
-            'sub empty' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '',
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Field 'sub' must have a minimum length of 1 characters."
-            ],
-            'sub too long' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => str_repeat('9', 256),
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Field 'sub' must have a maximum length of 255 characters."
-            ],
-            'exp missing' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Required field 'exp' is missing."
-            ],
-            'exp not an integer' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => 'not-an-integer',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Field 'exp' must be an integer."
-            ],
-            'exp not in the future' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => \time() - 5000,
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Field 'exp' failed custom validation."
-            ],
-            'email_verified missing' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Required field 'email_verified' is missing."
-            ],
-            'email_verified not a string' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email_verified' => true,
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Field 'email_verified' must be a string."
-            ],
-            'email_verified does not match expected value' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email_verified' => 'false',
-                    'email' => 'john@example.com',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Field 'email_verified' failed custom validation."
-            ],
-            'email missing' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Required field 'email' is missing."
-            ],
-            'email invalid' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'invalid-email',
-                    'name' => 'John'
-                ],
-                'exceptionMessage' => "Field 'email' must be a valid email address."
-            ],
-            'name missing' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                ],
-                'exceptionMessage' => "Required field 'name' is missing."
-            ],
-            'name not a string' => [
-                'claims' => [
-                    'iss' => 'https://accounts.google.com',
-                    'aud' => '1234567890.apps.googleusercontent.com',
-                    'sub' => '1234567890',
-                    'exp' => '253402300799',
-                    'email_verified' => 'true',
-                    'email' => 'john@example.com',
-                    'name' => 42
-                ],
-                'exceptionMessage' => "Field 'name' must be a string."
-            ],
+            'iss.required' => [[
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'iss.string' => [[
+                'iss' => ['not', 'a', 'string'],
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'iss.custom' => [[
+                'iss' => 'https://example.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'aud.required' => [[
+                'iss' => 'https://accounts.google.com',
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'aud.string' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => ['not', 'a', 'string'],
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'aud.custom' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '0987654321.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'sub.required' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'sub.string' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => ['not', 'a', 'string'],
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'sub.minLength' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '',
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'sub.maxLength' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => str_repeat('9', 256),
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'exp.required' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'exp.integer' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => 'not-an-integer',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'exp.custom' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => \time() - 5000,
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'email_verified.required' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'email_verified.string' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email_verified' => true,
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'email_verified.custom' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email_verified' => 'false',
+                'email' => 'john@example.com',
+                'name' => 'John'
+            ]],
+            'email.required' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'name' => 'John'
+            ]],
+            'email.email' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'not-an-email',
+                'name' => 'John'
+            ]],
+            'name.required' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+            ]],
+            'name.string' => [[
+                'iss' => 'https://accounts.google.com',
+                'aud' => '1234567890.apps.googleusercontent.com',
+                'sub' => '1234567890',
+                'exp' => '253402300799',
+                'email_verified' => 'true',
+                'email' => 'john@example.com',
+                'name' => ['not', 'a', 'string']
+            ]],
         ];
     }
 
@@ -931,33 +883,33 @@ class SignInWithGoogleActionTest extends TestCase
         return [
             'name matches pattern' => [
                 'expected' => 'John',
-                'name' => 'John',
-                'email' => 'john@example.com',
-                'sub' => '1234567890'
+                'name'     => 'John',
+                'email'    => 'john@example.com',
+                'sub'      => '1234567890'
             ],
             'name matches pattern, name has leading and trailing whitespace' => [
                 'expected' => 'John',
-                'name' => '  John  ',
-                'email' => 'john@example.com',
-                'sub' => '1234567890'
+                'name'     => '  John  ',
+                'email'    => 'john@example.com',
+                'sub'      => '1234567890'
             ],
             'name does not match pattern, email local part matches pattern' => [
                 'expected' => 'john',
-                'name' => '<invalid-display-name>',
-                'email' => 'john@example.com',
-                'sub' => '1234567890'
+                'name'     => '<invalid-display-name>',
+                'email'    => 'john@example.com',
+                'sub'      => '1234567890'
             ],
             'name does not match pattern, email does not contain "@"' => [
                 'expected' => 'User_1234567890',
-                'name' => '<invalid-display-name>',
-                'email' => 'invalid-email',
-                'sub' => '1234567890'
+                'name'     => '<invalid-display-name>',
+                'email'    => 'invalid-email',
+                'sub'      => '1234567890'
             ],
             'name does not match pattern, email local part does not match pattern' => [
                 'expected' => 'User_1234567890',
-                'name' => '<invalid-display-name>',
-                'email' => '<invalid-email-local-part>@example.com',
-                'sub' => '1234567890'
+                'name'     => '<invalid-display-name>',
+                'email'    => '<invalid-email-local-part>@example.com',
+                'sub'      => '1234567890'
             ],
         ];
     }

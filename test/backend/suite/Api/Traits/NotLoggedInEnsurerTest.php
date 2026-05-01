@@ -5,7 +5,7 @@ use \PHPUnit\Framework\TestCase;
 use \PHPUnit\Framework\Attributes\CoversClass;
 use \PHPUnit\Framework\Attributes\TestWith;
 
-use \Peneus\Api\Traits\LoggedInEnsurer;
+use \Peneus\Api\Traits\NotLoggedInEnsurer;
 
 use \Harmonia\Http\StatusCode;
 use \Peneus\Model\AccountView;
@@ -13,20 +13,20 @@ use \Peneus\Services\AccountService;
 use \TestToolkit\AccessHelper as ah;
 use \TestToolkit\Context;
 
-class _LoggedInEnsurerWithAccountService {
-    use LoggedInEnsurer;
+class _NotLoggedInEnsurerWithAccountService {
+    use NotLoggedInEnsurer;
     private readonly AccountService $accountService;
     public function __construct() {
         $this->accountService = AccountService::Instance();
     }
 }
-class _LoggedInEnsurerWithoutAccountService {
-    use LoggedInEnsurer;
+class _NotLoggedInEnsurerWithoutAccountService {
+    use NotLoggedInEnsurer;
 }
 
-#[CoversClass(_LoggedInEnsurerWithAccountService::class)]
-#[CoversClass(_LoggedInEnsurerWithoutAccountService::class)]
-class LoggedInEnsurerTest extends TestCase
+#[CoversClass(_NotLoggedInEnsurerWithAccountService::class)]
+#[CoversClass(_NotLoggedInEnsurerWithoutAccountService::class)]
+class NotLoggedInEnsurerTest extends TestCase
 {
     private ?AccountService $originalAccountService = null;
 
@@ -44,13 +44,13 @@ class LoggedInEnsurerTest extends TestCase
     private function systemUnderTest(bool $hasAccountService): object
     {
         return $hasAccountService
-            ? new _LoggedInEnsurerWithAccountService()
-            : new _LoggedInEnsurerWithoutAccountService();
+            ? new _NotLoggedInEnsurerWithAccountService()
+            : new _NotLoggedInEnsurerWithoutAccountService();
     }
 
-    #region ensureLoggedIn -----------------------------------------------------
+    #region ensureNotLoggedIn --------------------------------------------------
 
-    private function contextForEnsureLoggedIn(
+    private function contextForEnsureNotLoggedIn(
         bool $hasAccountService,
         bool $isLoggedIn
     ): Context
@@ -69,29 +69,28 @@ class LoggedInEnsurerTest extends TestCase
 
     #[TestWith([true ])]
     #[TestWith([false])]
-    function testEnsureLoggedInFailsIfUserNotLoggedIn(bool $hasAccountService)
+    function testEnsureNotLoggedInFailsIfUserIsLoggedIn(bool $hasAccountService)
     {
-        $ctx = $this->contextForEnsureLoggedIn(
+        $ctx = $this->contextForEnsureNotLoggedIn(
             hasAccountService: $hasAccountService,
-            isLoggedIn: false
+            isLoggedIn: true
         );
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage("You do not have permission to perform this action.");
-        $this->expectExceptionCode(StatusCode::Unauthorized->value);
-        ah::CallMethod($ctx->sut, 'ensureLoggedIn');
+        $this->expectExceptionMessage("You are already logged in.");
+        $this->expectExceptionCode(StatusCode::Conflict->value);
+        ah::CallMethod($ctx->sut, 'ensureNotLoggedIn');
     }
 
     #[TestWith([true ])]
     #[TestWith([false])]
-    function testEnsureLoggedInSucceeds(bool $hasAccountService)
+    function testEnsureNotLoggedInSucceedsIfUserIsNotLoggedIn(bool $hasAccountService)
     {
-        $ctx = $this->contextForEnsureLoggedIn(
+        $ctx = $this->contextForEnsureNotLoggedIn(
             hasAccountService: $hasAccountService,
-            isLoggedIn: true
+            isLoggedIn: false
         );
-        $actual = ah::CallMethod($ctx->sut, 'ensureLoggedIn');
-        $this->assertSame($ctx->accountView, $actual);
+        ah::CallMethod($ctx->sut, 'ensureNotLoggedIn');
     }
 
-    #endregion ensureLoggedIn
+    #endregion ensureNotLoggedIn
 }
